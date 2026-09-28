@@ -2,6 +2,9 @@ import type { CategoryId, ToolDefinition } from '../types';
 import { CATEGORIES, getCategory } from '../categories';
 import { createSearchIndex } from '@/lib/search';
 import { workspaceTools } from './workspace';
+import { workspaceSnippetsTools } from './workspace-snippets';
+import { workspaceDataTools } from './workspace-data';
+import { workspaceApiTools } from './workspace-api';
 import { pdfTools } from './pdf';
 import { imageTools } from './image';
 import { jsonTools } from './json';
@@ -26,6 +29,9 @@ import { filesTools } from './files';
  */
 export const TOOLS: ToolDefinition[] = [
   ...workspaceTools,
+  ...workspaceSnippetsTools,
+  ...workspaceDataTools,
+  ...workspaceApiTools,
   ...pdfTools,
   ...imageTools,
   ...jsonTools,
