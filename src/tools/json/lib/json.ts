@@ -1,3 +1,5 @@
+import { scanJson } from './jsonScan';
+
 export interface JsonParseError {
   message: string;
   line: number;
@@ -45,11 +47,24 @@ function describe(text: string, error: unknown): JsonParseError {
   return { message, line, column };
 }
 
-export function parseJson<T = unknown>(text: string): ParseResult<T> {
+/** Remove a leading UTF-8 byte order mark, which JSON.parse rejects. */
+export function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+export function parseJson<T = unknown>(input: string): ParseResult<T> {
+  const text = stripBom(input);
   if (!text.trim()) return { ok: false, error: { message: 'Input is empty', line: 1, column: 1 } };
   try {
     return { ok: true, value: JSON.parse(text) as T };
   } catch (error) {
+    // V8 often omits the position ("Unexpected token 'x', ... is not valid JSON"),
+    // so locate the problem with our own strict scanner for a precise, consistent message.
+    const scanned = scanJson(text);
+    if (scanned.error) {
+      const { message, line, column } = scanned.error;
+      return { ok: false, error: { message, line, column } };
+    }
     return { ok: false, error: describe(text, error) };
   }
 }

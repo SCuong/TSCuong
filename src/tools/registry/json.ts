@@ -1,4 +1,4 @@
-import { Braces } from 'lucide-react';
+import { Braces, FileCheck, GitCompare, ListTree, Route } from 'lucide-react';
 import type { ToolDefinition } from '../types';
 
 export const jsonTools: ToolDefinition[] = [
@@ -12,5 +12,52 @@ export const jsonTools: ToolDefinition[] = [
     keywords: ['json', 'format', 'pretty', 'print', 'beautify', 'minify', 'indent', 'validate'],
     aliases: ['format json', 'json beautifier', 'pretty print json', 'json prettifier', 'json minifier'],
     load: () => import('../json/JsonFormatter'),
+  },
+  {
+    id: 'json-validator',
+    name: 'JSON Validator',
+    description: 'Check JSON for errors with exact line and column, highlighted in the editor, plus duplicate-key detection.',
+    category: 'json',
+    icon: FileCheck,
+    route: 'json/validator',
+    keywords: ['json', 'validate', 'validator', 'lint', 'linter', 'check', 'syntax', 'error', 'duplicate keys', 'parse error'],
+    aliases: ['json lint', 'jsonlint', 'validate json', 'check json syntax', 'json checker', 'is my json valid'],
+    load: () => import('../json/JsonValidator'),
+  },
+  {
+    id: 'json-tree-viewer',
+    name: 'JSON Tree Viewer',
+    description: 'Explore JSON as a collapsible tree with search, type badges and one-click JSONPath copying.',
+    category: 'json',
+    icon: ListTree,
+    route: 'json/tree-viewer',
+    keywords: ['json', 'tree', 'viewer', 'explorer', 'browse', 'inspect', 'navigate', 'collapse', 'expand', 'path', 'large json'],
+    aliases: ['json viewer', 'json explorer', 'json tree', 'view json', 'json browser', 'json inspector'],
+    load: () => import('../json/JsonTreeViewer'),
+    layout: 'wide',
+  },
+  {
+    id: 'json-diff',
+    name: 'JSON Diff',
+    description: 'Compare two JSON documents structurally: added, removed and changed paths, or a side-by-side view.',
+    category: 'json',
+    icon: GitCompare,
+    route: 'json/diff',
+    keywords: ['json', 'diff', 'compare', 'difference', 'changes', 'semantic', 'structural', 'side by side', 'delta'],
+    aliases: ['compare json', 'json compare', 'json difference', 'diff json files', 'json comparison'],
+    load: () => import('../json/JsonDiff'),
+    layout: 'wide',
+  },
+  {
+    id: 'jsonpath-tester',
+    name: 'JSONPath Tester',
+    description: 'Evaluate RFC 9535 JSONPath queries live, with matched paths, syntax errors and a cheat sheet.',
+    category: 'json',
+    icon: Route,
+    route: 'json/jsonpath',
+    keywords: ['jsonpath', 'json path', 'query', 'filter', 'select', 'expression', 'evaluator', 'rfc 9535', 'jq'],
+    aliases: ['jsonpath evaluator', 'json path tester', 'query json', 'jsonpath online', 'json query'],
+    load: () => import('../json/JsonPathTester'),
+    layout: 'wide',
   },
 ];
