@@ -8,3 +8,7 @@ dist/
 node_modules/
 playwright-report/
 test-results/
+
+# Generated from node_modules by scripts/copy-engine-assets.mjs
+public/ocr/
+public/pdfjs/

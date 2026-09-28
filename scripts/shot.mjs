@@ -1,3 +1,4 @@
+/* global document, window -- used inside page.evaluate callbacks, which run in the browser */
 // Dev helper: screenshot pages in both themes and report console errors.
 // Usage: node scripts/shot.mjs <outDir> <path>[,<path>...] [--mobile] [--theme=dark|light|both] [--base=http://localhost:5173]
 import { chromium } from '@playwright/test';
