@@ -298,7 +298,7 @@ function Parts({ parts, tone }: { parts: InlinePart[]; tone: 'del' | 'add' }) {
 
 function LineNo({ n }: { n?: number }) {
   return (
-    <span className="w-12 shrink-0 pr-2 text-right text-fg-muted/80 tabular-nums select-none" aria-hidden>
+    <span className="w-9 shrink-0 pr-2 text-right text-fg-muted/80 tabular-nums select-none sm:w-12" aria-hidden>
       {n ?? ''}
     </span>
   );
@@ -391,7 +391,7 @@ function LineDiffView({ rows, view, collapse, ignoreCase }: { rows: DiffRow[]; v
         <LineNo n={line.oldNo} />
         <LineNo n={line.newNo} />
         <Marker kind={line.kind} />
-        <span className="min-w-0 flex-1 break-all whitespace-pre-wrap">
+        <span className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">
           {line.parts && line.kind !== 'ctx' ? <Parts parts={line.parts} tone={line.kind} /> : line.text || '\u200b'}
         </span>
       </div>
@@ -408,14 +408,14 @@ function LineDiffView({ rows, view, collapse, ignoreCase }: { rows: DiffRow[]; v
         <div className={cn('flex min-w-0 border-r border-line px-1 py-px', row.left ? ROW_TONE[leftKind] : 'bg-surface-sunken')}>
           <LineNo n={row.left?.no} />
           {row.left && <Marker kind={leftKind} />}
-          <span className="min-w-0 flex-1 break-all whitespace-pre-wrap">
+          <span className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">
             {row.left ? inline ? <Parts parts={inline.left} tone="del" /> : row.left.text || '\u200b' : ''}
           </span>
         </div>
         <div className={cn('flex min-w-0 px-1 py-px', row.right ? ROW_TONE[rightKind] : 'bg-surface-sunken')}>
           <LineNo n={row.right?.no} />
           {row.right && <Marker kind={rightKind} />}
-          <span className="min-w-0 flex-1 break-all whitespace-pre-wrap">
+          <span className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">
             {row.right ? inline ? <Parts parts={inline.right} tone="add" /> : row.right.text || '\u200b' : ''}
           </span>
         </div>

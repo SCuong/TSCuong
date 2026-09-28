@@ -122,16 +122,16 @@ export function FrequencyTable({
   return (
     <div className="min-w-0">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] text-[13px]">
+        <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-line text-left text-[12px] text-fg-muted">
               <th scope="col" className="w-12 py-2 pr-2 font-medium">#</th>
               <th scope="col" className="py-2 pr-3 font-medium">{itemHeader}</th>
               {mode === 'char' && (
-                <th scope="col" className="py-2 pr-3 font-medium">Code point</th>
+                <th scope="col" className="hidden py-2 pr-3 font-medium sm:table-cell">Code point</th>
               )}
               <th scope="col" className="py-2 pr-3 text-right font-medium">Count</th>
-              <th scope="col" className="w-[34%] py-2 font-medium">Share</th>
+              <th scope="col" className="py-2 text-right font-medium sm:w-[34%] sm:text-left">Share</th>
             </tr>
           </thead>
           <tbody>
@@ -145,12 +145,12 @@ export function FrequencyTable({
                     {name && <span className="ml-2 text-[12px] text-fg-muted">{name}</span>}
                   </td>
                   {mode === 'char' && (
-                    <td className="py-1.5 pr-3 font-mono text-[12px] whitespace-nowrap text-fg-secondary">{codePointLabel(row.item)}</td>
+                    <td className="hidden py-1.5 pr-3 font-mono text-[12px] whitespace-nowrap text-fg-secondary sm:table-cell">{codePointLabel(row.item)}</td>
                   )}
                   <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{formatNumber(row.count, 0)}</td>
                   <td className="py-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-hover">
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="hidden h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-hover sm:block">
                         <div className="h-full rounded-full bg-accent" style={{ width: `${(row.count / max) * 100}%` }} />
                       </div>
                       <span className="w-14 shrink-0 text-right font-mono text-[12px] text-fg-secondary tabular-nums">
