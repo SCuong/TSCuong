@@ -8,6 +8,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <Layout />,
     errorElement: <RouteError />,
+    hydrateFallbackElement: <div className="min-h-dvh" />,
     children: [
       { index: true, lazy: async () => ({ Component: (await import('./pages/HomePage')).HomePage }) },
       { path: 'tools', lazy: async () => ({ Component: (await import('./pages/AllToolsPage')).AllToolsPage }) },

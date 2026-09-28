@@ -117,7 +117,7 @@ export function EditorPanel({
           <CopyButton value={value} iconOnly />
         </div>
       </header>
-      <div className="min-h-0 flex-1 p-2" style={{ height }}>
+      <div className={cn('min-h-0 p-2', height === '100%' && 'flex-1')} style={height === '100%' ? undefined : { height }}>
         {useCode ? (
           <CodeEditor
             value={value}
