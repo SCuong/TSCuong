@@ -22,7 +22,13 @@ for (const theme of themes) {
     isMobile: mobile,
     hasTouch: mobile,
   });
-  await context.addInitScript((t) => localStorage.setItem('localkit:theme', t), theme);
+  await context.addInitScript((t) => {
+    try {
+      localStorage.setItem('localkit:theme', t);
+    } catch {
+      // sandboxed iframes (e.g. the HTML preview) have no storage access
+    }
+  }, theme);
   const page = await context.newPage();
   const errors = [];
   page.on('console', (m) => {
