@@ -1,0 +1,74 @@
+import { useState } from 'react';
+import { FileOutput } from 'lucide-react';
+import { ToolStack } from '@/components/tool/EditorPanel';
+import { ErrorMessage } from '@/components/ui/Alert';
+import { Button } from '@/components/ui/Button';
+import { Panel } from '@/components/ui/Panel';
+import { pluralize } from '@/lib/utils';
+import { formatPageList } from './lib/ranges';
+import { outputName, pdfBlob, type OutputFile } from './lib/files';
+import { runPdfOp } from './lib/runner';
+import { docId } from './lib/thumbnails';
+import { PdfInput, useEncryptionGate } from './components/PdfInput';
+import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
+import { PagePicker, PageScopeControl, usePageScope } from './components/PageScope';
+import { JobProgress, ResultFiles } from './components/Results';
+import { usePdfJob } from './components/usePdfJob';
+
+export default function ExtractPages() {
+  const controller = usePdfFile();
+  return (
+    <ToolStack>
+      <PdfInput controller={controller} title="Drop a PDF to extract pages from">
+        {(pdf) => <ExtractWorkspace key={docId(pdf.doc)} pdf={pdf} />}
+      </PdfInput>
+    </ToolStack>
+  );
+}
+
+function ExtractWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const scope = usePageScope(pdf.pageCount, 'pick');
+  const [result, setResult] = useState<OutputFile | null>(null);
+  const job = usePdfJob();
+  const gate = useEncryptionGate(pdf);
+
+  async function run() {
+    setResult(null);
+    const bytes = await job.run(({ signal, progress }) =>
+      runPdfOp('selectPages', { bytes: pdf.bytes, pages: scope.pages, ignoreEncryption: gate.ignoreEncryption }, { signal, onProgress: progress }),
+    );
+    if (bytes) setResult({ name: outputName(pdf.file.name, 'extracted'), data: pdfBlob(bytes), type: 'application/pdf' });
+  }
+
+  const summary =
+    scope.pages.length > 0
+      ? `${pluralize(scope.pages.length, 'page')}: ${formatPageList(scope.pages.map((p) => p + 1))}`
+      : 'No pages selected yet';
+
+  return (
+    <>
+      {gate.notice}
+      <Panel title="Pages to extract" description="The new PDF keeps the order you give, so a range like 10-1 reverses the pages.">
+        <div className="flex flex-col gap-4">
+          <PageScopeControl scope={scope} modes={['pick', 'range']} pickLabel="Select visually" />
+          {scope.mode === 'pick' && <PagePicker pdf={pdf} selected={scope.picked} onChange={scope.setPicked} />}
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+            <Button
+              variant="primary"
+              icon={FileOutput}
+              disabled={!gate.ok || scope.pages.length === 0 || Boolean(scope.error) || job.running}
+              loading={job.running}
+              onClick={() => void run()}
+            >
+              Extract pages
+            </Button>
+            <span className="min-w-0 truncate text-[13px] text-fg-muted">{summary}</span>
+          </div>
+        </div>
+      </Panel>
+      <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
+      <ErrorMessage error={job.error} title="Extraction failed" />
+      {result && <ResultFiles files={[result]} title={`Extracted ${pluralize(scope.pages.length, 'page')}`} />}
+    </>
+  );
+}

@@ -1,0 +1,92 @@
+/* Minimal pdf.js text layer styles (adapted from pdfjs-dist/web/pdf_viewer.css, Apache-2.0). */
+.lk-pdf-page {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+}
+
+.lk-pdf-page .textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.lk-pdf-page .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.lk-pdf-page .textLayer > :not(.markedContent),
+.lk-pdf-page .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.lk-pdf-page .textLayer .markedContent {
+  display: contents;
+}
+
+.lk-pdf-page .textLayer ::selection {
+  background: var(--lk-syn-selection);
+  color: transparent;
+}
+
+.lk-pdf-page .textLayer br::selection {
+  background: transparent;
+}
+
+.lk-pdf-page .textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.lk-pdf-page .textLayer.selecting .endOfContent {
+  top: 0;
+}
+
+.lk-pdf-page .textLayer .lk-hit {
+  background-color: var(--lk-syn-match);
+  border-radius: 2px;
+}
+
+.lk-pdf-page .textLayer .lk-hit-active {
+  background-color: var(--lk-syn-match-active);
+  box-shadow: 0 0 0 2px var(--lk-syn-match-active);
+}
+
+.lk-pdf-page [data-main-rotation='90'] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.lk-pdf-page [data-main-rotation='180'] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.lk-pdf-page [data-main-rotation='270'] {
+  transform: rotate(270deg) translateX(-100%);
+}
