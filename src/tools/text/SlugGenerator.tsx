@@ -1,0 +1,119 @@
+import { useDeferredValue, useMemo } from 'react';
+import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { Input, NumberInput, Switch } from '@/components/ui/Field';
+import { CopyButton } from '@/components/ui/Actions';
+import { Panel } from '@/components/ui/Panel';
+import { Segmented } from '@/components/ui/Segmented';
+import { useToolState } from '@/lib/hooks';
+import { pluralize } from '@/lib/utils';
+import { slugify, slugifyLines } from './lib/slug';
+import { Opt, TEXT_FILE_ACCEPT } from './components/shared';
+
+const ID = 'slug-generator';
+const SAMPLE_SINGLE = 'Crème Brûlée: 10 Easy Recipes & Tips for Beginners!';
+const SAMPLE_BULK = 'Hello World!\nCrème Brûlée à la carte\nStraße & Øresund Bridge\nПривет, мир\n10 Tips for Writing Clean Code (2025 Edition)';
+
+export default function SlugGenerator() {
+  const [input, setInput] = useToolState(ID, 'input', '');
+  const [bulk, setBulk] = useToolState(ID, 'bulk', false);
+  const [separator, setSeparator] = useToolState(ID, 'separator', '-');
+  const [lowercase, setLowercase] = useToolState(ID, 'lowercase', true);
+  const [maxLength, setMaxLength] = useToolState<number | ''>(ID, 'maxLength', '');
+  const [translit, setTranslit] = useToolState(ID, 'transliterate', true);
+  const [keepUnicode, setKeepUnicode] = useToolState(ID, 'keepUnicode', false);
+  const [umlauts, setUmlauts] = useToolState(ID, 'umlauts', false);
+  const [symbols, setSymbols] = useToolState(ID, 'symbols', true);
+
+  const deferred = useDeferredValue(input);
+  const opts = useMemo(
+    () => ({
+      separator,
+      lowercase,
+      maxLength: typeof maxLength === 'number' ? maxLength : 0,
+      transliterate: translit,
+      keepUnicode,
+      germanUmlauts: umlauts,
+      symbols,
+    }),
+    [separator, lowercase, maxLength, translit, keepUnicode, umlauts, symbols],
+  );
+  const output = useMemo(() => (bulk ? slugifyLines(deferred, opts) : slugify(deferred, opts)), [bulk, deferred, opts]);
+  const count = bulk ? output.split('\n').filter(Boolean).length : 0;
+
+  return (
+    <ToolStack>
+      <ToolBar>
+        <Opt label="Mode">
+          <Segmented
+            label="Mode"
+            value={bulk ? 'bulk' : 'single'}
+            onChange={(v) => setBulk(v === 'bulk')}
+            options={[
+              { value: 'single', label: 'Single' },
+              { value: 'bulk', label: 'One per line' },
+            ]}
+          />
+        </Opt>
+        <Opt label="Separator" className="w-24">
+          <Input value={separator} onChange={(e) => setSeparator(e.target.value.slice(0, 5))} mono aria-label="Separator" />
+        </Opt>
+        <Opt label="Max length" className="w-28">
+          <NumberInput value={maxLength} onChange={setMaxLength} min={0} placeholder="No limit" aria-label="Maximum length" />
+        </Opt>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
+          <Switch label="Lowercase" checked={lowercase} onChange={setLowercase} />
+          <Switch label="Transliterate accents" checked={translit} onChange={setTranslit} />
+          <Switch label="ä → ae" checked={umlauts} onChange={setUmlauts} disabled={!translit} />
+          <Switch label="& → and" checked={symbols} onChange={setSymbols} disabled={!translit} />
+          <Switch label="Keep non-Latin letters" checked={keepUnicode} onChange={setKeepUnicode} />
+        </div>
+      </ToolBar>
+
+      {bulk ? (
+        <SplitPanes>
+          <EditorPanel
+            title="Titles"
+            value={input}
+            onChange={setInput}
+            placeholder="One title per line…"
+            sample={SAMPLE_BULK}
+            fileAccept={TEXT_FILE_ACCEPT}
+            height="360px"
+          />
+          <EditorPanel
+            title="Slugs"
+            value={output}
+            placeholder="Slugs appear here"
+            downloadName="slugs.txt"
+            height="360px"
+            footer={output ? <span>{pluralize(count, 'slug')}</span> : undefined}
+          />
+        </SplitPanes>
+      ) : (
+        <>
+          <EditorPanel
+            title="Title or phrase"
+            value={input}
+            onChange={setInput}
+            placeholder="Type a title, e.g. “My First Blog Post!”"
+            sample={SAMPLE_SINGLE}
+            height="110px"
+          />
+          <Panel
+            title="Slug"
+            actions={<CopyButton value={output} />}
+            description={output ? `${pluralize(Array.from(output).length, 'character')}` : undefined}
+          >
+            {output ? (
+              <p className="font-mono text-[15px] break-all text-fg">{output}</p>
+            ) : (
+              <p className="text-[13px] text-fg-muted">
+                {input.trim() ? 'The text has no letters or digits that can be used in a slug.' : 'Your slug appears here as you type.'}
+              </p>
+            )}
+          </Panel>
+        </>
+      )}
+    </ToolStack>
+  );
+}
