@@ -1,0 +1,226 @@
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Download, Droplets, Wand } from 'lucide-react';
+import { ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { FileDrop } from '@/components/ui/FileDrop';
+import { Button } from '@/components/ui/Button';
+import { ErrorMessage } from '@/components/ui/Alert';
+import { Checkbox, Label } from '@/components/ui/Field';
+import { Segmented } from '@/components/ui/Segmented';
+import { Panel } from '@/components/ui/Panel';
+import { Spinner } from '@/components/ui/Feedback';
+import { toast } from '@/components/ui/Toast';
+import { useToolState } from '@/lib/hooks';
+import { baseName, downloadBlob, errorMessage, formatBytes } from '@/lib/utils';
+import { useSingleImage } from './components/useSingleImage';
+import { ColorField, RangeField } from './components/controls';
+import { canvasToBlob, createCanvas, getContext } from './lib/canvas';
+import { flatten, guessBackground, keyColor } from './lib/chroma';
+import { hexToRgb } from './lib/encoders';
+import { rgbToHex } from './lib/palette';
+import { resample } from './lib/pipeline';
+import { IMAGE_ACCEPT } from './lib/accept';
+
+type Mode = 'transparent' | 'replace' | 'flatten';
+type Bg = 'checker' | 'light' | 'dark';
+
+const PREVIEW_MAX = 1200;
+
+export default function TransparencyTool() {
+  const { image, error, loading, load, clear } = useSingleImage();
+  const [mode, setMode] = useToolState<Mode>('image-transparency', 'mode', 'transparent');
+  const [target, setTarget] = useToolState('image-transparency', 'target', '#ffffff');
+  const [replacement, setReplacement] = useToolState('image-transparency', 'replacement', '#2563eb');
+  const [background, setBackground] = useToolState('image-transparency', 'background', '#ffffff');
+  const [tolerance, setTolerance] = useToolState('image-transparency', 'tolerance', 12);
+  const [feather, setFeather] = useToolState('image-transparency', 'feather', 6);
+  const [contiguous, setContiguous] = useToolState('image-transparency', 'contiguous', false);
+  const [previewBg, setPreviewBg] = useState<Bg>('checker');
+  const [seed, setSeed] = useState<{ x: number; y: number } | null>(null);
+  const [affected, setAffected] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const base = useRef<{ data: ImageData; scale: number } | null>(null);
+
+  // Build the downscaled preview source when a new image loads.
+  useEffect(() => {
+    base.current = null;
+    setSeed(null);
+    if (!image) return;
+    const scale = Math.min(1, PREVIEW_MAX / Math.max(image.width, image.height));
+    const w = Math.max(1, Math.round(image.width * scale));
+    const h = Math.max(1, Math.round(image.height * scale));
+    const small = scale < 1 ? resample(image.bitmap, { width: w, height: h }) : (() => {
+      const c = createCanvas(w, h);
+      getContext(c).drawImage(image.bitmap, 0, 0);
+      return c;
+    })();
+    base.current = { data: getContext(small, { willReadFrequently: true }).getImageData(0, 0, w, h), scale };
+    const guess = guessBackground(base.current.data.data, w, h);
+    setTarget(rgbToHex(guess));
+  }, [image, setTarget]);
+
+  function apply(data: ImageData, scale: number): number {
+    if (mode === 'flatten') {
+      flatten(data.data, hexToRgb(background) ?? [255, 255, 255]);
+      return data.width * data.height;
+    }
+    return keyColor(data.data, data.width, data.height, {
+      target: hexToRgb(target) ?? [255, 255, 255],
+      tolerance,
+      feather,
+      mode,
+      replacement: hexToRgb(replacement) ?? [255, 255, 255],
+      contiguous,
+      seed: seed ? { x: seed.x * scale, y: seed.y * scale } : { x: 0, y: 0 },
+    });
+  }
+
+  // Re-render the preview when settings change.
+  useEffect(() => {
+    const b = base.current;
+    const c = canvasRef.current;
+    if (!b || !c) return;
+    const t = setTimeout(() => {
+      const copy = new ImageData(new Uint8ClampedArray(b.data.data), b.data.width, b.data.height);
+      const n = apply(copy, b.scale);
+      c.width = copy.width;
+      c.height = copy.height;
+      c.getContext('2d')?.putImageData(copy, 0, 0);
+      setAffected(n / (copy.width * copy.height));
+    }, 40);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image, mode, target, replacement, background, tolerance, feather, contiguous, seed]);
+
+  function onPick(e: ReactPointerEvent<HTMLCanvasElement>) {
+    const b = base.current;
+    if (!b || !image || mode === 'flatten') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = Math.floor(((e.clientX - rect.left) / rect.width) * b.data.width);
+    const py = Math.floor(((e.clientY - rect.top) / rect.height) * b.data.height);
+    if (px < 0 || py < 0 || px >= b.data.width || py >= b.data.height) return;
+    const i = (py * b.data.width + px) * 4;
+    const d = b.data.data;
+    setTarget(rgbToHex([d[i], d[i + 1], d[i + 2]]));
+    setSeed({ x: px / b.scale, y: py / b.scale });
+  }
+
+  async function exportPng() {
+    if (!image) return;
+    setBusy(true);
+    try {
+      const c = createCanvas(image.width, image.height);
+      const ctx = getContext(c, { willReadFrequently: true });
+      ctx.drawImage(image.bitmap, 0, 0);
+      const data = ctx.getImageData(0, 0, image.width, image.height);
+      apply(data, 1);
+      ctx.putImageData(data, 0, 0);
+      const blob = await canvasToBlob(c, 'image/png');
+      downloadBlob(blob, `${baseName(image.file.name)}-${mode === 'flatten' ? 'flattened' : mode === 'replace' ? 'recolored' : 'transparent'}.png`);
+      toast(`Saved PNG (${formatBytes(blob.size)})`);
+    } catch (e) {
+      toast(errorMessage(e, 'Could not export the image.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const bgClass = previewBg === 'checker' ? 'lk-checker' : '';
+  const bgStyle = previewBg === 'light' ? { backgroundColor: '#ffffff' } : previewBg === 'dark' ? { backgroundColor: '#0b0e14' } : undefined;
+
+  return (
+    <ToolStack>
+      <ToolBar>
+        <div>
+          <Label>Action</Label>
+          <Segmented
+            label="Action"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'transparent', label: 'Make color transparent' },
+              { value: 'replace', label: 'Replace color' },
+              { value: 'flatten', label: 'Flatten onto color' },
+            ]}
+          />
+        </div>
+        {mode !== 'flatten' ? (
+          <>
+            <ColorField label="Color to change" value={target} onChange={setTarget} />
+            {mode === 'replace' && <ColorField label="Replace with" value={replacement} onChange={setReplacement} />}
+          </>
+        ) : (
+          <ColorField label="Background" value={background} onChange={setBackground} />
+        )}
+      </ToolBar>
+      {mode !== 'flatten' && (
+        <ToolBar>
+          <RangeField label="Tolerance" className="w-full sm:w-56" value={tolerance} min={0} max={100} onChange={setTolerance} format={(v) => `${v}%`} />
+          <RangeField label="Feather (soft edge)" className="w-full sm:w-56" value={feather} min={0} max={50} onChange={setFeather} format={(v) => `${v}%`} />
+          <Checkbox
+            label="Only connected area"
+            description="Flood-fill from the point you click (default: top-left corner)."
+            checked={contiguous}
+            onChange={setContiguous}
+          />
+          {image && base.current && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={Wand}
+              onClick={() => {
+                const b = base.current!;
+                setTarget(rgbToHex(guessBackground(b.data.data, b.data.width, b.data.height)));
+                setSeed(null);
+              }}
+            >
+              Detect background
+            </Button>
+          )}
+        </ToolBar>
+      )}
+      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Droplets} title="Drop an image" hint="Remove a solid background, recolor it, or flatten transparency. Nothing is uploaded." />}
+      {loading && <Spinner label="Opening image…" />}
+      <ErrorMessage error={error} />
+      {image && (
+        <Panel
+          title={image.file.name}
+          description={`${image.width} × ${image.height} px${affected !== null && mode !== 'flatten' ? ` · ${(affected * 100).toFixed(1)}% of pixels affected` : ''}`}
+          actions={
+            <>
+              <Segmented
+                label="Preview background"
+                size="sm"
+                value={previewBg}
+                onChange={setPreviewBg}
+                options={[
+                  { value: 'checker', label: 'Checker' },
+                  { value: 'light', label: 'White' },
+                  { value: 'dark', label: 'Black' },
+                ]}
+              />
+              <Button size="sm" variant="ghost" onClick={clear}>
+                Choose another
+              </Button>
+            </>
+          }
+        >
+          <div className={`flex justify-center overflow-hidden rounded-lg border border-line ${bgClass}`} style={bgStyle}>
+            <canvas
+              ref={canvasRef}
+              onPointerDown={onPick}
+              className={`block h-auto max-h-[65vh] max-w-full object-contain ${mode === 'flatten' ? '' : 'cursor-crosshair'}`}
+              aria-label={mode === 'flatten' ? 'Preview' : 'Preview. Click to choose the color to change.'}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[12.5px] text-fg-muted">{mode === 'flatten' ? 'Transparent areas are filled with the background color.' : 'Click the image to pick the color (and the starting point for “connected area”).'}</p>
+            <Button variant="primary" icon={Download} loading={busy} onClick={exportPng}>
+              Download PNG
+            </Button>
+          </div>
+        </Panel>
+      )}
+    </ToolStack>
+  );
+}
