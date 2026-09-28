@@ -1,3 +1,49 @@
+import { Contrast, Eye, Pipette, SwatchBook } from 'lucide-react';
 import type { ToolDefinition } from '../types';
 
-export const colorTools: ToolDefinition[] = [];
+export const colorTools: ToolDefinition[] = [
+  {
+    id: 'color-converter',
+    name: 'Color Converter',
+    description: 'Convert colors between HEX, RGB, HSL, HWB, LAB, LCH, OKLCH, CMYK and names, with a picker and eyedropper.',
+    category: 'color',
+    icon: Pipette,
+    route: 'color/converter',
+    keywords: ['color', 'colour', 'hex', 'rgb', 'rgba', 'hsl', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'cmyk', 'convert', 'picker', 'eyedropper', 'css color'],
+    aliases: ['hex to rgb', 'rgb to hex', 'hsl to hex', 'hex to hsl', 'rgb to hsl', 'hex to oklch', 'color picker', 'colour converter'],
+    load: () => import('../color/ColorConverter'),
+  },
+  {
+    id: 'contrast-checker',
+    name: 'Contrast Checker',
+    description: 'Check WCAG contrast ratios for text and UI colors and find the nearest passing color.',
+    category: 'color',
+    icon: Contrast,
+    route: 'color/contrast-checker',
+    keywords: ['contrast', 'wcag', 'accessibility', 'a11y', 'aa', 'aaa', 'ratio', 'text', 'color', 'legibility'],
+    aliases: ['wcag contrast checker', 'color contrast', 'accessible colors', 'contrast ratio calculator'],
+    load: () => import('../color/ContrastChecker'),
+  },
+  {
+    id: 'palette-generator',
+    name: 'Palette Generator',
+    description: 'Generate color harmonies and a 50–950 tint and shade scale, then export CSS, Tailwind, JSON or SVG.',
+    category: 'color',
+    icon: SwatchBook,
+    route: 'color/palette',
+    keywords: ['palette', 'color scheme', 'harmony', 'complementary', 'analogous', 'triadic', 'tetradic', 'tints', 'shades', 'scale', 'tailwind', 'oklch', 'design system'],
+    aliases: ['color palette generator', 'tailwind color scale', 'color scheme generator', 'shades generator'],
+    load: () => import('../color/PaletteGenerator'),
+  },
+  {
+    id: 'color-blindness-simulator',
+    name: 'Color Blindness Simulator',
+    description: 'Preview how a palette looks with protanopia, deuteranopia, tritanopia and achromatopsia.',
+    category: 'color',
+    icon: Eye,
+    route: 'color/blindness-simulator',
+    keywords: ['color blindness', 'colorblind', 'cvd', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia', 'accessibility', 'simulate', 'palette'],
+    aliases: ['colorblind simulator', 'color vision deficiency', 'daltonism simulator'],
+    load: () => import('../color/ColorBlindnessSimulator'),
+  },
+];
