@@ -12,11 +12,11 @@ export function ThemeSwitcher({ withLabels = false, className }: { withLabels?: 
       value={preference}
       onChange={setThemePreference}
       options={[
-        { value: 'light', label: withLabels ? 'Light' : <span className="sr-only">Light</span>, icon: Sun, title: 'Light theme' },
-        { value: 'dark', label: withLabels ? 'Dark' : <span className="sr-only">Dark</span>, icon: Moon, title: 'Dark theme' },
+        { value: 'light', label: withLabels ? 'Light' : <span className="sr-only">Light theme</span>, icon: Sun, title: 'Light theme' },
+        { value: 'dark', label: withLabels ? 'Dark' : <span className="sr-only">Dark theme</span>, icon: Moon, title: 'Dark theme' },
         {
           value: 'system',
-          label: withLabels ? 'System' : <span className="sr-only">System</span>,
+          label: withLabels ? 'System' : <span className="sr-only">System theme</span>,
           icon: Monitor,
           title: 'Match system theme',
         },
