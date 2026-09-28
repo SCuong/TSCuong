@@ -1,3 +1,65 @@
+import { Database, FileSearch } from 'lucide-react';
 import type { ToolDefinition } from '../types';
 
-export const workspaceDataTools: ToolDefinition[] = [];
+export const workspaceDataTools: ToolDefinition[] = [
+  {
+    id: 'sqlite-viewer',
+    name: 'SQLite Studio',
+    description:
+      'Open SQLite databases locally: browse tables, inspect the schema, run SQL (read-only by default) and export results or the whole database.',
+    category: 'workspace',
+    icon: Database,
+    route: 'sqlite',
+    keywords: [
+      'sqlite',
+      'sqlite3',
+      'sql',
+      'database',
+      'db',
+      'viewer',
+      'browser',
+      'editor',
+      'query',
+      'table',
+      'schema',
+      'select',
+      'export',
+      'csv',
+      'dump',
+      'explorer',
+    ],
+    aliases: ['sqlite viewer', 'sqlite browser', 'open .db file', 'db browser for sqlite', 'run sql queries', 'sqlite editor online'],
+    load: () => import('../sqlite/SqliteStudio'),
+    requires: ['webAssembly'],
+    layout: 'full',
+  },
+  {
+    id: 'file-search',
+    name: 'Local File Search',
+    description:
+      'Index a folder on this device and search file names and contents with fuzzy full-text or regex search. Nothing is uploaded.',
+    category: 'workspace',
+    icon: FileSearch,
+    route: 'files/search',
+    keywords: [
+      'search',
+      'find',
+      'files',
+      'folder',
+      'directory',
+      'grep',
+      'full text',
+      'fulltext',
+      'regex',
+      'index',
+      'content',
+      'code search',
+      'filename',
+      'local',
+    ],
+    aliases: ['search files in folder', 'find in files', 'grep folder', 'desktop search', 'search my documents', 'code search'],
+    load: () => import('../filesearch/FileSearch'),
+    requires: ['indexedDB'],
+    layout: 'full',
+  },
+];
