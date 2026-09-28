@@ -1,0 +1,29 @@
+export interface Item {
+  id: string;
+  price: number;
+  quantity: number;
+}
+
+export function subtotal(items: Item[]): number {
+  let total = 0;
+  for (const item of items) {
+    total += item.price * item.quantity;
+  }
+  return total;
+}
+
+export function itemCount(items: Item[]): number {
+  return items.reduce((n, item) => n + item.quantity, 0);
+}
+
+export function isEmpty(items: Item[]): boolean {
+  return items.length === 0;
+}
+
+export function findItem(items: Item[], id: string): Item | undefined {
+  return items.find((item) => item.id === id);
+}
+
+export function formatPrice(value: number): string {
+  return '$' + value.toFixed(2);
+}

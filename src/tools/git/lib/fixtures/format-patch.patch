@@ -1,0 +1,87 @@
+From 09e116fb19413c170cac8c6616409ab6d9e67e1d Mon Sep 17 00:00:00 2001
+From: Ada Lovelace <ada@example.com>
+Date: Tue, 29 Sep 2026 01:51:33 +0700
+Subject: [PATCH] feat(core): change many things
+
+Body line explaining why.
+
+Refs: #12
+---
+ a.txt                      |   3 ++-
+ "caf\303\251.txt"          |   1 +
+ img.bin                    | Bin 9 -> 9 bytes
+ old name.md => new name.md |   1 +
+ nums.txt                   |   4 ++--
+ run.sh                     |   0
+ 6 files changed, 6 insertions(+), 3 deletions(-)
+ create mode 100644 "caf\303\251.txt"
+ rename old name.md => new name.md (85%)
+ mode change 100644 => 100755 run.sh
+
+diff --git a/a.txt b/a.txt
+index 83db48f..ffd2f60 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1,3 +1,4 @@
+ line1
+-line2
++line2 changed
+ line3
++line4
+\ No newline at end of file
+diff --git "a/caf\303\251.txt" "b/caf\303\251.txt"
+new file mode 100644
+index 0000000..d5a09df
+--- /dev/null
++++ "b/caf\303\251.txt"
+@@ -0,0 +1 @@
++brand new
+diff --git a/img.bin b/img.bin
+index 0f49c4ae77b43dff338093c78e009676e7e308ba..de092419aef1d9e2b1225a5880e8da54c5f416d4 100644
+GIT binary patch
+literal 9
+QcmZQzPRh(nEUGjD01IgXy8r+H
+
+literal 9
+QcmZQzWJ=1+ODw7c00^)Gi2wiq
+
+diff --git a/old name.md b/new name.md
+similarity index 85%
+rename from old name.md
+rename to new name.md
+index 97ae5a5..4d82c49 100644
+--- a/old name.md	
++++ b/new name.md	
+@@ -2,3 +2,4 @@ old name content
+ keep
+ keep2
+ keep3
++added
+diff --git a/nums.txt b/nums.txt
+index 1c99002..c211e4b 100644
+--- a/nums.txt
++++ b/nums.txt
+@@ -7,7 +7,7 @@
+ 7
+ 8
+ 9
+-10
++ten
+ 11
+ 12
+ 13
+@@ -27,7 +27,7 @@
+ 27
+ 28
+ 29
+-30
++thirty
+ 31
+ 32
+ 33
+diff --git a/run.sh b/run.sh
+old mode 100644
+new mode 100755
+-- 
+2.55.0.windows.5
+
