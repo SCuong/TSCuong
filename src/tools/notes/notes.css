@@ -1,0 +1,79 @@
+/* Markdown Notes: preview extras and print rules. Uses the global design tokens. */
+
+.lk-note-prose .lk-note-mermaid {
+  flex-direction: column;
+  align-items: center;
+}
+.lk-note-prose .lk-note-mermaid > pre {
+  width: 100%;
+  margin: 0;
+}
+.lk-note-prose .lk-note-mermaid[data-mermaid='pending'] > pre,
+.lk-note-prose .lk-note-mermaid[data-mermaid='rendering'] > pre {
+  opacity: 0.55;
+}
+.lk-note-prose .lk-note-mermaid[data-mermaid='error'] {
+  align-items: stretch;
+}
+.lk-note-prose .lk-note-mermaid[data-mermaid='error'] > pre {
+  border-color: color-mix(in srgb, var(--lk-danger) 45%, var(--lk-border));
+}
+.lk-note-mermaid-error {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lk-danger);
+}
+.lk-note-prose li > input[type='checkbox']:not(:disabled) {
+  cursor: pointer;
+}
+
+/*
+ * Printing from the browser menu (Ctrl+P and the Print button print a clean,
+ * standalone copy instead): only the rendered note, in dark ink on white.
+ */
+@media print {
+  .lk-notes-noprint,
+  .lk-notes-layout .lk-notes-noprint {
+    display: none !important;
+  }
+  .lk-notes-layout,
+  .lk-notes-layout > section {
+    display: block !important;
+    height: auto !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .lk-notes-layout .lk-note-prose,
+  .lk-notes-layout .lk-note-prose * {
+    max-height: none !important;
+  }
+  .lk-notes-layout [class*='overflow-y-auto'] {
+    overflow: visible !important;
+  }
+  .lk-note-prose {
+    --lk-text-primary: #111;
+    --lk-text-secondary: #444;
+    --lk-border: #d0d7de;
+    --lk-border-strong: #bbb;
+    --lk-surface-hover: #f3f4f6;
+    --lk-surface-sunken: #f6f8fa;
+    --lk-accent-text: #0b57d0;
+    --lk-syn-keyword: #cf222e;
+    --lk-syn-string: #0a3069;
+    --lk-syn-number: #0550ae;
+    --lk-syn-comment: #6e7781;
+    --lk-syn-function: #8250df;
+    --lk-syn-property: #0550ae;
+    --lk-syn-tag: #116329;
+    --lk-syn-type: #953800;
+    --lk-syn-attr: #6639ba;
+    color: #111;
+  }
+  .lk-note-prose pre,
+  .lk-note-prose table,
+  .lk-note-prose .lk-mermaid {
+    break-inside: avoid;
+  }
+}
