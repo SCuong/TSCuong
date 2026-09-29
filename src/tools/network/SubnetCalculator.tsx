@@ -59,7 +59,7 @@ function Row({ label, value, copy = true, mono = true }: { label: ReactNode; val
 
 function BinaryView({ rows, prefix }: { rows: Array<{ label: string; bits: string }>; prefix: number }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Binary representation">
       <table className="font-mono text-[12.5px]">
         <tbody>
           {rows.map((row) => {

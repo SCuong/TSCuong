@@ -118,7 +118,7 @@ function ParseMode() {
       </SplitPanes>
       {pairs.length > 0 && (
         <Panel title={`Parameters (${pairs.length})`} bodyClassName="p-0">
-          <div className="max-h-[420px] overflow-auto">
+          <div className="max-h-[420px] overflow-auto" tabIndex={0} role="region" aria-label="Parameters">
             <table className="w-full min-w-[420px] text-left text-[13px]">
               <thead className="sticky top-0 bg-surface text-[12px] text-fg-muted">
                 <tr className="border-b border-line">
