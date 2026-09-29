@@ -98,15 +98,24 @@ export function useAsyncJob() {
       setRunning(true);
       setProgress(null);
       setLabel('');
+      // Settle as soon as the job is cancelled, even if the job ignores its signal (some engines
+      // never settle once their worker is terminated): callers get the usual AbortError.
+      const aborted = new Promise<never>((_, reject) => {
+        ctrl.signal.addEventListener('abort', () => reject(ctrl.signal.reason), { once: true });
+      });
+      aborted.catch(() => {});
       try {
-        return await job({
-          signal: ctrl.signal,
-          progress: (fraction, text) => {
-            if (ctrl.signal.aborted) return;
-            setProgress(fraction);
-            if (text !== undefined) setLabel(text);
-          },
-        });
+        return await Promise.race([
+          job({
+            signal: ctrl.signal,
+            progress: (fraction, text) => {
+              if (ctrl.signal.aborted) return;
+              setProgress(fraction);
+              if (text !== undefined) setLabel(text);
+            },
+          }),
+          aborted,
+        ]);
       } finally {
         if (controller.current === ctrl) {
           controller.current = null;
@@ -119,7 +128,16 @@ export function useAsyncJob() {
     [],
   );
 
-  const cancel = useCallback(() => controller.current?.abort(), []);
+  /** Aborts the job and returns the UI to idle immediately; a late result from the job is ignored. */
+  const cancel = useCallback(() => {
+    const ctrl = controller.current;
+    if (!ctrl) return;
+    controller.current = null;
+    ctrl.abort();
+    setRunning(false);
+    setProgress(null);
+    setLabel('');
+  }, []);
 
   return { running, progress, label, run, cancel };
 }

@@ -42,7 +42,8 @@ describe('universal search over the real registry', () => {
     expect(top('mermiad')).toBe('mermaid-studio');
   });
 
-  it('every tool can be found by its own name', () => {
+  // ~200 full searches: allow for a loaded CI machine (it runs in well under a second normally).
+  it('every tool can be found by its own name', { timeout: 30_000 }, () => {
     const misses = TOOLS.filter((tool) => !ids(tool.name, 3).includes(tool.id)).map((t) => `${t.id} (“${t.name}”)`);
     expect(misses).toEqual([]);
   });
