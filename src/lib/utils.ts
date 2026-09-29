@@ -1,6 +1,21 @@
-/** Join class names, skipping falsy values. */
+import { extendTailwindMerge } from 'tailwind-merge';
+
+/** Knows LocalKit's custom theme scales so e.g. `shadow-card` is merged as a box shadow, not a shadow color. */
+const mergeClasses = extendTailwindMerge({
+  extend: {
+    theme: {
+      shadow: ['card', 'raised', 'popover'],
+    },
+  },
+});
+
+/**
+ * Join class names, skipping falsy values. Conflicting Tailwind utilities are
+ * resolved in favour of the later one, so a component's `className` prop
+ * reliably overrides its base classes (e.g. `hidden` over a base `inline-flex`).
+ */
 export function cn(...parts: unknown[]): string {
-  return parts.filter((p): p is string => typeof p === 'string' && p.length > 0).join(' ');
+  return mergeClasses(parts.filter((p): p is string => typeof p === 'string' && p.length > 0).join(' '));
 }
 
 export function formatBytes(bytes: number, decimals = 1): string {
