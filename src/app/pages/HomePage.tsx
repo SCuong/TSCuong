@@ -6,7 +6,7 @@ import { recordSearch, useFavorites, usePinned, useRecentTools } from '@/lib/use
 import { ToolCard, ToolGrid } from '@/components/ToolCard';
 import { ToolIcon } from '@/components/ToolIcon';
 import { Kbd } from '@/components/ui/Panel';
-import { modKey } from '@/lib/utils';
+import { cn, modKey } from '@/lib/utils';
 import { useDocumentTitle } from '../useDocumentTitle';
 
 const QUICK_QUERIES = ['format json', 'merge pdf', 'compress image', 'decode jwt', 'csv to json', 'regex', 'diagram'];
@@ -220,14 +220,15 @@ export function HomePage() {
                           to={`/category/${category.id}`}
                           className="inline-flex items-center gap-1 text-[13px] text-fg-muted hover:text-fg"
                         >
-                          {tools.length > shown.length ? `All ${tools.length}` : 'Open category'}
+                          {tools.length > 4 ? `All ${tools.length}` : 'Open category'}
                           <ArrowRight size={13} aria-hidden />
                         </Link>
                       }
                     >
                       <ul className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {shown.map((tool) => (
-                          <li key={tool.id} className="min-w-0">
+                        {shown.map((tool, i) => (
+                          // Phones show four per category (the "All N" link covers the rest) to keep the page short.
+                          <li key={tool.id} className={cn('min-w-0', i >= 4 && 'hidden min-[480px]:block')}>
                             <ToolCard tool={tool} />
                           </li>
                         ))}
