@@ -59,7 +59,6 @@
     "@zxcvbn-ts/language-en": "^4.1.1",
     "bowser": "^2.14.1",
     "comlink": "^4.4.2",
-    "cron-parser": "^5.10.1",
     "cronstrue": "^3.27.0",
     "csso": "^5.0.5",
     "culori": "^4.0.2",
