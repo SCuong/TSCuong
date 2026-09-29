@@ -237,6 +237,23 @@ export default function ApiClient() {
 
   const send = useCallback(async () => {
     if (controller.current) return;
+    // A curl command typed or dropped into the URL field (not pasted) is imported rather than
+    // sent as a URL. The user reviews the imported request before anything goes out.
+    if (looksLikeCurl(draft.url)) {
+      const r = draftFromCurl(draft.url);
+      if (!r.ok) {
+        setPrepError(r.error);
+        setMobileView('request');
+        return;
+      }
+      load(r.draft, null);
+      setNotice({
+        tone: r.warnings.length ? 'warning' : 'info',
+        title: 'Imported from curl. Review the request, then press Send.',
+        items: r.warnings,
+      });
+      return;
+    }
     const prepared = prepareRequest(draft, scope);
     if (!prepared.ok) {
       setPrepError(prepared.error);
@@ -276,7 +293,7 @@ export default function ApiClient() {
     } finally {
       if (controller.current === ctrl) controller.current = null;
     }
-  }, [draft, scope, settings, addHistory]);
+  }, [draft, scope, settings, addHistory, load]);
 
   const cancel = useCallback(() => {
     const ctrl = controller.current;
