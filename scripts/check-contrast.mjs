@@ -71,6 +71,9 @@ for (const [theme, selector] of [
   for (const s of ['surface', 'surface-sunken', 'surface-hover']) {
     for (const fg of SYNTAX) check(fg, `${s} (code)`, color(s).rgb);
   }
+  // Filled buttons: their label color on every fill state they can show.
+  for (const fill of ['accent', 'accent-hover']) check('accent-contrast', `${fill} (button)`, color(fill).rgb);
+  check('accent-contrast', 'danger-solid (button)', color('danger-solid').rgb);
   for (const [tint, fgs] of Object.entries(TINTS)) {
     for (const s of ['bg', 'surface', 'surface-raised']) {
       const bg = over(color(tint), color(s).rgb);

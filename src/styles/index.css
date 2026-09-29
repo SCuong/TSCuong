@@ -77,7 +77,7 @@
   --lk-text-secondary: #a7b1c2;
   --lk-text-muted: #8590a4; /* ≥ 4.5:1 on every dark surface and tint (scripts/check-contrast.mjs) */
   --lk-accent: #2f6fed;
-  --lk-accent-hover: #3d7bf5;
+  --lk-accent-hover: #2a66e0; /* deeper, not lighter: white labels need ≥ 4.5:1 */
   --lk-accent-contrast: #ffffff;
   --lk-accent-text: #72a6ff;
   --lk-accent-soft: rgb(79 141 255 / 0.12);
