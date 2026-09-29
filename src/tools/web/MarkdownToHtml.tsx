@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Code, Eye } from 'lucide-react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Label, Switch } from '@/components/ui/Field';
@@ -49,6 +49,15 @@ export default function MarkdownToHtml() {
     () => (allowRemote ? { html: fragment, blocked: 0, hosts: [] } : blockRemoteContent(fragment)),
     [fragment, allowRemote],
   );
+  // Code blocks in the preview scroll horizontally: make them keyboard-reachable (preview DOM only,
+  // the generated HTML is untouched).
+  const previewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    for (const pre of previewRef.current?.querySelectorAll<HTMLPreElement>('pre') ?? []) {
+      pre.tabIndex = 0;
+      if (!pre.hasAttribute('aria-label')) pre.setAttribute('aria-label', 'Code block');
+    }
+  }, [preview.html]);
 
   return (
     <ToolStack>
@@ -100,7 +109,7 @@ export default function MarkdownToHtml() {
                     className="mb-4"
                   />
                   {/* Sanitized by DOMPurify in markdownToHtml; remote media neutralized by blockRemoteContent. */}
-                  <div className="lk-prose" dangerouslySetInnerHTML={{ __html: preview.html }} />
+                  <div ref={previewRef} className="lk-prose" dangerouslySetInnerHTML={{ __html: preview.html }} />
                 </>
               ) : (
                 <EmptyState icon={Eye} title="Nothing to preview yet">

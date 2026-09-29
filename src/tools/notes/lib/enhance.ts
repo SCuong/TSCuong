@@ -120,6 +120,11 @@ export function prepareInteractive(root: HTMLElement) {
       a.rel = 'noopener noreferrer';
     }
   }
+  // Code blocks scroll horizontally; make them keyboard-reachable so long lines can be read.
+  for (const pre of root.querySelectorAll<HTMLPreElement>('pre')) {
+    pre.tabIndex = 0;
+    if (!pre.hasAttribute('aria-label')) pre.setAttribute('aria-label', 'Code block');
+  }
 }
 
 /** A complete, sanitized, styled HTML document for a note (diagrams rendered with the light theme). */

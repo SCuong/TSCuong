@@ -92,7 +92,7 @@ export function FilterChips<T extends string>({
             )}
           >
             {o.label}
-            {o.count !== undefined && <span className={cn('tabular-nums', active ? 'opacity-80' : 'text-fg-muted')}>{o.count}</span>}
+            {o.count !== undefined && <span className={cn('tabular-nums', !active && 'text-fg-muted')}>{o.count}</span>}
           </button>
         );
       })}

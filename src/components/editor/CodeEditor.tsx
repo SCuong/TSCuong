@@ -157,10 +157,13 @@ export function CodeEditor({
     lineWrapping ? EditorView.lineWrapping : [],
     showLineNumbers ? [lineNumbers(), highlightActiveLineGutter(), foldGutter()] : [],
     placeholder ? placeholderExt(placeholder) : [],
-    // Read-only content is not contenteditable, so it would not be focusable: keep it in the tab
-    // order so keyboard users can reach, scroll and select output.
+    // Keep the content in the tab order explicitly: read-only content is not contenteditable (so it
+    // would not be focusable at all), and CodeMirror marks its scroller tabindex=-1, so assistive
+    // checks need an explicit tabindex to see that the scroll region is keyboard-reachable.
     EditorView.contentAttributes.of(
-      readOnly ? { 'aria-label': ariaLabel, 'aria-readonly': 'true', tabindex: '0' } : { 'aria-label': ariaLabel },
+      readOnly
+        ? { 'aria-label': ariaLabel, 'aria-readonly': 'true', tabindex: '0' }
+        : { 'aria-label': ariaLabel, tabindex: '0' },
     ),
   ];
 
