@@ -404,7 +404,10 @@ export default function SqliteStudio() {
           </Drawer>
         )}
 
-        <main className="flex min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface p-3 shadow-card sm:p-4">
+        <section
+          aria-label="Database contents"
+          className="flex min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface p-3 shadow-card sm:p-4"
+        >
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Segmented
               label="View"
@@ -483,7 +486,7 @@ export default function SqliteStudio() {
             ))}
 
           {tab === 'info' && info && <InfoPanel info={info} fileName={name} originalSize={originalSize} />}
-        </main>
+        </section>
       </div>
 
       <ConfirmDialog
