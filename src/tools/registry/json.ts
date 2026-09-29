@@ -1,4 +1,4 @@
-import { Braces, FileCheck, GitCompare, ListTree, Route } from 'lucide-react';
+import { Braces, FileCheck, GitCompare, ListChecks, ListTree, Route, Shapes } from 'lucide-react';
 import type { ToolDefinition } from '../types';
 
 export const jsonTools: ToolDefinition[] = [
@@ -9,6 +9,7 @@ export const jsonTools: ToolDefinition[] = [
     category: 'json',
     icon: Braces,
     route: 'json-formatter',
+    priority: 3,
     keywords: ['json', 'format', 'pretty', 'print', 'beautify', 'minify', 'indent', 'validate'],
     aliases: ['format json', 'json beautifier', 'pretty print json', 'json prettifier', 'json minifier'],
     load: () => import('../json/JsonFormatter'),
@@ -58,6 +59,47 @@ export const jsonTools: ToolDefinition[] = [
     keywords: ['jsonpath', 'json path', 'query', 'filter', 'select', 'expression', 'evaluator', 'rfc 9535', 'jq'],
     aliases: ['jsonpath evaluator', 'json path tester', 'query json', 'jsonpath online', 'json query'],
     load: () => import('../json/JsonPathTester'),
+    layout: 'wide',
+  },
+  {
+    id: 'json-schema-validator',
+    name: 'JSON Schema Validator',
+    description:
+      'Validate JSON against a JSON Schema (draft 4, 7, 2019-09 or 2020-12) with every error linked to the document, or generate a schema from sample JSON.',
+    category: 'json',
+    icon: ListChecks,
+    route: 'json-schema-validator',
+    keywords: [
+      'json schema', 'schema', 'validate', 'validator', 'validation', 'ajv', 'draft 4', 'draft 7', 'draft-07',
+      '2019-09', '2020-12', 'ref', 'required', 'generate schema', 'infer schema', 'openapi', 'contract', 'lint',
+    ],
+    aliases: [
+      'validate json against schema', 'json schema validator', 'schema validator', 'ajv online', 'check json schema',
+      'generate json schema from json', 'json to json schema', 'infer json schema', 'test json schema',
+    ],
+    load: () => import('../json/schema/JsonSchemaValidator'),
+    layout: 'wide',
+  },
+  {
+    id: 'json-to-types',
+    name: 'JSON to TypeScript & Types',
+    description:
+      'Generate TypeScript, Zod, Go, Rust, Python, C#, Kotlin or JSON Schema types from sample JSON, with optional and nullable fields inferred.',
+    category: 'json',
+    icon: Shapes,
+    route: 'json-to-types',
+    keywords: [
+      'json', 'typescript', 'ts', 'interface', 'interfaces', 'type', 'types', 'zod', 'go', 'golang', 'struct',
+      'rust', 'serde', 'python', 'dataclass', 'typeddict', 'pydantic', 'c#', 'csharp', 'dotnet', 'kotlin',
+      'kotlinx', 'json schema', 'quicktype', 'codegen', 'generate', 'model', 'dto', 'infer', 'class',
+    ],
+    aliases: [
+      'json to typescript', 'json to interface', 'json to ts', 'json to zod', 'json to go struct', 'json to go',
+      'json to rust', 'json to serde struct', 'json to python', 'json to dataclass', 'json to pydantic',
+      'json to typeddict', 'json to c#', 'json to csharp class', 'json to kotlin', 'json to kotlin data class',
+      'generate types from json', 'quicktype alternative', 'typescript interface generator',
+    ],
+    load: () => import('../json/typegen/JsonToTypes'),
     layout: 'wide',
   },
 ];
