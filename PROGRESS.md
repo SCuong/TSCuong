@@ -20,9 +20,9 @@ Committed since 14:11 (all verified: tsc, eslint, vitest, audit crawler with --a
     palette quick actions (4a4db6d); EditorPanel extensions/onReady, CodePanel removed (a1b9041);
     catalog generator npm run docs:tools (93e8005); docs ARCHITECTURE/TESTING
 Background agents (resumed 19:14 via SendMessage; they own these files, do NOT start duplicates):
-  - security builder: src/tools/security/** new dirs + registry/security.ts (JWT, passwords, PEM, key pair, TOTP);
-    asked to replace its shared-b/CodePanel with EditorPanel and pass --axe
-  - audit-pdf: src/tools/pdf/**, src/tools/ocr/**, e2e/audit-pdf.spec.ts (had 16 files modified mid-work)
+  - audit-web: src/tools/web/**, src/tools/color/**, e2e/audit-web.spec.ts (launched 19:40)
+  - audit-workspaces-a: src/tools/notes/**, diagrams/**, snippets/**, e2e/audit-workspaces-a.spec.ts (launched 20:35)
+Done since resume: security tools (5530ea1), PDF audit 23 fixes (74d0d74), useAsyncJob cancel fix (0f85d60), Bates padding (6dcd370).
   - audit-image: src/tools/image/**, src/tools/qr/**, e2e/audit-image.spec.ts
   - audit-text: src/tools/text/**, regex/**, encoding/**, e2e/audit-text.spec.ts
 Held uncommitted by the lead until security is verified: docs/PRIVACY.md, docs/BROWSER_SUPPORT.md, docs/TOOLS.md.
