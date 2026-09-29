@@ -1,13 +1,12 @@
 import { useMemo, useRef } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { CircleCheck, CircleX, Crosshair, FileCheck, TriangleAlert } from 'lucide-react';
-import { ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, ToolStack } from '@/components/tool/EditorPanel';
 import { Panel, Stat } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, formatBytes, formatNumber, pluralize } from '@/lib/utils';
-import { CodePanel } from './shared/CodePanel';
 import { problemMarkers, revealPosition, type EditorProblem } from './shared/errorMarkers';
 import { scanJson } from './lib/jsonScan';
 import { jsonStats, stripBom } from './lib/json';
@@ -69,7 +68,7 @@ export default function JsonValidator() {
   return (
     <ToolStack>
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <CodePanel
+        <EditorPanel code
           title="JSON"
           value={input}
           onChange={setInput}

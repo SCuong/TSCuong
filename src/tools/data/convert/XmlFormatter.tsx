@@ -7,7 +7,6 @@ import { Panel, Stat } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { cn, formatBytes, formatNumber } from '@/lib/utils';
-import { CodePanel } from '@/tools/json/shared/CodePanel';
 import { utf8Bytes, type IndentOption } from './lib/common';
 import { formatXml, minifyXml, xmlStats, type AttributeLayout, type EmptyElementStyle } from './lib/xmlFormat';
 import { Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
@@ -133,7 +132,7 @@ export default function XmlFormatter() {
       )}
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="XML"
           value={input}
           onChange={setInput}

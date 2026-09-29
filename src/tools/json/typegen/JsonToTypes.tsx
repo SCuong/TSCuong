@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Input, Label, Select, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { Alert, ErrorMessage } from '@/components/ui/Alert';
@@ -7,7 +7,6 @@ import { Spinner } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { formatBytes, pluralize } from '@/lib/utils';
 import type { EditorLanguage } from '@/components/editor/languages';
-import { CodePanel } from '../shared/CodePanel';
 import { problemMarkers } from '../shared/errorMarkers';
 import { formatJsonError } from '../lib/json';
 import { TARGETS, targetInfo, type GenerateOptions, type GenerateResult, type TargetId } from './lib/generate';
@@ -202,7 +201,7 @@ export default function JsonToTypes() {
       />
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="JSON"
           value={input}
           onChange={setInput}
@@ -215,7 +214,7 @@ export default function JsonToTypes() {
           extensions={inputExtensions}
           footer={hasInput ? <span>{formatBytes(new Blob([input]).size)}</span> : undefined}
         />
-        <CodePanel
+        <EditorPanel code
           title={info.label}
           value={code}
           language={editorLanguage}

@@ -1,4 +1,6 @@
 import { useRef, type ReactNode } from 'react';
+import type { Extension } from '@codemirror/state';
+import type { EditorView } from '@codemirror/view';
 import { Eraser, FileUp, FlaskConical } from 'lucide-react';
 import { cn, errorMessage } from '@/lib/utils';
 import { CodeEditor } from '@/components/editor/CodeEditor';
@@ -36,6 +38,10 @@ export interface EditorPanelProps {
   lineWrapping?: boolean;
   invalid?: boolean;
   ariaLabel?: string;
+  /** Extra CodeMirror extensions (e.g. error markers). Keep the array reference stable. Implies `code`. */
+  extensions?: Extension[];
+  /** Receives the CodeMirror view (e.g. to move the cursor to an error). Implies `code`. */
+  onReady?: (view: EditorView) => void;
 }
 
 /** A titled input or output area with the standard copy/clear/open/download actions. */
@@ -58,9 +64,11 @@ export function EditorPanel({
   lineWrapping = true,
   invalid,
   ariaLabel,
+  extensions,
+  onReady,
 }: EditorPanelProps) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const useCode = code || (language !== undefined && language !== 'plain');
+  const useCode = code || extensions !== undefined || onReady !== undefined || (language !== undefined && language !== 'plain');
   const label = ariaLabel ?? (typeof title === 'string' ? title : 'Editor');
 
   async function openFile(file: File) {
@@ -69,7 +77,9 @@ export function EditorPanel({
       return;
     }
     try {
-      onChange?.(await file.text());
+      const text = await file.text();
+      // Drop a UTF-8 byte-order mark so parsers (JSON, CSV, YAML…) see the real first character.
+      onChange?.(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
     } catch (error) {
       toast(errorMessage(error, 'Could not read the file.'), 'error');
     }
@@ -128,6 +138,8 @@ export function EditorPanel({
             lineWrapping={lineWrapping}
             ariaLabel={label}
             className="h-full"
+            extensions={extensions}
+            onReady={onReady}
           />
         ) : (
           <Textarea

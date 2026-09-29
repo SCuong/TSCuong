@@ -8,7 +8,6 @@ import { Badge, Panel, Stat } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { cn, formatNumber, pluralize } from '@/lib/utils';
-import { CodePanel } from '@/tools/json/shared/CodePanel';
 import type { EditorProblem } from '@/tools/json/shared/errorMarkers';
 import { describeDifference, formatYaml, validateYaml, type YamlDiagnostic, type YamlVersion } from './lib/yaml';
 import { Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
@@ -168,7 +167,7 @@ export default function YamlFormatter() {
       )}
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="YAML"
           value={input}
           onChange={setInput}

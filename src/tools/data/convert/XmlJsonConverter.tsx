@@ -3,7 +3,6 @@ import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/E
 import { Input, Select, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
-import { CodePanel } from '@/tools/json/shared/CodePanel';
 import { looksLikeJson, looksLikeXml, type IndentOption } from './lib/common';
 import { ATTRIBUTE_PREFIXES, jsonToXml, TEXT_KEYS, xmlToJson } from './lib/xml';
 import { DirectionHint, DirectionSwitch, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
@@ -167,7 +166,7 @@ export default function XmlJsonConverter() {
       <NotesPanel notes={result?.ok ? result.warnings : []} />
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title={toJson ? 'XML input' : 'JSON input'}
           value={input}
           onChange={setInput}

@@ -3,7 +3,6 @@ import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/E
 import { Select, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
-import { CodePanel } from '@/tools/json/shared/CodePanel';
 import { looksLikeJson, type IndentOption } from './lib/common';
 import { jsonToYaml, yamlToJson, type MultiDocMode } from './lib/yaml';
 import { DirectionHint, DirectionSwitch, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
@@ -170,7 +169,7 @@ export default function JsonYamlConverter() {
       <NotesPanel notes={result?.ok ? result.warnings : []} />
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title={toJson ? 'YAML input' : 'JSON input'}
           value={input}
           onChange={setInput}

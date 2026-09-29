@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { BookOpen, Route } from 'lucide-react';
-import { SplitPanes, ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, SplitPanes, ToolStack } from '@/components/tool/EditorPanel';
 import { Input } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { ErrorMessage } from '@/components/ui/Alert';
@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, formatNumber, pluralize } from '@/lib/utils';
 import { CodeEditor } from '@/components/editor/CodeEditor';
-import { CodePanel } from './shared/CodePanel';
 import { formatJsonError, parseJson } from './lib/json';
 import { JSONPATH_EXAMPLES, runJsonPath } from './lib/jsonpath';
 
@@ -89,7 +88,7 @@ export default function JsonPathTester() {
       </div>
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="JSON document"
           value={input}
           onChange={setInput}

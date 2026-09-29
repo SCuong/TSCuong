@@ -4,7 +4,6 @@ import { NumberInput, Select, Switch } from '@/components/ui/Field';
 import { Spinner } from '@/components/ui/Feedback';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
-import { CodePanel } from '@/tools/json/shared/CodePanel';
 import { utf8Bytes } from '../convert/lib/common';
 import { ErrorPanel, MoreOptionsToggle, Option, TextStats, useEditorView, useProblemMarkers } from '../convert/shared/ConvertUi';
 import { DIALECTS, dialectInfo, type SqlDialect } from './lib/dialects';
@@ -189,7 +188,7 @@ export default function SqlFormatter() {
       <ErrorPanel title={mode === 'format' ? 'Could not format this SQL' : 'Could not minify this SQL'} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="SQL"
           value={input}
           onChange={setInput}

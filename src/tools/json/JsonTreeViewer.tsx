@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Link, ListTree, Search } from 'lucide-react';
-import { ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, ToolStack } from '@/components/tool/EditorPanel';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/Feedback';
@@ -9,7 +9,6 @@ import { ErrorMessage } from '@/components/ui/Alert';
 import { toast } from '@/components/ui/Toast';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, copyText, formatNumber, pluralize } from '@/lib/utils';
-import { CodePanel } from './shared/CodePanel';
 import { formatJsonError, parseJson } from './lib/json';
 import { countNodes, flattenTree, previewValue, searchTree, type ExpansionState, type JsonType, type TreeRow } from './lib/tree';
 
@@ -89,7 +88,7 @@ export default function JsonTreeViewer() {
   return (
     <ToolStack>
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <CodePanel
+        <EditorPanel code
           title="JSON input"
           value={input}
           onChange={(v) => {

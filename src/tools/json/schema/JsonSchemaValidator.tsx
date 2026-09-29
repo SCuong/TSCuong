@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { BookOpenCheck, Crosshair, FileSearch, ListChecks, WandSparkles } from 'lucide-react';
-import { SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Label, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { Alert } from '@/components/ui/Alert';
@@ -12,7 +12,6 @@ import { ConfirmDialog } from '@/components/ui/Dialog';
 import { toast } from '@/components/ui/Toast';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, formatBytes, formatNumber, pluralize } from '@/lib/utils';
-import { CodePanel } from '../shared/CodePanel';
 import { problemMarkers, type EditorProblem } from '../shared/errorMarkers';
 import { useLatestJobRunner } from '../typegen/hooks';
 import { DRAFT_LABELS, type DraftChoice } from './lib/drafts';
@@ -286,7 +285,7 @@ export default function JsonSchemaValidator() {
       </ToolBar>
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="JSON document"
           value={doc}
           onChange={setDoc}
@@ -299,7 +298,7 @@ export default function JsonSchemaValidator() {
           onReady={(v) => (docView.current = v)}
           footer={hasDoc || slow ? docFooter : undefined}
         />
-        <CodePanel
+        <EditorPanel code
           title="JSON Schema"
           value={schema}
           onChange={setSchema}

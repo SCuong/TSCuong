@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowLeftRight, GitCompare } from 'lucide-react';
-import { SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Segmented } from '@/components/ui/Segmented';
 import { Label, Switch } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +10,6 @@ import { Badge, Panel } from '@/components/ui/Panel';
 import { EmptyState } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, formatNumber } from '@/lib/utils';
-import { CodePanel } from './shared/CodePanel';
 import { formatJsonError, parseJson } from './lib/json';
 import { diffJson, normalizeForText, sideBySide, summarize, type AlignedRow, type DiffEntry, type DiffKind } from './lib/jsonDiff';
 
@@ -136,7 +135,7 @@ export default function JsonDiff() {
   return (
     <ToolStack>
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title="Original"
           value={left}
           onChange={setLeft}
@@ -147,7 +146,7 @@ export default function JsonDiff() {
           invalid={Boolean(pa && !pa.ok)}
           height="300px"
         />
-        <CodePanel
+        <EditorPanel code
           title="Modified"
           value={right}
           onChange={setRight}

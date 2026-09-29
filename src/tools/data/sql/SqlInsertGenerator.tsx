@@ -1,11 +1,10 @@
 import { useDeferredValue, useMemo } from 'react';
-import { SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Input, NumberInput, Select, Switch } from '@/components/ui/Field';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { formatBytes, formatNumber, pluralize } from '@/lib/utils';
-import { CodePanel } from '@/tools/json/shared/CodePanel';
 import { OutputPanel } from '@/tools/data/csv/components/OutputPanel';
 import { utf8Bytes } from '../convert/lib/common';
 import { DirectionHint, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from '../convert/shared/ConvertUi';
@@ -174,7 +173,7 @@ export default function SqlInsertGenerator() {
       <NotesPanel notes={notes} title="Notes" />
 
       <SplitPanes>
-        <CodePanel
+        <EditorPanel code
           title={format === 'json' ? 'JSON records' : 'CSV with a header row'}
           value={input}
           onChange={setInput}
