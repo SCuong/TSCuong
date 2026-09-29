@@ -1,4 +1,21 @@
-import { ArrowRightLeft, Braces, ChartColumn, CodeXml, CopyMinus, FileSpreadsheet, Grid3x3, Sheet, Table } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  Braces,
+  ChartColumn,
+  CodeXml,
+  CopyMinus,
+  Database,
+  DatabaseZap,
+  FileBraces,
+  FileBracesCorner,
+  FileCog,
+  FileSpreadsheet,
+  Grid3x3,
+  ListChecks,
+  ListCollapse,
+  Sheet,
+  Table,
+} from 'lucide-react';
 import type { ToolDefinition } from '../types';
 
 export const dataTools: ToolDefinition[] = [
@@ -104,5 +121,143 @@ export const dataTools: ToolDefinition[] = [
     keywords: ['html', 'table', 'generator', 'csv', 'thead', 'tbody', 'markup', 'code', 'escape', 'web'],
     aliases: ['csv to html table', 'html table maker', 'table to html', 'create html table'],
     load: () => import('../data/csv/HtmlTableGenerator'),
+  },
+
+  // --- Format converters (DATA-CONVERT) ---
+  {
+    id: 'json-yaml-converter',
+    name: 'JSON ↔ YAML Converter',
+    description: 'Convert YAML to JSON and JSON to YAML, with YAML 1.1 “Norway problem” warnings, multi-document streams and precise errors.',
+    category: 'data',
+    icon: FileBraces,
+    route: 'data/json-yaml',
+    keywords: [
+      'yaml', 'yml', 'json', 'convert', 'converter', 'yaml to json', 'json to yaml', 'yml to json', 'json to yml', 'kubernetes', 'k8s',
+      'docker compose', 'helm', 'cloudformation', 'github actions', 'openapi', 'swagger', 'multi-document', 'anchors',
+    ],
+    aliases: [
+      'yaml to json', 'json to yaml', 'yml to json', 'json to yml', 'convert yaml to json', 'convert json to yaml', 'yaml2json', 'json2yaml',
+      'yaml json converter', 'yaml parser online',
+    ],
+    load: () => import('../data/convert/JsonYamlConverter'),
+    priority: 1,
+  },
+  {
+    id: 'yaml-formatter',
+    name: 'YAML Validator & Formatter',
+    description: 'Validate YAML with line and column errors, duplicate-key and YAML 1.1 checks, then re-indent it keeping comments and anchors.',
+    category: 'data',
+    icon: ListChecks,
+    route: 'data/yaml-formatter',
+    keywords: [
+      'yaml', 'yml', 'validator', 'validate', 'lint', 'linter', 'formatter', 'format', 'beautify', 'pretty print', 'indent', 'sort keys',
+      'syntax check', 'duplicate keys', 'kubernetes', 'docker compose', 'norway problem',
+    ],
+    aliases: [
+      'yaml validator', 'yaml lint', 'yaml linter', 'yaml formatter', 'format yaml', 'validate yaml', 'yaml beautifier', 'yml validator',
+      'check yaml syntax', 'yaml pretty print',
+    ],
+    load: () => import('../data/convert/YamlFormatter'),
+    layout: 'wide',
+  },
+  {
+    id: 'xml-formatter',
+    name: 'XML Formatter & Validator',
+    description: 'Pretty-print or minify XML, check that it is well-formed with precise errors, and count elements, attributes and depth.',
+    category: 'data',
+    icon: CodeXml,
+    route: 'data/xml-formatter',
+    keywords: [
+      'xml', 'formatter', 'format', 'pretty print', 'beautify', 'indent', 'minify', 'validator', 'validate', 'well-formed', 'lint', 'xsd',
+      'svg', 'rss', 'soap', 'plist', 'cdata', 'namespaces', 'doctype',
+    ],
+    aliases: [
+      'xml pretty print', 'xml formatter', 'format xml', 'xml beautifier', 'validate xml', 'xml validator', 'minify xml', 'xml minifier',
+      'check xml', 'xml linter',
+    ],
+    load: () => import('../data/convert/XmlFormatter'),
+    layout: 'wide',
+    priority: 1,
+  },
+  {
+    id: 'xml-json-converter',
+    name: 'XML ↔ JSON Converter',
+    description: 'Convert XML to JSON and JSON to XML with options for attribute prefixes, text keys, arrays and namespaces.',
+    category: 'data',
+    icon: FileBracesCorner,
+    route: 'data/xml-json',
+    keywords: ['xml', 'json', 'convert', 'converter', 'xml to json', 'json to xml', 'attributes', 'soap', 'rss', 'api', 'parse xml', 'namespaces'],
+    aliases: ['xml to json', 'json to xml', 'convert xml to json', 'convert json to xml', 'xml2json', 'json2xml', 'xml json converter'],
+    load: () => import('../data/convert/XmlJsonConverter'),
+  },
+  {
+    id: 'toml-json-converter',
+    name: 'TOML ↔ JSON Converter',
+    description: 'Convert TOML to JSON and JSON to TOML: dates, inline tables, arrays of tables, 64-bit integers and precise errors.',
+    category: 'data',
+    icon: FileCog,
+    route: 'data/toml-json',
+    keywords: [
+      'toml', 'json', 'convert', 'converter', 'toml to json', 'json to toml', 'cargo.toml', 'pyproject.toml', 'config', 'rust', 'python',
+      'hugo', 'netlify', 'validate toml',
+    ],
+    aliases: ['toml to json', 'json to toml', 'convert toml to json', 'convert json to toml', 'toml parser', 'toml validator', 'toml json converter'],
+    load: () => import('../data/convert/TomlJsonConverter'),
+  },
+
+  // --- SQL (DATA-CONVERT) ---
+  {
+    id: 'sql-formatter',
+    name: 'SQL Formatter',
+    description: 'Format or minify SQL for PostgreSQL, MySQL, SQL Server, Oracle, SQLite, BigQuery, Snowflake and more, with keyword case and indent options.',
+    category: 'data',
+    icon: Database,
+    route: 'data/sql-formatter',
+    keywords: [
+      'sql', 'formatter', 'format', 'beautifier', 'beautify', 'pretty print', 'indent', 'minify', 'minifier', 'compress', 'query',
+      'postgresql', 'postgres', 'mysql', 'mariadb', 'sql server', 't-sql', 'tsql', 'oracle', 'pl/sql', 'sqlite', 'bigquery', 'snowflake',
+      'redshift', 'spark', 'dbt', 'uppercase keywords',
+    ],
+    aliases: [
+      'format sql', 'sql beautifier', 'sql pretty print', 'minify sql', 'sql minifier', 'beautify sql query', 'sql formatter online',
+      'uppercase sql keywords', 'format sql query',
+    ],
+    load: () => import('../data/sql/SqlFormatter'),
+    priority: 1,
+  },
+  {
+    id: 'sql-insert-generator',
+    name: 'JSON / CSV to SQL INSERT',
+    description: 'Turn a JSON array or CSV into INSERT statements for your database, with batching, escaping and an optional CREATE TABLE.',
+    category: 'data',
+    icon: DatabaseZap,
+    route: 'data/sql-insert',
+    keywords: [
+      'sql', 'insert', 'insert statements', 'json to sql', 'csv to sql', 'create table', 'import', 'seed', 'bulk insert', 'values',
+      'postgresql', 'mysql', 'sqlite', 'sql server', 'oracle', 'migration', 'escape',
+    ],
+    aliases: [
+      'json to sql', 'csv to sql', 'json to sql insert', 'csv to sql insert', 'generate insert statements', 'sql insert generator',
+      'convert json to sql', 'convert csv to sql', 'json to insert statements',
+    ],
+    load: () => import('../data/sql/SqlInsertGenerator'),
+    layout: 'wide',
+  },
+  {
+    id: 'list-converter',
+    name: 'List to SQL IN Clause',
+    description: 'Turn lines into a quoted, comma-separated list, a SQL IN (…) clause or a JSON array, or split such a list back into lines.',
+    category: 'data',
+    icon: ListCollapse,
+    route: 'data/list-converter',
+    keywords: [
+      'list', 'sql', 'in clause', 'where in', 'comma separated', 'comma', 'quote', 'quoted list', 'join lines', 'split list', 'json array',
+      'dedupe', 'ids', 'csv', 'lines',
+    ],
+    aliases: [
+      'sql in clause', 'list to sql in', 'comma separated list', 'lines to comma separated', 'quote each line', 'list to json array',
+      'comma separated to lines', 'column to comma separated list', 'excel column to sql',
+    ],
+    load: () => import('../data/sql/ListConverter'),
   },
 ];

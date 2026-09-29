@@ -1,0 +1,261 @@
+import { useDeferredValue, useMemo } from 'react';
+import { SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
+import { Input, NumberInput, Select, Switch } from '@/components/ui/Field';
+import { Badge, Panel } from '@/components/ui/Panel';
+import { Segmented } from '@/components/ui/Segmented';
+import { useToolState } from '@/lib/hooks';
+import { formatBytes, formatNumber, pluralize } from '@/lib/utils';
+import { CodePanel } from '@/tools/json/shared/CodePanel';
+import { OutputPanel } from '@/tools/data/csv/components/OutputPanel';
+import { utf8Bytes } from '../convert/lib/common';
+import { DirectionHint, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from '../convert/shared/ConvertUi';
+import {
+  datasetFromCsv,
+  datasetFromJson,
+  defaultQuoting,
+  generateInserts,
+  INSERT_DIALECTS,
+  quoteIdentifier,
+  sqlTypeName,
+  type IdentifierQuoting,
+  type InsertDialect,
+  type InsertOptions,
+} from './lib/sqlInsert';
+
+const TOOL = 'sql-insert-generator';
+
+const SAMPLE_JSON = `[
+  { "id": 1, "name": "Ada Lovelace", "email": "ada@example.com", "active": true, "signup": "2024-01-15", "score": 98.5, "tags": ["admin", "beta"] },
+  { "id": 2, "name": "O'Brien, Pat", "email": null, "active": false, "signup": "2024-02-01", "score": 71.25, "tags": [] },
+  { "id": 3, "name": "Zoë Chen", "email": "zoe@example.com", "active": true, "signup": "2024-03-09", "score": 88, "notes": "Path: C:\\\\temp\\\\new" }
+]`;
+
+const SAMPLE_CSV = `id,name,email,active,signup,score
+1,Ada Lovelace,ada@example.com,true,2024-01-15,98.5
+2,"O'Brien, Pat",,false,2024-02-01,71.25
+3,Zoë Chen,zoe@example.com,true,2024-03-09,88
+`;
+
+type InputFormat = 'json' | 'csv';
+
+interface CsvSettings {
+  delimiter: string;
+  detectTypes: boolean;
+  emptyAsNull: boolean;
+}
+
+const QUOTE_LABELS: Record<'double' | 'backtick' | 'bracket', string> = { double: '"name"', backtick: '`name`', bracket: '[name]' };
+
+export default function SqlInsertGenerator() {
+  const [input, setInput] = useToolState(TOOL, 'input', '');
+  const [format, setFormat] = useToolState<InputFormat>(TOOL, 'format', 'json');
+  const [o, setO] = useToolState<InsertOptions>(TOOL, 'options', {
+    table: 'my_table',
+    dialect: 'postgresql',
+    quoting: 'auto',
+    batchSize: 1,
+    createTable: true,
+    includeColumns: true,
+    transaction: false,
+    detectDates: true,
+  });
+  const [c, setC] = useToolState<CsvSettings>(TOOL, 'csv', { delimiter: '', detectTypes: true, emptyAsNull: true });
+  const set = <K extends keyof InsertOptions>(key: K, value: InsertOptions[K]) => setO((prev) => ({ ...prev, [key]: value }));
+  const setCsv = <K extends keyof CsvSettings>(key: K, value: CsvSettings[K]) => setC((prev) => ({ ...prev, [key]: value }));
+  const editor = useEditorView();
+
+  const deferred = useDeferredValue(input);
+  const dataset = useMemo(() => {
+    if (!deferred.trim()) return null;
+    return format === 'json' ? datasetFromJson(deferred) : datasetFromCsv(deferred, c);
+  }, [deferred, format, c]);
+  const result = useMemo(() => (dataset?.ok ? generateInserts(dataset.data, o) : null), [dataset, o]);
+
+  const inputError = dataset && !dataset.ok ? dataset.error : null;
+  const markers = useProblemMarkers(inputError);
+  const output = result?.ok ? result.sql : '';
+  const notes = [...(dataset?.ok ? dataset.data.notes : []), ...(result?.ok ? result.warnings : [])];
+  const outBytes = useMemo(() => utf8Bytes(output), [output]);
+  const looksLikeCsv = format === 'json' && Boolean(inputError) && !/^\s*[[{]/.test(deferred) && /[,;\t]/.test(deferred.split('\n', 1)[0] ?? '');
+  const looksLikeJsonInput = format === 'csv' && /^\s*[[{]/.test(deferred);
+  const autoStyle = defaultQuoting(o.dialect);
+
+  return (
+    <ToolStack>
+      <ToolBar>
+        <Option label="Input">
+          <Segmented
+            label="Input"
+            value={format}
+            onChange={setFormat}
+            options={[
+              { value: 'json', label: 'JSON' },
+              { value: 'csv', label: 'CSV' },
+            ]}
+          />
+        </Option>
+        <Option label="Database" htmlFor="ins-dialect" className="w-40">
+          <Select id="ins-dialect" value={o.dialect} onChange={(e) => set('dialect', e.target.value as InsertDialect)} className="h-8 py-1 text-[13px]">
+            {INSERT_DIALECTS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </Select>
+        </Option>
+        <Option label="Table" htmlFor="ins-table" className="w-40">
+          <Input
+            id="ins-table"
+            value={o.table}
+            onChange={(e) => set('table', e.target.value)}
+            placeholder="schema.table"
+            spellCheck={false}
+            className="h-8 py-1 font-mono text-[13px]"
+          />
+        </Option>
+        <Option label="Quote names" htmlFor="ins-quote" className="w-40">
+          <Select id="ins-quote" value={o.quoting} onChange={(e) => set('quoting', e.target.value as IdentifierQuoting)} className="h-8 py-1 text-[13px]">
+            <option value="auto">{`Always ${QUOTE_LABELS[autoStyle]}`}</option>
+            <option value="minimal">Only when needed</option>
+            <option value="double">Always "name"</option>
+            <option value="backtick">Always `name`</option>
+            <option value="bracket">Always [name]</option>
+          </Select>
+        </Option>
+        <Option label="Rows per INSERT" htmlFor="ins-batch" className="w-32">
+          <NumberInput
+            id="ins-batch"
+            min={1}
+            max={10000}
+            step={1}
+            value={o.batchSize}
+            onChange={(v) => set('batchSize', v === '' ? 1 : Math.min(10000, Math.max(1, Math.round(v))))}
+            className="h-8 py-1 text-[13px]"
+          />
+        </Option>
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+          <Switch label="CREATE TABLE with inferred types" checked={o.createTable} onChange={(v) => set('createTable', v)} />
+          <Switch label="Column list" checked={o.includeColumns} onChange={(v) => set('includeColumns', v)} />
+          <Switch label="Wrap in a transaction" checked={o.transaction} onChange={(v) => set('transaction', v)} />
+          <Switch label="Detect dates" checked={o.detectDates} onChange={(v) => set('detectDates', v)} />
+          {format === 'csv' && (
+            <>
+              <Switch label="Numbers & booleans" checked={c.detectTypes} onChange={(v) => setCsv('detectTypes', v)} />
+              <Switch label="Empty cells as NULL" checked={c.emptyAsNull} onChange={(v) => setCsv('emptyAsNull', v)} />
+              <div className="flex items-center gap-2">
+                <label htmlFor="ins-delim" className="text-sm text-fg">
+                  Delimiter
+                </label>
+                <Select id="ins-delim" value={c.delimiter} onChange={(e) => setCsv('delimiter', e.target.value)} className="h-8 w-32 py-1 text-[13px]">
+                  <option value="">Auto-detect</option>
+                  <option value=",">Comma</option>
+                  <option value=";">Semicolon</option>
+                  <option value={'\t'}>Tab</option>
+                  <option value="|">Pipe</option>
+                </Select>
+              </div>
+            </>
+          )}
+        </div>
+      </ToolBar>
+
+      {looksLikeCsv && (
+        <DirectionHint actionLabel="Read as CSV" onAction={() => setFormat('csv')}>
+          This input looks like CSV rather than JSON.
+        </DirectionHint>
+      )}
+      {looksLikeJsonInput && (
+        <DirectionHint actionLabel="Read as JSON" onAction={() => setFormat('json')}>
+          This input looks like JSON rather than CSV.
+        </DirectionHint>
+      )}
+      <ErrorPanel title={format === 'json' ? 'Invalid JSON' : 'Cannot read this CSV'} error={inputError} onReveal={() => editor.reveal(inputError?.line, inputError?.column)} />
+      <ErrorPanel title="Cannot generate SQL" error={result && !result.ok ? { message: result.error } : null} />
+      <NotesPanel notes={notes} title="Notes" />
+
+      <SplitPanes>
+        <CodePanel
+          title={format === 'json' ? 'JSON records' : 'CSV with a header row'}
+          value={input}
+          onChange={setInput}
+          language={format === 'json' ? 'json' : 'plain'}
+          placeholder={format === 'json' ? 'Paste a JSON array of objects…' : 'Paste CSV (first row = column names)…'}
+          sample={format === 'json' ? SAMPLE_JSON : SAMPLE_CSV}
+          fileAccept={format === 'json' ? '.json,application/json,text/plain' : '.csv,.tsv,.txt,text/csv,text/plain'}
+          invalid={Boolean(inputError)}
+          height="480px"
+          lineWrapping={false}
+          extensions={markers}
+          onReady={editor.onReady}
+          footer={input ? <TextStats text={input} /> : undefined}
+        />
+        <OutputPanel
+          title="SQL"
+          value={output}
+          language="sql"
+          downloadName={`${(o.table.trim() || 'data').replace(/[^\w.-]+/g, '_')}.sql`}
+          downloadType="application/sql"
+          placeholder="INSERT statements appear here"
+          height="480px"
+          bytes={outBytes}
+          footer={
+            result?.ok ? (
+              <>
+                <span>{pluralize(result.rows, 'row')}</span>
+                <span>{pluralize(result.statements, 'INSERT statement')}</span>
+                <span>{formatBytes(outBytes)}</span>
+              </>
+            ) : undefined
+          }
+        />
+      </SplitPanes>
+
+      {result?.ok && dataset?.ok && dataset.data.columns.length > 0 && (
+        <Panel title="Columns" description="Types are inferred from every value; nested objects and arrays are stored as JSON text." bodyClassName="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] text-left text-[13px]">
+              <thead className="border-b border-line text-[12px] text-fg-muted">
+                <tr>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Column
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    SQL type ({INSERT_DIALECTS.find((d) => d.value === o.dialect)?.label})
+                  </th>
+                  <th scope="col" className="px-4 py-2 font-medium">
+                    Values
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {dataset.data.columns.slice(0, 200).map((name, i) => {
+                  const t = result.types[i];
+                  return (
+                    <tr key={`${name}-${i}`}>
+                      <td className="px-4 py-1.5 font-mono text-[12.5px] break-all text-fg">{quoteIdentifier(name, o.dialect, o.quoting)}</td>
+                      <td className="px-4 py-1.5 font-mono text-[12.5px] text-fg-secondary">{sqlTypeName(t, o.dialect)}</td>
+                      <td className="px-4 py-1.5">
+                        {t.kind === 'unknown' ? (
+                          <Badge tone="warning">all NULL</Badge>
+                        ) : t.nullable ? (
+                          <Badge>has NULLs</Badge>
+                        ) : (
+                          <Badge tone="success">no NULLs</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {dataset.data.columns.length > 200 && (
+            <p className="border-t border-line px-4 py-2 text-[12.5px] text-fg-muted">
+              Showing 200 of {formatNumber(dataset.data.columns.length)} columns.
+            </p>
+          )}
+        </Panel>
+      )}
+    </ToolStack>
+  );
+}
