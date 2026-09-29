@@ -9,7 +9,7 @@ import { Kbd } from '@/components/ui/Panel';
 import { modKey } from '@/lib/utils';
 import { useDocumentTitle } from '../useDocumentTitle';
 
-const QUICK_QUERIES = ['format json', 'merge pdf', 'compress image', 'decode jwt', 'regex', 'csv to json', 'uuid', 'diagram'];
+const QUICK_QUERIES = ['format json', 'merge pdf', 'compress image', 'decode jwt', 'csv to json', 'regex', 'diagram'];
 
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -80,7 +80,7 @@ export function HomePage() {
             </span>
           </div>
           <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-fg sm:text-[46px]">
-            Every everyday dev tool.
+            Every tool you reach for.
             <br className="hidden sm:block" /> <span className="text-fg-secondary">None of your data leaves.</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-pretty text-fg-secondary sm:text-base">
