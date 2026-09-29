@@ -23,7 +23,7 @@ Requires Node 20+.
 npm install
 npm run dev          # http://localhost:5173
 npm run build        # production build (dist/)
-npm run preview      # serve the production build on :4173
+npm run preview      # serve the production build on :4317
 npm run check        # typecheck + lint + unit tests + build
 ```
 

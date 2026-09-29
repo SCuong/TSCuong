@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 /** E2E_DEV=1 runs against an already running dev server (fast iteration); default is the production preview. */
 const DEV = Boolean(process.env.E2E_DEV);
-const PORT = DEV ? 5173 : 4173;
+const PORT = DEV ? 5173 : 4317;
 
 export default defineConfig({
   testDir: './e2e',

@@ -5,6 +5,7 @@
 coverage/
 dev-dist/
 dist/
+dist-analyze/
 node_modules/
 playwright-report/
 test-results/

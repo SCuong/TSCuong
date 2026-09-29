@@ -1,7 +1,8 @@
 /**
  * tesseract.js wrapper. Every engine file (worker script, WebAssembly core and
- * the English model) is served from this site's /ocr/ folder: nothing is
- * fetched from a CDN. Only English ("eng") recognition data is bundled.
+ * the English model) is served from this site's versioned /ocr/<versions>/ folder
+ * (see scripts/engine-assets.mjs): nothing is fetched from a CDN. Only English
+ * ("eng") recognition data is bundled.
  */
 import Tesseract from 'tesseract.js';
 import { cleanText, flattenBlocks, meanConfidence, type OcrPageResult, type TesseractBlock } from './result';
@@ -10,7 +11,7 @@ export const OCR_LANGUAGE = 'eng';
 
 function assetBase(): string {
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-  return new URL(`${base}ocr/`, window.location.origin).href;
+  return new URL(`${base}${__OCR_ASSET_DIR__}`, window.location.origin).href;
 }
 
 export type OcrProgress = (fraction: number, status: string) => void;

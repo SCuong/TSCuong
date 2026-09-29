@@ -15,7 +15,8 @@ export { OPS, TextLayer } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
-const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+/** Versioned folder with pdf.js fonts, cmaps and wasm decoders (see scripts/engine-assets.mjs). */
+const ASSETS = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}${__PDFJS_ASSET_DIR__}`;
 
 export type { PDFDocumentProxy, PDFPageProxy };
 
@@ -34,9 +35,9 @@ export async function openPdf(bytes: Uint8Array, options: { password?: string; f
   const task = getDocument({
     data: bytes.slice(),
     password: options.password,
-    standardFontDataUrl: `${BASE}pdfjs/standard_fonts/`,
-    wasmUrl: `${BASE}pdfjs/wasm/`,
-    cMapUrl: `${BASE}pdfjs/cmaps/`,
+    standardFontDataUrl: `${ASSETS}standard_fonts/`,
+    wasmUrl: `${ASSETS}wasm/`,
+    cMapUrl: `${ASSETS}cmaps/`,
     cMapPacked: true,
     isEvalSupported: false,
     enableXfa: false,

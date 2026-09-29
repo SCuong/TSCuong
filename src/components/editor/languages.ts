@@ -30,7 +30,11 @@ const cache = new Map<EditorLanguage, Promise<Extension>>();
 export function loadLanguage(language: EditorLanguage): Promise<Extension> {
   let pending = cache.get(language);
   if (!pending) {
-    pending = load(language).catch(() => []);
+    pending = load(language).catch(() => {
+      // Offline and not cached yet: fall back to plain text now, retry on the next editor mount.
+      cache.delete(language);
+      return [];
+    });
     cache.set(language, pending);
   }
   return pending;
