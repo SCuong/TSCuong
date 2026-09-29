@@ -7,6 +7,7 @@ import {
   compressLossless,
   crop,
   formatPageNumber,
+  hasPageToken,
   imagePlacement,
   imagesToPdf,
   inspectStructure,
@@ -169,6 +170,21 @@ describe('page numbers', () => {
     expect(formatPageNumber('{n}', 3, 9)).toBe('3');
     expect(formatPageNumber('Page {n} of {total}', 3, 9)).toBe('Page 3 of 9');
     expect(formatPageNumber('{N}/{TOTAL}', 1, 2)).toBe('1/2');
+  });
+
+  it('zero-pads {n:width} and {total:width} for Bates numbering', () => {
+    expect(formatPageNumber('ABC{n:6}', 42, 900)).toBe('ABC000042');
+    expect(formatPageNumber('{n:3} of {total:3}', 7, 120)).toBe('007 of 120');
+    expect(formatPageNumber('{N:4}', 12345, 12345)).toBe('12345'); // wider than the pad: unchanged
+    expect(formatPageNumber('{n:25}', 1, 1)).toBe('1'.padStart(20, '0')); // widths are capped at 20
+    expect(formatPageNumber('{n:99}', 1, 1)).toBe('1'.padStart(20, '0'));
+  });
+
+  it('recognizes the page token in plain and padded forms', () => {
+    expect(hasPageToken('Page {n}')).toBe(true);
+    expect(hasPageToken('DOC-{n:8}')).toBe(true);
+    expect(hasPageToken('{total} pages')).toBe(false);
+    expect(hasPageToken('{n:}')).toBe(false);
   });
 
   it('numbers the selected pages starting at the start number', async () => {

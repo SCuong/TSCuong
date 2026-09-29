@@ -327,7 +327,10 @@ export interface PageNumberOptions {
   /** 0-based pages that receive a number, in document order. */
   pages: number[];
   position: NumberPosition;
-  /** "{n}" is replaced with the number, "{total}" with the last number. */
+  /**
+   * "{n}" is replaced with the number, "{total}" with the last number; a width such as
+   * "{n:6}" zero-pads (Bates numbering: "ABC{n:6}" → "ABC000042").
+   */
   format: string;
   fontSize: number;
   /** Distance from the page edges, in points. */
@@ -337,8 +340,20 @@ export interface PageNumberOptions {
   ignoreEncryption?: boolean;
 }
 
+/** Matches {n}, {total} and zero-padded forms like {n:6} (width 1–20). */
+const PAGE_TOKEN = /\{(n|total)(?::(\d{1,2}))?\}/gi;
+
+/** Whether a page-number format contains the page number token ({n} or {n:width}). */
+export function hasPageToken(format: string): boolean {
+  return /\{n(?::\d{1,2})?\}/i.test(format);
+}
+
 export function formatPageNumber(format: string, n: number, total: number): string {
-  return format.replace(/\{n\}/gi, String(n)).replace(/\{total\}/gi, String(total));
+  return format.replace(PAGE_TOKEN, (_match, name: string, width?: string) => {
+    const value = String(name.toLowerCase() === 'n' ? n : total);
+    const pad = width ? Math.min(Number(width), 20) : 0;
+    return pad > value.length ? value.padStart(pad, '0') : value;
+  });
 }
 
 /** Replace characters the font cannot draw; throws with a clear message if any exist. */

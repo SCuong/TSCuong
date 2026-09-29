@@ -7,7 +7,7 @@ import { Checkbox, Input, Label, NumberInput, Select } from '@/components/ui/Fie
 import { Panel } from '@/components/ui/Panel';
 import { cn, pluralize } from '@/lib/utils';
 import { anchorCenter, mmToPt } from './lib/geometry';
-import { formatPageNumber, type NumberPosition } from './lib/ops';
+import { formatPageNumber, hasPageToken, type NumberPosition } from './lib/ops';
 import { outputName, pdfBlob, type OutputFile } from './lib/files';
 import { runPdfOp } from './lib/runner';
 import { docId } from './lib/thumbnails';
@@ -66,7 +66,7 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
     fontSize === '' || fontSize < 4 || fontSize > 144 ? 'Font size must be between 4 and 144 pt.' : null,
     marginMm === '' || marginMm < 0 || marginMm > 100 ? 'Margin must be between 0 and 100 mm.' : null,
     start === '' || !Number.isInteger(start) || start < 0 ? 'The start number must be a whole number (0 or more).' : null,
-    !format.includes('{n}') ? 'The format must contain {n}.' : null,
+    !hasPageToken(format) ? 'The format must contain {n} (or a zero-padded {n:6}).' : null,
     format.length > 60 ? 'The format is too long.' : null,
     unsupported.length ? unsupportedCharacterMessage(unsupported) : null,
   ].filter(Boolean) as string[];
@@ -141,7 +141,7 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   <Label htmlFor={ids.custom}>Custom format</Label>
                   <Input id={ids.custom} mono value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Page {n} of {total}" />
                   <p className="mt-1.5 text-[12.5px] text-fg-muted">
-                    <code>{'{n}'}</code> = number, <code>{'{total}'}</code> = last number
+                    <code>{'{n}'}</code> = number, <code>{'{total}'}</code> = last number, <code>{'{n:6}'}</code> = zero-padded (Bates, e.g. <code>{'ABC{n:6}'}</code> → ABC000001)
                   </p>
                 </div>
               )}

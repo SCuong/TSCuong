@@ -156,6 +156,8 @@ async function scannedPdf(page: Page, pages: number): Promise<FilePayload> {
 // ---------------------------------------------------------------------------
 
 test.describe('PDF tools (audit)', () => {
+  // Large documents and OCR: generous per-test budget so a busy machine does not cause false failures.
+  test.describe.configure({ timeout: 150_000 });
   test('extract pages keeps a reversed range order and never offers a stale result', async ({ page }) => {
     await page.goto('/tools/pdf/extract-pages');
     await page.locator('input[type=file]').first().setInputFiles([await makePdf('doc.pdf', 5)]);
@@ -243,7 +245,7 @@ test.describe('PDF tools (audit)', () => {
 
     await page.goto('/tools/pdf/split');
     await openWithPassword();
-    await expect(page.getByText(/Pages copied out of an encrypted PDF come out blank or unreadable/)).toBeVisible();
+    await expect(page.getByText(/Pages copied out of an encrypted PDF come out blank or unreadable/)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('button', { name: 'Split PDF' })).toBeDisabled();
 
     await page.goto('/tools/pdf/inspector');
@@ -257,7 +259,8 @@ test.describe('PDF tools (audit)', () => {
     await page.locator('input[type=file]').first().setInputFiles([await makePdf('long.pdf', 300)]);
     await page.getByLabel('Search in document').fill('long.pdf page 297');
     // The index used to restart every 20 pages (quadratic); it must now finish well within this timeout.
-    await expect(page.getByText('1 / 1', { exact: true })).toBeVisible({ timeout: 15_000 });
+    // Normally ~2-3 s; the old quadratic indexing took 90 s+, so 30 s still catches that regression on a busy machine.
+    await expect(page.getByText('1 / 1', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByLabel('Page number')).toHaveValue('297');
   });
 
@@ -277,7 +280,7 @@ test.describe('PDF tools (audit)', () => {
     await expect(page.getByRole('progressbar', { name: /Recognizing page/ })).toBeVisible({ timeout: 90_000 });
     await page.getByRole('button', { name: 'Cancel' }).click();
     // Cancelling used to leave the job hanging forever (tesseract.js never settles jobs of a terminated worker).
-    await expect(page.getByRole('progressbar')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.getByRole('progressbar')).toHaveCount(0, { timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Run OCR on 40 pages' })).toBeEnabled();
     await expect(page.getByText('Searchable PDF ready')).toHaveCount(0);
 
