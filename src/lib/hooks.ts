@@ -32,15 +32,34 @@ export function useToolState<T>(toolId: string, key: string, initial: T): [T, (n
   });
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** The latest value waiting to be written; serialized only when flushed (typing stays cheap). */
+  const pending = useRef<{ value: T } | null>(null);
+
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    const next = pending.current;
+    if (!next) return;
+    pending.current = null;
+    const serialized = JSON.stringify(next.value);
+    writeRaw(storageKey, serialized.length > MAX_REMEMBERED_CHARS ? null : serialized);
+  }, [storageKey]);
+
   useEffect(() => {
     if (!settingsStore.get().rememberToolInput) return;
+    pending.current = { value };
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const serialized = JSON.stringify(value);
-      writeRaw(storageKey, serialized.length > MAX_REMEMBERED_CHARS ? null : serialized);
-    }, 300);
-    return () => clearTimeout(timer.current);
-  }, [storageKey, value]);
+    timer.current = setTimeout(flush, 300);
+  }, [value, flush]);
+
+  // Write the last change instead of dropping it when the tool unmounts (navigation)
+  // or the page is being hidden/closed within the debounce window.
+  useEffect(() => {
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, [flush]);
 
   return [value, setValue];
 }
