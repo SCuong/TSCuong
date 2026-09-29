@@ -298,7 +298,7 @@ function Parts({ parts, tone }: { parts: InlinePart[]; tone: 'del' | 'add' }) {
 
 function LineNo({ n }: { n?: number }) {
   return (
-    <span className="w-9 shrink-0 pr-2 text-right text-fg-muted/80 tabular-nums select-none sm:w-12" aria-hidden>
+    <span className="w-9 shrink-0 pr-2 text-right text-fg-muted tabular-nums select-none sm:w-12" aria-hidden>
       {n ?? ''}
     </span>
   );

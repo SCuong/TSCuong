@@ -53,7 +53,7 @@ export function AllToolsPage() {
                 )}
               >
                 {c.name}
-                <span className="text-[11.5px] tabular-nums opacity-70">{c.count}</span>
+                <span className={cn('text-[11.5px] tabular-nums', category !== c.id && 'text-fg-muted')}>{c.count}</span>
               </button>
             ),
           )}

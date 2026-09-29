@@ -107,7 +107,7 @@ export function TableEditor({
   }
 
   const cellClass =
-    'block h-8 w-full min-w-28 bg-transparent px-2.5 text-[13px] text-fg outline-none placeholder:text-fg-muted/70 focus:bg-surface-raised focus:ring-2 focus:ring-accent focus:ring-inset';
+    'block h-8 w-full min-w-28 bg-transparent px-2.5 text-[13px] text-fg outline-none placeholder:text-fg-muted focus:bg-surface-raised focus:ring-2 focus:ring-accent focus:ring-inset';
 
   return (
     <div ref={rootRef} className="flex min-w-0 flex-col gap-3">

@@ -272,7 +272,7 @@ export default function HexViewer() {
             className={cn(
               'inline-block w-[2.5ch] cursor-default rounded-[3px] text-center',
               i === 8 && 'ml-[1ch]',
-              v === 0 && !sel ? 'text-fg-muted/70' : 'text-fg',
+              v === 0 && !sel ? 'text-fg-muted' : 'text-fg',
               cls,
             )}
           >
@@ -285,7 +285,7 @@ export default function HexViewer() {
             data-off={off}
             className={cn(
               'inline-block w-[1ch] rounded-[2px] text-center',
-              v !== undefined && (v < 0x20 || v >= 0x7f) ? 'text-fg-muted/70' : 'text-fg-secondary',
+              v !== undefined && (v < 0x20 || v >= 0x7f) ? 'text-fg-muted' : 'text-fg-secondary',
               cls,
             )}
           >
@@ -295,7 +295,7 @@ export default function HexViewer() {
       }
       rows.push(
         <div key={r} className="flex items-center whitespace-pre" style={{ height: ROW_H }}>
-          <span className="mr-2 shrink-0 text-accent-text/80 select-none sm:mr-3">{toHex(base, offWidth)}</span>
+          <span className="mr-2 shrink-0 text-accent-text select-none sm:mr-3">{toHex(base, offWidth)}</span>
           <span className="mr-2 shrink-0 sm:mr-3">{hex}</span>
           <span className="shrink-0 border-l border-line pl-2 sm:pl-3">{txt}</span>
         </div>,

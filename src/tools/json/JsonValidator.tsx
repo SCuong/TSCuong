@@ -158,7 +158,7 @@ export default function JsonValidator() {
                             <span className="block truncate font-mono text-[11.5px] text-fg-muted">in {d.path}</span>
                           </span>
                           <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">
-                            line {d.line} <span className="text-fg-muted/80">(first {d.firstLine})</span>
+                            line {d.line} <span className="text-fg-muted">(first {d.firstLine})</span>
                           </span>
                         </button>
                       </li>

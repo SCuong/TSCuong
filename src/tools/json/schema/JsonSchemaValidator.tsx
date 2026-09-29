@@ -246,7 +246,7 @@ export default function JsonSchemaValidator() {
   const schemaFooter = run && hasSchema && !schemaError ? (
     <>
       <span>
-        {DRAFT_LABELS[run.draft]} <span className="text-fg-muted/80">({sourceLabel})</span>
+        {DRAFT_LABELS[run.draft]} <span className="text-fg-muted">({sourceLabel})</span>
       </span>
       {warnings.length > 0 && <span className="text-warning">{pluralize(warnings.length, 'warning')}</span>}
     </>
