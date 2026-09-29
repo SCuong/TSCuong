@@ -57,6 +57,8 @@ export interface ToolDefinition {
   icon: LucideIcon;
   /** Path below `/tools/`, e.g. `json-formatter` or `pdf/merge`. */
   route: string;
+  /** Alternative paths below `/tools/` that redirect to `route` (renamed routes, common guesses). */
+  redirectFrom?: string[];
   /** Search terms: formats, verbs and nouns people type. */
   keywords: string[];
   /** Alternative names and natural phrases, e.g. "pretty print json". */

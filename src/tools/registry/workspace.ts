@@ -9,6 +9,7 @@ export const workspaceTools: ToolDefinition[] = [
     category: 'workspace',
     icon: NotebookPen,
     route: 'notes',
+    redirectFrom: ['markdown-notes', 'markdown-editor'],
     keywords: [
       'notes',
       'markdown',
@@ -41,6 +42,7 @@ export const workspaceTools: ToolDefinition[] = [
     category: 'workspace',
     icon: Workflow,
     route: 'diagrams',
+    redirectFrom: ['mermaid', 'mermaid-editor', 'diagram'],
     keywords: [
       'mermaid',
       'diagram',

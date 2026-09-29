@@ -10,6 +10,7 @@ export const workspaceApiTools: ToolDefinition[] = [
     category: 'workspace',
     icon: Send,
     route: 'api',
+    redirectFrom: ['api-client', 'http-client', 'rest-client'],
     keywords: [
       'api',
       'rest',

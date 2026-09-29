@@ -84,6 +84,15 @@ test('favorites, pins and recent tools persist', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Recently used' })).toBeVisible();
 });
 
+test('alias tool paths redirect to the canonical route without a history entry', async ({ page }) => {
+  await page.goto('/');
+  await page.goto('/tools/mermaid?from=docs');
+  await expect(page).toHaveURL(/\/tools\/diagrams\?from=docs$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Diagram Studio' })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test('unknown routes show a not-found page', async ({ page }) => {
   await page.goto('/tools/does-not-exist');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();

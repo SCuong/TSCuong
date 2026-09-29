@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useEffect, useMemo, type ComponentType, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, Navigate, useLocation, useParams } from 'react-router';
 import { ChevronRight, Globe, HardDrive, Pin, PinOff, RotateCcw, Star, WifiOff } from 'lucide-react';
 import { getToolByRoute } from '@/tools/registry';
 import { getCategory } from '@/tools/categories';
@@ -104,15 +104,18 @@ function NetworkBadge({ tool }: { tool: ToolDefinition }) {
 
 export function ToolPage() {
   const params = useParams();
-  const route = params['*'] ?? '';
+  const location = useLocation();
+  const route = (params['*'] ?? '').replace(/^\/+|\/+$/g, '');
   const tool = getToolByRoute(route);
+  const isRedirect = Boolean(tool && tool.route !== route);
   useDocumentTitle(tool?.name ?? 'Tool not found');
 
   useEffect(() => {
-    if (tool) recordToolVisit(tool.id);
-  }, [tool]);
+    if (tool && !isRedirect) recordToolVisit(tool.id);
+  }, [tool, isRedirect]);
 
   if (!tool) return <NotFoundPage message={`There is no tool at /tools/${route}.`} />;
+  if (isRedirect) return <Navigate to={`/tools/${tool.route}${location.search}${location.hash}`} replace />;
   return <ToolView key={tool.id} tool={tool} />;
 }
 

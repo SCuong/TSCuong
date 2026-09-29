@@ -52,13 +52,19 @@ export const TOOLS: ToolDefinition[] = [
 
 const byId = new Map(TOOLS.map((tool) => [tool.id, tool]));
 const byRoute = new Map(TOOLS.map((tool) => [tool.route, tool]));
+/** Redirect paths never shadow a real route. */
+const byRedirect = new Map(
+  TOOLS.flatMap((tool) => (tool.redirectFrom ?? []).filter((r) => !byRoute.has(r)).map((r) => [r, tool] as const)),
+);
 
 export function getTool(id: string): ToolDefinition | undefined {
   return byId.get(id);
 }
 
+/** Resolves a path below `/tools/`, following `redirectFrom` aliases (check `tool.route` to detect a redirect). */
 export function getToolByRoute(route: string): ToolDefinition | undefined {
-  return byRoute.get(route.replace(/^\/+|\/+$/g, ''));
+  const path = route.replace(/^\/+|\/+$/g, '');
+  return byRoute.get(path) ?? byRedirect.get(path);
 }
 
 export function toolPath(tool: ToolDefinition): string {
