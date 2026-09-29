@@ -68,4 +68,10 @@ export interface ToolDefinition {
   requires?: BrowserRequirement[];
   /** Workspace-style tools get the full content width and manage their own padding. */
   layout?: 'standard' | 'wide' | 'full';
+  /**
+   * Small search prior (1–3) for the flagship tool of a family, so a bare query like "json" or
+   * "regex" puts the formatter/tester first instead of breaking ties alphabetically. It never
+   * outweighs a better textual match.
+   */
+  priority?: number;
 }

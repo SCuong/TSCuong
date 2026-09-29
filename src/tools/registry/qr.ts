@@ -9,6 +9,7 @@ export const qrTools: ToolDefinition[] = [
     category: 'qr',
     icon: QrCode,
     route: 'qr/generator',
+    priority: 2,
     keywords: [
       'qr', 'qr code', 'generate', 'generator', 'create', 'wifi', 'wi-fi', 'vcard', 'contact', 'url', 'link', 'email', 'sms', 'phone',
       'geo', 'location', 'calendar', 'event', 'png', 'svg',

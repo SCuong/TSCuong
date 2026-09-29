@@ -15,6 +15,8 @@ export interface SearchDoc {
   category: string;
   keywords: string[];
   aliases?: string[];
+  /** Tie-breaking prior for a family's flagship tool (see ToolDefinition.priority). */
+  priority?: number;
 }
 
 export interface SearchResult<T extends SearchDoc> {
@@ -181,6 +183,14 @@ export function editDistance(a: string, b: string, max: number): number {
   return prev[cols - 1];
 }
 
+/** Minimal English plural folding for search tokens (not a general stemmer). */
+export function singularize(word: string): string {
+  if (word.length < 4 || !word.endsWith('s') || word.endsWith('ss') || word.endsWith('us') || word.endsWith('is')) return word;
+  if (word.endsWith('ies') && word.length > 4) return `${word.slice(0, -3)}y`;
+  if (/(?:ch|sh|x|z)es$/.test(word)) return word.slice(0, -2);
+  return word.slice(0, -1);
+}
+
 interface Field {
   words: string[];
   text: string;
@@ -249,6 +259,14 @@ export function createSearchIndex<T extends SearchDoc>(items: T[], categoryName:
       const s = matchToken(token, f);
       if (s > best) best = s;
     }
+    // Plural folding: "images", "pdfs", "files" also match "image", "pdf", "file".
+    const singular = singularize(token);
+    if (singular !== token) {
+      for (const f of doc.fields) {
+        const s = matchToken(singular, f) * 0.95;
+        if (s > best) best = s;
+      }
+    }
     const synonyms = SYNONYMS[token];
     if (synonyms) {
       for (const syn of synonyms) {
@@ -295,6 +313,8 @@ export function createSearchIndex<T extends SearchDoc>(items: T[], categoryName:
           total += 6;
         }
       }
+      // Flagship prior: breaks ties between tools that match a family name equally well.
+      total += Math.min(Math.max(doc.item.priority ?? 0, 0), 3);
       results.push({ item: doc.item, score: total });
     }
 

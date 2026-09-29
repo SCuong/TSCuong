@@ -9,6 +9,7 @@ export const colorTools: ToolDefinition[] = [
     category: 'color',
     icon: Pipette,
     route: 'color/converter',
+    priority: 2,
     keywords: ['color', 'colour', 'hex', 'rgb', 'rgba', 'hsl', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'cmyk', 'convert', 'picker', 'eyedropper', 'css color'],
     aliases: ['hex to rgb', 'rgb to hex', 'hsl to hex', 'hex to hsl', 'rgb to hsl', 'hex to oklch', 'color picker', 'colour converter'],
     load: () => import('../color/ColorConverter'),

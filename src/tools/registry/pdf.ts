@@ -29,6 +29,7 @@ export const pdfTools: ToolDefinition[] = [
     category: 'pdf',
     icon: Combine,
     route: 'pdf/merge',
+    priority: 2,
     keywords: ['pdf', 'merge', 'combine', 'join', 'concatenate', 'append', 'unite', 'bind', 'multiple', 'files'],
     aliases: ['merge pdf', 'combine pdf files', 'join pdfs', 'pdf merger', 'put pdfs together'],
     load: () => import('../pdf/MergePdf'),

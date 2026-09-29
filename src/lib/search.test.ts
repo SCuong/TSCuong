@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSearchIndex, editDistance, normalize, tokenize, type SearchDoc } from './search';
+import { createSearchIndex, editDistance, normalize, singularize, tokenize, type SearchDoc } from './search';
 
 const docs: SearchDoc[] = [
   { id: 'json-formatter', name: 'JSON Formatter', description: 'Pretty-print or minify JSON.', category: 'json', keywords: ['json', 'format', 'beautify', 'minify'], aliases: ['format json', 'pretty print json'] },
@@ -29,6 +29,24 @@ describe('normalize/tokenize', () => {
   it('drops stop words but keeps a query made only of stop words', () => {
     expect(tokenize('jpg to webp')).toEqual(['jpg', 'webp']);
     expect(tokenize('to')).toEqual(['to']);
+  });
+});
+
+describe('singularize', () => {
+  it('folds common plurals', () => {
+    expect(singularize('images')).toBe('image');
+    expect(singularize('files')).toBe('file');
+    expect(singularize('pdfs')).toBe('pdf');
+    expect(singularize('queries')).toBe('query');
+    expect(singularize('boxes')).toBe('box');
+    expect(singularize('matches')).toBe('match');
+  });
+  it('leaves short words and non-plurals alone', () => {
+    expect(singularize('css')).toBe('css');
+    expect(singularize('status')).toBe('status');
+    expect(singularize('analysis')).toBe('analysis');
+    expect(singularize('glass')).toBe('glass');
+    expect(singularize('json')).toBe('json');
   });
 });
 

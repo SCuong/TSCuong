@@ -30,6 +30,7 @@ export const webTools: ToolDefinition[] = [
     category: 'web',
     icon: FileCode,
     route: 'web/html-formatter',
+    priority: 1,
     keywords: ['html', 'format', 'beautify', 'prettier', 'pretty', 'indent', 'markup', 'template', 'vue', 'angular', 'tidy'],
     aliases: ['beautify html', 'html beautifier', 'format html', 'html prettier', 'pretty print html', 'html pretty printer'],
     load: () => import('../web/HtmlFormatter'),

@@ -30,6 +30,7 @@ export const imageTools: ToolDefinition[] = [
     category: 'image',
     icon: Minimize2,
     route: 'image/compress',
+    priority: 2,
     keywords: [
       'compress', 'image', 'picture', 'photo', 'shrink', 'reduce', 'size', 'optimize', 'jpg', 'jpeg', 'png', 'webp', 'avif',
       'smaller', 'file size', 'kb', 'mb', 'quality', 'batch', 'tinypng', 'lossy',

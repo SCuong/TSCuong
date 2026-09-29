@@ -9,6 +9,7 @@ export const gitTools: ToolDefinition[] = [
     category: 'git',
     icon: FileDiff,
     route: 'git/diff-viewer',
+    priority: 1,
     keywords: [
       'git',
       'diff',
