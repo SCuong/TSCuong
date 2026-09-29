@@ -1,6 +1,8 @@
-import { useLayoutEffect, useMemo, useRef, type MouseEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useDebouncedValue } from '@/lib/hooks';
+import { blockRemoteContent } from '@/lib/remoteContent';
 import { cn } from '@/lib/utils';
+import { RemoteContentNotice } from '@/components/RemoteContentNotice';
 import { enhancePreview, prepareInteractive, type DiagramRenderer, type DiagramTheme } from '../lib/enhance';
 import { renderMarkdown } from '../lib/render';
 
@@ -23,7 +25,13 @@ export function NotePreview({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const debounced = useDebouncedValue(content, 150);
-  const html = useMemo(() => renderMarkdown(debounced), [debounced]);
+  // Remote images stay blocked until the user opts in for this note (the editor remounts per note).
+  const [allowRemote, setAllowRemote] = useState(false);
+  const rendered = useMemo(() => renderMarkdown(debounced), [debounced]);
+  const { html, blocked, hosts } = useMemo(
+    () => (allowRemote ? { html: rendered, blocked: 0, hosts: [] } : blockRemoteContent(rendered)),
+    [rendered, allowRemote],
+  );
 
   useLayoutEffect(() => {
     const el = root.current;
@@ -59,6 +67,7 @@ export function NotePreview({
       {!content.trim() && (
         <p className="text-[13.5px] text-fg-muted">Nothing to preview yet. Start writing in the editor.</p>
       )}
+      <RemoteContentNotice blocked={blocked} hosts={hosts} onAllow={() => setAllowRemote(true)} className="mb-4" />
       <div ref={root} onClick={onClick} className="lk-prose lk-note-prose" aria-label="Rendered note" />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Code, Eye } from 'lucide-react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Label, Switch } from '@/components/ui/Field';
@@ -6,6 +6,8 @@ import { Segmented } from '@/components/ui/Segmented';
 import { CopyButton, DownloadButton } from '@/components/ui/Actions';
 import { EmptyState } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
+import { blockRemoteContent } from '@/lib/remoteContent';
+import { RemoteContentNotice } from '@/components/RemoteContentNotice';
 import { firstHeading, markdownToHtml, standaloneDocument } from './lib/markdown';
 
 const SAMPLE = `# Release notes
@@ -41,6 +43,12 @@ export default function MarkdownToHtml() {
 
   const fragment = useMemo(() => (debounced.trim() ? markdownToHtml(debounced, { breaks }) : ''), [debounced, breaks]);
   const html = input.trim() ? (standalone ? standaloneDocument(fragment, firstHeading(debounced) ?? 'Document') : fragment) : '';
+  // The preview (not the HTML output) keeps remote images blocked until the user opts in.
+  const [allowRemote, setAllowRemote] = useState(false);
+  const preview = useMemo(
+    () => (allowRemote ? { html: fragment, blocked: 0, hosts: [] } : blockRemoteContent(fragment)),
+    [fragment, allowRemote],
+  );
 
   return (
     <ToolStack>
@@ -84,8 +92,16 @@ export default function MarkdownToHtml() {
             </header>
             <div className="h-[560px] overflow-auto p-5">
               {fragment ? (
-                // Sanitized by DOMPurify in markdownToHtml.
-                <div className="lk-prose" dangerouslySetInnerHTML={{ __html: fragment }} />
+                <>
+                  <RemoteContentNotice
+                    blocked={preview.blocked}
+                    hosts={preview.hosts}
+                    onAllow={() => setAllowRemote(true)}
+                    className="mb-4"
+                  />
+                  {/* Sanitized by DOMPurify in markdownToHtml; remote media neutralized by blockRemoteContent. */}
+                  <div className="lk-prose" dangerouslySetInnerHTML={{ __html: preview.html }} />
+                </>
               ) : (
                 <EmptyState icon={Eye} title="Nothing to preview yet">
                   Type Markdown on the left, or load the sample.

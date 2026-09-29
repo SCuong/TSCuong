@@ -184,6 +184,41 @@ test.describe('Markdown Notes', () => {
   });
 });
 
+test.describe('Remote content in previews', () => {
+  async function trackRemote(page: Page) {
+    const requests: string[] = [];
+    await page.route('https://remote-images.test/**', (route) => {
+      requests.push(route.request().url());
+      return route.fulfill({ contentType: 'image/png', body: makePng('pixel.png', 4, 4).buffer });
+    });
+    return requests;
+  }
+
+  test('Markdown Notes does not contact image hosts until the user loads images', async ({ page }) => {
+    const requests = await trackRemote(page);
+    await page.goto('/tools/notes');
+    await page.getByRole('region', { name: 'Notes' }).getByRole('button', { name: 'New note' }).click();
+    await fillEditor(page, 'Note content (Markdown)', '# Pics\n\n![Logo](https://remote-images.test/logo.png)');
+    await expect(page.getByText('1 remote image from remote-images.test not loaded', { exact: false })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Remote image not loaded: Logo' })).toBeVisible();
+    expect(requests).toEqual([]);
+
+    await page.getByRole('button', { name: 'Load images' }).click();
+    await expect.poll(() => requests.length).toBeGreaterThan(0);
+    await expect(page.getByRole('img', { name: 'Logo', exact: true })).toBeVisible();
+  });
+
+  test('Markdown to HTML keeps remote images out of the preview but not out of the HTML', async ({ page }) => {
+    const requests = await trackRemote(page);
+    await page.goto('/tools/web/markdown-to-html');
+    await fillEditor(page, 'Markdown', '![Chart](https://remote-images.test/chart.png)');
+    await expect(page.getByText('1 remote image from remote-images.test not loaded', { exact: false })).toBeVisible();
+    expect(requests).toEqual([]);
+    await page.getByRole('radio', { name: 'HTML' }).click();
+    await expect(page.getByRole('textbox', { name: 'HTML', exact: true })).toContainText('src="https://remote-images.test/chart.png"');
+  });
+});
+
 test.describe('Tool state', () => {
   test('small tool settings persist between visits', async ({ page }) => {
     await page.goto('/tools/json-formatter');
