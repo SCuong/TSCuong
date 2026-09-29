@@ -8,7 +8,7 @@ import { Badge, Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { formatNumber, pluralize } from '@/lib/utils';
 import { throwIfAborted } from '@/lib/hooks';
-import { createOcrEngine, type OcrEngine } from '../ocr/lib/engine';
+import { createOcrEngine, type OcrEngine, type OcrProgress } from '../ocr/lib/engine';
 import { confidenceLevel } from '../ocr/lib/result';
 import { releaseCanvas, renderPageToCanvas } from './lib/pdfjs';
 import { joinPages, runsToLines, type PageText, type TextRun } from './lib/text';
@@ -28,6 +28,36 @@ type Dpi = '150' | '200' | '300';
 interface PageOutcome extends PageText {
   source: 'ocr' | 'text-layer';
   confidence?: number;
+}
+
+/**
+ * Start the OCR engine, giving up as soon as the job is cancelled (loading takes a few
+ * seconds). An engine that finishes loading after the cancel is terminated right away.
+ */
+function startEngine(signal: AbortSignal, onProgress: OcrProgress): Promise<OcrEngine> {
+  const creating = createOcrEngine(onProgress);
+  return new Promise<OcrEngine>((resolve, reject) => {
+    const onAbort = () => {
+      reject(new PdfError('cancelled', 'The operation was cancelled.'));
+      creating.then((e) => e.terminate(), () => {});
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+    creating.then(
+      (e) => {
+        signal.removeEventListener('abort', onAbort);
+        if (signal.aborted) void e.terminate();
+        else resolve(e);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 export default function OcrPdf() {
@@ -53,7 +83,11 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [pages, setPages] = useState<PageOutcome[] | null>(null);
   const [file, setFile] = useState<OutputFile | null>(null);
   const job = usePdfJob();
-  const gate = useEncryptionGate(searchable ? pdf : null);
+  const gate = useEncryptionGate(
+    searchable ? pdf : null,
+    'draw',
+    'A text layer added to an encrypted PDF comes out unreadable, so the new file would not be searchable. Turn off “Create a searchable PDF” to only read the text.',
+  );
   const engine = useRef<OcrEngine | null>(null);
 
   useEffect(
@@ -98,7 +132,7 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
             const canvas = await renderPageToCanvas(page, { scale: Number(dpi) / 72, signal, intent: 'print' });
             try {
               if (!engine.current) {
-                engine.current = await createOcrEngine((_v, label) => progress(base * share, label));
+                engine.current = await startEngine(signal, (_v, label) => progress(base * share, label));
               }
               throwIfAborted(signal);
               const current = engine.current;
@@ -205,7 +239,7 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
       {pages && skipped > 0 && (
         <Alert tone="info">
           {pluralize(skipped, 'page')} already had selectable text, so {skipped === 1 ? 'it was' : 'they were'} read directly
-          {searchable ? ' and left unchanged in the PDF' : ''}.
+          {searchable && ocrPages.length > 0 ? ' and left unchanged in the PDF' : ''}.
         </Alert>
       )}
       {pages && searchable && !file && ocrPages.length === 0 && (

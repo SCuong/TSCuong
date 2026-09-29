@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assertPdfBytes, hasPdfHeader, headerVersion, isLinearized, looksEncrypted } from './bytes';
-import { PdfError, toPdfError } from './errors';
+import { PdfError, toPdfError, unsupportedCharacterMessage } from './errors';
 import { makePdf } from './fixtures.test-util';
 
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -48,7 +48,14 @@ describe('toPdfError', () => {
     expect(toPdfError(new Error('Input document to `PDFDocument.load` is encrypted.')).kind).toBe('encrypted');
     const font = toPdfError(new Error('WinAnsi cannot encode "中" (0x4e2d)'));
     expect(font.kind).toBe('font');
-    expect(font.message).toContain('中');
+    expect(font.message).toContain('"中" (U+4E2D)');
+  });
+
+  it('names look-alike and astral characters by code point', () => {
+    // Greek capital epsilon looks exactly like "E": the code point makes the message understandable.
+    expect(toPdfError(new Error('WinAnsi cannot encode "Ε" (0x0395)')).message).toContain('"Ε" (U+0395)');
+    // pdf-lib quotes a broken character for emoji (String.fromCharCode); rebuild it from the hex code.
+    expect(toPdfError(new Error('WinAnsi cannot encode "\uf389" (0x1f389)')).message).toContain('"🎉" (U+1F389)');
   });
 
   it('maps invalid PDFs and cancellation', () => {
@@ -64,5 +71,15 @@ describe('toPdfError', () => {
     const long = toPdfError(new Error('x'.repeat(500) + '\nstack'));
     expect(long.message.length).toBeLessThanOrEqual(180);
     expect(toPdfError(undefined).message).toMatch(/Something went wrong/);
+  });
+});
+
+describe('unsupportedCharacterMessage', () => {
+  it('lists up to three characters with code points', () => {
+    expect(unsupportedCharacterMessage(['中'])).toBe(
+      'The built-in PDF font cannot draw the character "中" (U+4E2D). Use Latin letters, digits and common punctuation.',
+    );
+    expect(unsupportedCharacterMessage(['a', 'b', 'c', 'd'])).toContain('the characters "a" (U+0061), "b" (U+0062), "c" (U+0063)…');
+    expect(unsupportedCharacterMessage([])).toMatch(/some of these characters/);
   });
 });

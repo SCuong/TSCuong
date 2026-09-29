@@ -16,6 +16,7 @@ import { PagePicker, PageScopeControl, pageId, usePageScope } from './components
 import { PageGrid, type GridItem } from './components/PageGrid';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
 
 export default function DeletePages() {
   const controller = usePdfFile();
@@ -31,11 +32,12 @@ export default function DeletePages() {
 function DeleteWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const scope = usePageScope(pdf.pageCount, 'pick');
   const [confirming, setConfirming] = useState(false);
-  const [result, setResult] = useState<OutputFile | null>(null);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'copy');
 
   const removed = useMemo(() => new Set(scope.pages), [scope.pages]);
+  const removedList = useMemo(() => [...removed].sort((a, b) => a - b), [removed]);
+  const result = useKeyedResult<{ file: OutputFile; remaining: number }>(removedList.join(','));
   const isRemoved = useCallback((i: number) => removed.has(i), [removed]);
   const remaining = pdf.pageCount - removed.size;
   const everything = removed.size > 0 && remaining === 0;
@@ -54,13 +56,21 @@ function DeleteWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
   async function run() {
     setConfirming(false);
-    setResult(null);
+    const key = removedList.join(',');
+    result.clear();
     const keep = Array.from({ length: pdf.pageCount }, (_, i) => i).filter((i) => !removed.has(i));
     const bytes = await job.run(({ signal, progress }) =>
       runPdfOp('selectPages', { bytes: pdf.bytes, pages: keep, ignoreEncryption: gate.ignoreEncryption }, { signal, onProgress: progress }),
     );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'edited'), data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) {
+      result.set(key, {
+        file: { name: outputName(pdf.file.name, 'edited'), data: pdfBlob(bytes), type: 'application/pdf' },
+        remaining: keep.length,
+      });
+    }
   }
+
+  const removedText = formatPageList(removedList.map((p) => p + 1));
 
   return (
     <>
@@ -89,7 +99,7 @@ function DeleteWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not delete pages" />
-      {result && <ResultFiles files={[result]} title={`New PDF with ${pluralize(remaining, 'page')}`} />}
+      {result.value && <ResultFiles files={[result.value.file]} title={`New PDF with ${pluralize(result.value.remaining, 'page')}`} />}
       {scope.mode === 'pick' ? (
         <PagePicker pdf={pdf} selected={scope.picked} onChange={scope.setPicked} removed={isRemoved} />
       ) : (
@@ -102,7 +112,7 @@ function DeleteWorkspace({ pdf }: { pdf: LoadedPdf }) {
         title={`Delete ${pluralize(removed.size, 'page')}?`}
         confirmLabel="Delete pages"
       >
-        Pages {formatPageList([...removed].sort((a, b) => a - b).map((p) => p + 1))} will be removed. The new PDF will have{' '}
+        {removed.size === 1 ? `Page ${removedText} will be removed.` : `Pages ${removedText} will be removed.`} The new PDF will have{' '}
         {pluralize(remaining, 'page')}. Your original file stays unchanged.
       </ConfirmDialog>
     </>

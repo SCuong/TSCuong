@@ -16,6 +16,8 @@ import { PageScopeControl, usePageScope } from './components/PageScope';
 import { PreviewPage, type PageGeometry } from './components/PreviewPage';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
+import { verifyEncryptedEdit } from './components/verifyEdit';
 
 type Unit = 'mm' | 'pt';
 const SIDES: Array<keyof Margins> = ['top', 'right', 'bottom', 'left'];
@@ -40,9 +42,10 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
   /** Margins are stored in points. */
   const [margins, setMargins] = useState<Margins>({ top: mmToPt(10), right: mmToPt(10), bottom: mmToPt(10), left: mmToPt(10) });
   const [permanent, setPermanent] = useState(false);
-  const [result, setResult] = useState<OutputFile | null>(null);
+  const inputKey = JSON.stringify([margins, scope.pages, permanent]);
+  const result = useKeyedResult<OutputFile>(inputKey);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'structure');
   const baseId = useId();
   const previewPage = scope.pages[0];
 
@@ -53,15 +56,18 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const nothing = SIDES.every((s) => margins[s] === 0);
 
   async function run() {
-    setResult(null);
-    const bytes = await job.run(({ signal, progress }) =>
-      runPdfOp(
+    const key = inputKey;
+    result.clear();
+    const bytes = await job.run(async ({ signal, progress }) => {
+      const out = await runPdfOp(
         'crop',
         { bytes: pdf.bytes, pages: scope.pages, margins, setMediaBox: permanent, ignoreEncryption: gate.ignoreEncryption },
         { signal, onProgress: progress },
-      ),
-    );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'cropped'), data: pdfBlob(bytes), type: 'application/pdf' });
+      );
+      await verifyEncryptedEdit(pdf, out);
+      return out;
+    });
+    if (bytes) result.set(key, { name: outputName(pdf.file.name, 'cropped'), data: pdfBlob(bytes), type: 'application/pdf' });
   }
 
   return (
@@ -91,10 +97,7 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
                     min={0}
                     step={unit === 'mm' ? 1 : 5}
                     value={toUnit(margins[side])}
-                    onChange={(v) => {
-                      setResult(null);
-                      setMargins((m) => ({ ...m, [side]: v === '' ? 0 : Math.max(0, fromUnit(v)) }));
-                    }}
+                    onChange={(v) => setMargins((m) => ({ ...m, [side]: v === '' ? 0 : Math.max(0, fromUnit(v)) }))}
                   />
                 </div>
               ))}
@@ -114,7 +117,7 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
             <PageScopeControl scope={scope} modes={['all', 'range']} label="Pages to crop" />
             <Checkbox
               label="Permanent crop"
-              description="Also shrinks the MediaBox, so the hidden area cannot be restored by other apps. Without it, only the CropBox (visible area) changes."
+              description="Also shrinks the page itself (the MediaBox), so apps cannot simply show the trimmed margins again. Without it, only the visible area (the CropBox) changes. Either way the trimmed content stays inside the file, so do not rely on cropping to hide sensitive information."
               checked={permanent}
               onChange={setPermanent}
             />
@@ -140,10 +143,7 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   <CropOverlay
                     geometry={g}
                     margins={margins}
-                    onChange={(m) => {
-                      setResult(null);
-                      setMargins(m);
-                    }}
+                    onChange={setMargins}
                   />
                 )}
               </PreviewPage>
@@ -155,7 +155,7 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not crop" />
-      {result && <ResultFiles files={[result]} />}
+      {result.value && <ResultFiles files={[result.value]} />}
     </>
   );
 }

@@ -1,13 +1,13 @@
 import { useEffect, useId, useState } from 'react';
 import { Eraser, Save, Tags } from 'lucide-react';
 import { ToolStack } from '@/components/tool/EditorPanel';
-import { Alert, ErrorMessage } from '@/components/ui/Alert';
+import { ErrorMessage } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Checkbox, Input, Label, Textarea } from '@/components/ui/Field';
 import { KeyValueList, Panel } from '@/components/ui/Panel';
 import { Spinner } from '@/components/ui/Feedback';
-import { EMPTY_METADATA, parsePdfDate, type MetadataFields } from './lib/metadata';
+import { EMPTY_METADATA, customInfoEntries, parsePdfDate, type MetadataFields } from './lib/metadata';
 import { outputName, pdfBlob, type OutputFile } from './lib/files';
 import { runPdfOp } from './lib/runner';
 import { docId } from './lib/thumbnails';
@@ -15,6 +15,8 @@ import { PdfInput, useEncryptionGate } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
+import { verifyEncryptedEdit } from './components/verifyEdit';
 import { isoToLocalInput, localInputToIso } from './lib/dates';
 
 export default function EditMetadata() {
@@ -51,7 +53,6 @@ async function readWithPdfjs(pdf: LoadedPdf): Promise<Loaded> {
     const d = text(k) ? parsePdfDate(text(k)) : null;
     return d ? d.toISOString() : '';
   };
-  const customRaw = (info.Custom ?? {}) as Record<string, unknown>;
   return {
     fields: {
       title: text('Title'),
@@ -63,10 +64,7 @@ async function readWithPdfjs(pdf: LoadedPdf): Promise<Loaded> {
       creationDate: date('CreationDate'),
       modDate: date('ModDate'),
     },
-    custom: Object.entries(customRaw).map(([key, value]) => ({
-      key,
-      value: typeof value === 'string' ? value : typeof value === 'object' && value && 'name' in value ? String((value as { name: string }).name) : String(value),
-    })),
+    custom: customInfoEntries(info.Custom),
     hasXmp: Boolean(meta.metadata),
   };
 }
@@ -77,9 +75,11 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [fields, setFields] = useState<MetadataFields>(EMPTY_METADATA);
   const [removeXmp, setRemoveXmp] = useState(true);
   const [confirmStrip, setConfirmStrip] = useState(false);
-  const [result, setResult] = useState<OutputFile | null>(null);
+  const inputKey = JSON.stringify([fields, removeXmp]);
+  const result = useKeyedResult<{ file: OutputFile; stripped: boolean }>(inputKey);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  // New metadata strings cannot be encrypted with the file's key, but removing metadata only deletes entries.
+  const gate = useEncryptionGate(pdf, 'draw', 'Metadata written to an encrypted PDF comes out garbled, because the in-browser PDF editor cannot encrypt it with the file’s key. Removing all metadata works.');
   const baseId = useId();
 
   useEffect(() => {
@@ -96,25 +96,36 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
     };
   }, [pdf]);
 
-  const set = (key: keyof MetadataFields, value: string) => {
-    setResult(null);
-    setFields((f) => ({ ...f, [key]: value }));
-  };
+  const set = (key: keyof MetadataFields, value: string) => setFields((f) => ({ ...f, [key]: value }));
 
   const changed = loaded ? (Object.keys(fields) as Array<keyof MetadataFields>).some((k) => fields[k] !== loaded.fields[k]) : false;
 
   async function save(removeAll: boolean) {
     setConfirmStrip(false);
-    setResult(null);
-    const bytes = await job.run(({ signal, progress }) =>
-      runPdfOp(
+    // After removing everything the form is emptied, so the result belongs to the empty fields.
+    const key = removeAll ? JSON.stringify([EMPTY_METADATA, removeXmp]) : inputKey;
+    result.clear();
+    const bytes = await job.run(async ({ signal, progress }) => {
+      const out = await runPdfOp(
         'setMetadata',
-        { bytes: pdf.bytes, fields, removeAll, removeXmp: removeAll || (loaded?.hasXmp ? removeXmp : false), ignoreEncryption: gate.ignoreEncryption },
+        {
+          bytes: pdf.bytes,
+          fields,
+          removeAll,
+          removeXmp: removeAll || (loaded?.hasXmp ? removeXmp : false),
+          // Removing entries is safe on encrypted files; writing new strings needs the user's consent.
+          ignoreEncryption: removeAll ? pdf.encrypted : gate.ignoreEncryption,
+        },
         { signal, onProgress: progress },
-      ),
-    );
+      );
+      await verifyEncryptedEdit(pdf, out);
+      return out;
+    });
     if (bytes) {
-      setResult({ name: outputName(pdf.file.name, removeAll ? 'no-metadata' : 'metadata'), data: pdfBlob(bytes), type: 'application/pdf' });
+      result.set(key, {
+        file: { name: outputName(pdf.file.name, removeAll ? 'no-metadata' : 'metadata'), data: pdfBlob(bytes), type: 'application/pdf' },
+        stripped: removeAll,
+      });
       if (removeAll) setFields(EMPTY_METADATA);
     }
   }
@@ -183,7 +194,7 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
             <Button variant="primary" icon={Save} disabled={!gate.ok || job.running || (!changed && !(loaded.hasXmp && removeXmp))} loading={job.running} onClick={() => void save(false)}>
               Save metadata
             </Button>
-            <Button variant="secondary" icon={Eraser} disabled={!gate.ok || job.running} onClick={() => setConfirmStrip(true)}>
+            <Button variant="secondary" icon={Eraser} disabled={job.running} onClick={() => setConfirmStrip(true)}>
               Remove all metadata
             </Button>
             {changed && (
@@ -194,12 +205,11 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
           </div>
         </div>
       </Panel>
-      {pdf.encrypted && gate.ok && (
-        <Alert tone="info">Metadata strings of encrypted PDFs are stored encrypted; values written here may not display correctly.</Alert>
-      )}
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not save" />
-      {result && <ResultFiles files={[result]} title="PDF saved with the new metadata" />}
+      {result.value && (
+        <ResultFiles files={[result.value.file]} title={result.value.stripped ? 'PDF saved without metadata' : 'PDF saved with the new metadata'} />
+      )}
       <ConfirmDialog
         open={confirmStrip}
         onCancel={() => setConfirmStrip(false)}

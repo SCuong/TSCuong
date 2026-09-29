@@ -45,6 +45,13 @@ describe('parsePageRange', () => {
     expect(pages('1,,2,', 10)).toEqual([1, 2]);
   });
 
+  it('accepts pasted Unicode hyphens and full-width input', () => {
+    expect(pages('1‐3', 10)).toEqual([1, 2, 3]); // U+2010 hyphen (word processors)
+    expect(pages('2‑4', 10)).toEqual([2, 3, 4]); // U+2011 non-breaking hyphen
+    expect(pages('５－７，９', 10)).toEqual([5, 6, 7, 9]); // full-width digits, hyphen and comma
+    expect(pages('1−2', 10)).toEqual([1, 2]); // U+2212 minus sign
+  });
+
   it('removes duplicates by default but can keep them', () => {
     expect(pages('1-3, 2, 1', 10)).toEqual([1, 2, 3]);
     expect(pages('1, 1, 2', 10, false)).toEqual([1, 1, 2]);

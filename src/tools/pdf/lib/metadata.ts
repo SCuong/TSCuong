@@ -118,6 +118,24 @@ export function readMetadata(doc: PDFDocument): ReadMetadata {
   return { fields, custom, hasXmp: doc.catalog.has(PDFName.of('Metadata')), invalidDates };
 }
 
+/**
+ * Custom Info entries as reported by pdf.js `getMetadata().info.Custom`: a Map in pdf.js 6+,
+ * a plain object in older versions. Values are strings, names ({ name }), numbers or booleans.
+ */
+export function customInfoEntries(custom: unknown): Array<{ key: string; value: string }> {
+  const entries: Array<[unknown, unknown]> =
+    custom instanceof Map ? [...custom.entries()] : custom && typeof custom === 'object' ? Object.entries(custom) : [];
+  return entries.map(([key, value]) => ({
+    key: String(key),
+    value:
+      typeof value === 'string'
+        ? value
+        : value && typeof value === 'object' && 'name' in value
+          ? String((value as { name: unknown }).name)
+          : String(value),
+  }));
+}
+
 /** Encode text so non-Latin characters survive (UTF-16BE hex string when needed). */
 function encodeText(value: string) {
   // PDFDocEncoding is close to Latin-1 for printable ASCII; use a literal string only for plain ASCII.
@@ -151,16 +169,21 @@ export function writeMetadata(doc: PDFDocument, fields: MetadataFields, options:
     if (Number.isNaN(date.getTime())) throw new Error(`"${value}" is not a valid date.`);
     dict.set(PDFName.of(key), PDFString.of(formatPdfDate(date)));
   }
-  if (options.removeXmp) doc.catalog.delete(PDFName.of('Metadata'));
+  if (options.removeXmp) removeXmpPacket(doc);
+}
+
+/** Unlink the document-level XMP packet and delete the stream itself, so its text is not saved. */
+function removeXmpPacket(doc: PDFDocument): void {
+  const xmp = doc.catalog.get(PDFName.of('Metadata'));
+  doc.catalog.delete(PDFName.of('Metadata'));
+  if (xmp instanceof PDFRef) doc.context.delete(xmp);
 }
 
 /** Remove the Info dictionary contents and the XMP metadata stream. */
 export function removeAllMetadata(doc: PDFDocument): void {
   const dict = infoDict(doc);
   if (dict) for (const key of dict.keys()) dict.delete(key);
-  const xmp = doc.catalog.get(PDFName.of('Metadata'));
-  doc.catalog.delete(PDFName.of('Metadata'));
-  if (xmp instanceof PDFRef) doc.context.delete(xmp);
+  removeXmpPacket(doc);
   // Drop the Info reference entirely so no empty dictionary remains.
   const info = doc.context.trailerInfo.Info;
   if (info instanceof PDFRef) doc.context.delete(info);

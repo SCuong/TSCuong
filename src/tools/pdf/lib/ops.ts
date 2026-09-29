@@ -32,6 +32,7 @@ import {
 } from 'pdf-lib';
 import { zlibSync } from 'fflate';
 import { PdfError, toPdfError } from './errors';
+import { looksEncrypted } from './bytes';
 import {
   anchorCenter,
   insetBox,
@@ -65,7 +66,15 @@ export async function loadDoc(bytes: Uint8Array, ignoreEncryption = false, fileN
   try {
     return await PDFDocument.load(bytes, { ignoreEncryption, updateMetadata: false, throwOnInvalidObject: false });
   } catch (error) {
-    throw toPdfError(error, fileName);
+    const e = toPdfError(error, fileName);
+    // pdf-lib cannot decrypt, so encrypted object streams look like damage to it. Say what is really going on.
+    if (e.kind === 'corrupt' && looksEncrypted(bytes)) {
+      throw new PdfError(
+        'encrypted',
+        `${fileName ? `"${fileName}"` : 'This PDF'} is encrypted in a way the in-browser PDF editor cannot read. Remove the protection in your PDF app first, then try again.`,
+      );
+    }
+    throw e;
   }
 }
 
@@ -78,8 +87,20 @@ async function newDoc(): Promise<PDFDocument> {
   return doc;
 }
 
+export function isEncryptedDoc(doc: PDFDocument): boolean {
+  return Boolean(doc.context.trailerInfo.Encrypt);
+}
+
 async function save(doc: PDFDocument, useObjectStreams = true): Promise<Uint8Array> {
-  return doc.save({ useObjectStreams, addDefaultPage: false, updateFieldAppearances: false });
+  // An edited encrypted file keeps its /Encrypt dictionary, /ID and object numbers, so it stays
+  // readable with the original password — but only without object streams: objects packed into
+  // a new object stream (including the /Encrypt dictionary itself) would be "decrypted" by
+  // readers into garbage, and the whole file would ask for a password it never had.
+  return doc.save({
+    useObjectStreams: useObjectStreams && !isEncryptedDoc(doc),
+    addDefaultPage: false,
+    updateFieldAppearances: false,
+  });
 }
 
 function touch(doc: PDFDocument) {
@@ -474,6 +495,10 @@ export async function setMetadata(
   const doc = await loadDoc(args.bytes, args.ignoreEncryption);
   if (args.removeAll) removeAllMetadata(doc);
   else writeMetadata(doc, args.fields, { removeXmp: args.removeXmp });
+  // Old values also live in objects nothing refers to any more (the removed XMP packet, Info
+  // dictionaries left behind by earlier incremental saves). pdf-lib writes every object it
+  // parsed, so drop the unreachable ones or "removed" metadata would still be in the file.
+  removeUnreachable(doc);
   ctx.progress(0.9, 'Saving');
   return save(doc);
 }
@@ -510,23 +535,29 @@ function refsReachable(doc: PDFDocument): Set<PDFRef> {
   return seen;
 }
 
+/** Delete every indirect object that the trailer (Root, Info, Encrypt) cannot reach. Returns how many. */
+export function removeUnreachable(doc: PDFDocument): number {
+  const reachable = refsReachable(doc);
+  let removed = 0;
+  for (const [ref] of doc.context.enumerateIndirectObjects()) {
+    if (!reachable.has(ref)) {
+      doc.context.delete(ref);
+      removed++;
+    }
+  }
+  return removed;
+}
+
 export async function compressLossless(
   args: { bytes: Uint8Array; ignoreEncryption?: boolean },
   ctx: OpContext = noopContext,
 ): Promise<{ bytes: Uint8Array; stats: CompressStats }> {
   const doc = await loadDoc(args.bytes, args.ignoreEncryption);
   const { context } = doc;
-  const encrypted = Boolean(context.trailerInfo.Encrypt);
-  const before = context.enumerateIndirectObjects();
+  const encrypted = isEncryptedDoc(doc);
+  const objectsBefore = context.enumerateIndirectObjects().length;
   ctx.progress(0.2, 'Finding unused objects');
-  const reachable = refsReachable(doc);
-  let removed = 0;
-  for (const [ref] of before) {
-    if (!reachable.has(ref)) {
-      context.delete(ref);
-      removed++;
-    }
-  }
+  const removed = removeUnreachable(doc);
   ctx.progress(0.4, 'Compressing streams');
   let compressedStreams = 0;
   if (!encrypted) {
@@ -555,7 +586,7 @@ export async function compressLossless(
   return {
     bytes,
     stats: {
-      objectsBefore: before.length,
+      objectsBefore,
       objectsAfter: context.enumerateIndirectObjects().length,
       removedObjects: removed,
       compressedStreams,

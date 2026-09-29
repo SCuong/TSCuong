@@ -197,31 +197,64 @@ function PasswordPrompt({
 }
 
 /**
- * Warning for encrypted PDFs in tools that rewrite the file with pdf-lib.
- * Returns whether the tool may proceed.
+ * What an edit does to an encrypted PDF. The in-browser editor (pdf-lib) can neither decrypt
+ * nor encrypt, so:
+ * - 'copy': pages are copied into a new file, where their still-encrypted content is unreadable
+ *   (blank pages);
+ * - 'draw': new text or images are added to the file, but readers "decrypt" them into garbage,
+ *   so the additions do not show up;
+ * - 'structure': only page boxes, rotation or dictionary entries change; the file keeps its
+ *   encryption and stays readable with the same password.
  */
-export function useEncryptionGate(pdf: LoadedPdf | null) {
+export type EncryptionImpact = 'copy' | 'draw' | 'structure';
+
+const PROTECTION_HINT = 'Remove the protection in your PDF app first (for example by printing to a new PDF), then open that copy here.';
+
+/**
+ * Notice (and, where the result would be broken, a gate) for encrypted PDFs in tools that
+ * rewrite the file with pdf-lib. `ok` says whether the tool may proceed. `detail` replaces the
+ * default explanation of what goes wrong for 'copy'/'draw' tools.
+ */
+export function useEncryptionGate(pdf: LoadedPdf | null, impact: EncryptionImpact, detail?: string) {
   const [allowed, setAllowed] = useState<LoadedPdf | null>(null);
-  const ok = !pdf?.encrypted || allowed === pdf;
-  const notice = pdf?.encrypted ? (
-    <Alert
-      tone="warning"
-      title="This PDF is encrypted"
-      action={
-        allowed === pdf ? undefined : (
-          <Button size="sm" variant="secondary" onClick={() => setAllowed(pdf)}>
-            Try anyway
-          </Button>
-        )
-      }
-    >
-      {pdf.password
-        ? 'It is protected with an open password. The in-browser PDF editor cannot re-encrypt or decrypt files, so edited pages may come out blank or unreadable. '
-        : 'It has permission restrictions (an owner password). The in-browser PDF editor cannot decrypt it, so the result may be blank or unreadable. '}
-      {allowed === pdf
-        ? 'You chose to try anyway: check the result before relying on it.'
-        : 'Remove the protection in your PDF app first for reliable results.'}
-    </Alert>
-  ) : null;
-  return { ok, ignoreEncryption: Boolean(pdf?.encrypted && allowed === pdf), notice };
+  if (!pdf?.encrypted) return { ok: true, ignoreEncryption: false, notice: null };
+  const protection = pdf.password ? 'an open password' : 'permission restrictions (an owner password)';
+  if (impact === 'structure') {
+    return {
+      ok: true,
+      ignoreEncryption: true,
+      notice: (
+        <Alert tone="info" title="This PDF is encrypted">
+          It is protected with {protection}. The edited copy keeps the same protection
+          {pdf.password ? ', so it opens with the same password' : ''}.
+        </Alert>
+      ),
+    };
+  }
+  const tried = allowed === pdf;
+  const consequence =
+    detail ??
+    (impact === 'copy'
+      ? 'Pages copied out of an encrypted PDF come out blank or unreadable, because the in-browser PDF editor cannot decrypt them.'
+      : 'Text or images added to an encrypted PDF will not show up, because the in-browser PDF editor cannot encrypt them with the file’s key.');
+  return {
+    ok: tried,
+    ignoreEncryption: tried,
+    notice: (
+      <Alert
+        tone="warning"
+        title="This PDF is encrypted"
+        action={
+          tried ? undefined : (
+            <Button size="sm" variant="secondary" onClick={() => setAllowed(pdf)}>
+              Try anyway
+            </Button>
+          )
+        }
+      >
+        It is protected with {protection}. {consequence}{' '}
+        {tried ? 'You chose to try anyway: check the result before relying on it.' : PROTECTION_HINT}
+      </Alert>
+    ),
+  };
 }

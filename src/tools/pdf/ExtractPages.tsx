@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { FileOutput } from 'lucide-react';
 import { ToolStack } from '@/components/tool/EditorPanel';
 import { ErrorMessage } from '@/components/ui/Alert';
@@ -14,6 +13,7 @@ import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PagePicker, PageScopeControl, usePageScope } from './components/PageScope';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
 
 export default function ExtractPages() {
   const controller = usePdfFile();
@@ -28,16 +28,23 @@ export default function ExtractPages() {
 
 function ExtractWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const scope = usePageScope(pdf.pageCount, 'pick');
-  const [result, setResult] = useState<OutputFile | null>(null);
+  const result = useKeyedResult<{ file: OutputFile; count: number }>(scope.pages.join(','));
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'copy');
 
   async function run() {
-    setResult(null);
+    const pages = scope.pages;
+    const key = pages.join(',');
+    result.clear();
     const bytes = await job.run(({ signal, progress }) =>
-      runPdfOp('selectPages', { bytes: pdf.bytes, pages: scope.pages, ignoreEncryption: gate.ignoreEncryption }, { signal, onProgress: progress }),
+      runPdfOp('selectPages', { bytes: pdf.bytes, pages, ignoreEncryption: gate.ignoreEncryption }, { signal, onProgress: progress }),
     );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'extracted'), data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) {
+      result.set(key, {
+        file: { name: outputName(pdf.file.name, 'extracted'), data: pdfBlob(bytes), type: 'application/pdf' },
+        count: pages.length,
+      });
+    }
   }
 
   const summary =
@@ -68,7 +75,7 @@ function ExtractWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Extraction failed" />
-      {result && <ResultFiles files={[result]} title={`Extracted ${pluralize(scope.pages.length, 'page')}`} />}
+      {result.value && <ResultFiles files={[result.value.file]} title={`Extracted ${pluralize(result.value.count, 'page')}`} />}
     </>
   );
 }

@@ -17,8 +17,17 @@ import { PdfInput, useEncryptionGate } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
+import { sizeChange } from './lib/sizeChange';
+import { verifyEncryptedEdit } from './components/verifyEdit';
 
 type Mode = 'lossless' | 'rasterize';
+
+const NOT_SMALLER_TITLE = {
+  same: 'No size reduction',
+  marginal: 'Almost no size reduction',
+  larger: 'The result is larger than the original',
+} as const;
 
 export default function CompressPdf() {
   const controller = usePdfFile();
@@ -36,19 +45,24 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [dpi, setDpi] = useState<'72' | '100' | '150' | '200'>('150');
   const [quality, setQuality] = useState(0.7);
   const [grayscale, setGrayscale] = useState(false);
-  const [result, setResult] = useState<{ file: OutputFile; size: number; stats?: CompressStats; mode: Mode } | null>(null);
+  const inputKey = mode === 'lossless' ? mode : JSON.stringify([mode, dpi, quality, grayscale]);
+  const result = useKeyedResult<{ file: OutputFile; size: number; stats?: CompressStats; mode: Mode }>(inputKey);
   const job = usePdfJob();
-  const gate = useEncryptionGate(mode === 'lossless' ? pdf : null);
+  // Rasterizing renders with pdf.js (which decrypts), so only the lossless re-save touches encryption.
+  const gate = useEncryptionGate(mode === 'lossless' ? pdf : null, 'structure');
   const qualityId = useId();
 
   async function run() {
-    setResult(null);
+    const key = inputKey;
+    result.clear();
     if (mode === 'lossless') {
-      const out = await job.run(({ signal, progress }) =>
-        runPdfOp('compressLossless', { bytes: pdf.bytes, ignoreEncryption: gate.ignoreEncryption }, { signal, onProgress: progress }),
-      );
+      const out = await job.run(async ({ signal, progress }) => {
+        const done = await runPdfOp('compressLossless', { bytes: pdf.bytes, ignoreEncryption: gate.ignoreEncryption }, { signal, onProgress: progress });
+        await verifyEncryptedEdit(pdf, done.bytes);
+        return done;
+      });
       if (out) {
-        setResult({
+        result.set(key, {
           file: { name: outputName(pdf.file.name, 'compressed'), data: pdfBlob(out.bytes), type: 'application/pdf' },
           size: out.bytes.byteLength,
           stats: out.stats,
@@ -96,7 +110,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
       });
     });
     if (out) {
-      setResult({
+      result.set(key, {
         file: { name: outputName(pdf.file.name, 'compressed'), data: pdfBlob(out), type: 'application/pdf' },
         size: out.byteLength,
         mode,
@@ -105,7 +119,8 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
   }
 
   const before = pdf.file.size;
-  const change = result ? (result.size - before) / before : 0;
+  const done = result.value;
+  const change = done ? sizeChange(before, done.size) : null;
 
   return (
     <>
@@ -116,10 +131,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
             className="self-start"
             label="Compression method"
             value={mode}
-            onChange={(m) => {
-              setMode(m);
-              setResult(null);
-            }}
+            onChange={setMode}
             options={[
               { value: 'lossless', label: 'Lossless' },
               { value: 'rasterize', label: 'Strong (rasterize)' },
@@ -135,6 +147,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
               <Alert tone="warning" title="Text will no longer be selectable">
                 Every page is re-drawn as a JPEG image. This can shrink scans and image-heavy PDFs a lot, but text becomes a picture (no
                 search, copy or screen readers) and links, bookmarks and form fields are removed.
+                {pdf.encrypted && ' The new file is not encrypted: its password and permission restrictions are not carried over.'}
               </Alert>
               <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
                 <div>
@@ -142,10 +155,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   <Segmented
                     label="Resolution"
                     value={dpi}
-                    onChange={(v) => {
-                      setDpi(v);
-                      setResult(null);
-                    }}
+                    onChange={setDpi}
                     options={[
                       { value: '72', label: '72 DPI' },
                       { value: '100', label: '100' },
@@ -164,10 +174,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
                     max={0.95}
                     step={0.05}
                     value={quality}
-                    onChange={(e) => {
-                      setQuality(Number(e.target.value));
-                      setResult(null);
-                    }}
+                    onChange={(e) => setQuality(Number(e.target.value))}
                   />
                 </div>
                 <Checkbox label="Grayscale" checked={grayscale} onChange={setGrayscale} className="pb-1.5" />
@@ -183,28 +190,32 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Compression failed" />
-      {result && change >= 0 && (
-        <Alert tone="warning" title={change === 0 ? 'No size reduction' : 'The result is larger than the original'}>
-          {result.mode === 'lossless'
+      {done && change && change.verdict !== 'smaller' && (
+        <Alert tone="warning" title={NOT_SMALLER_TITLE[change.verdict]}>
+          {done.mode === 'lossless'
             ? 'This PDF is already well optimized. Keep your original file, or try the strong (rasterize) method if it is mostly scans or images.'
             : 'Rasterizing did not help for this file (it is probably mostly text or vector graphics). Keep your original, or try a lower resolution or quality.'}
         </Alert>
       )}
-      {result && (
-        <ResultFiles files={[result.file]} tone={change < 0 ? 'success' : 'neutral'} title={change < 0 ? `Reduced by ${Math.round(-change * 100)}%` : 'Compressed file'}>
+      {done && change && (
+        <ResultFiles
+          files={[done.file]}
+          tone={change.verdict === 'smaller' ? 'success' : 'neutral'}
+          title={change.verdict === 'smaller' ? `Reduced by ${Math.round(-change.fraction * 100)}%` : 'Compressed file'}
+        >
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-fg-secondary">
             <span>
               Before: <strong className="font-medium text-fg">{formatBytes(before)}</strong>
             </span>
             <span>
-              After: <strong className="font-medium text-fg">{formatBytes(result.size)}</strong>
+              After: <strong className="font-medium text-fg">{formatBytes(done.size)}</strong>
             </span>
             <span>
-              Change: <strong className={change < 0 ? 'font-medium text-success' : 'font-medium text-warning'}>{`${change > 0 ? '+' : ''}${(change * 100).toFixed(1)}%`}</strong>
+              Change: <strong className={change.verdict === 'smaller' ? 'font-medium text-success' : 'font-medium text-warning'}>{change.percent}</strong>
             </span>
-            {result.stats && (
+            {done.stats && (
               <span>
-                {pluralize(result.stats.removedObjects, 'unused object')} removed · {pluralize(result.stats.compressedStreams, 'stream')} compressed
+                {pluralize(done.stats.removedObjects, 'unused object')} removed · {pluralize(done.stats.compressedStreams, 'stream')} compressed
               </span>
             )}
           </div>

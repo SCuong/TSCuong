@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import {
   EMPTY_METADATA,
+  customInfoEntries,
   formatPdfDate,
   infoDict,
   parsePdfDate,
@@ -105,10 +106,13 @@ describe('read/write metadata', () => {
 
   it('removes the XMP stream when asked', async () => {
     const doc = await PDFDocument.create({ updateMetadata: false });
-    doc.catalog.set(PDFName.of('Metadata'), doc.context.register(doc.context.stream('<x:xmpmeta/>')));
+    const ref = doc.context.register(doc.context.stream('<x:xmpmeta/>'));
+    doc.catalog.set(PDFName.of('Metadata'), ref);
     expect(readMetadata(doc).hasXmp).toBe(true);
     writeMetadata(doc, { ...EMPTY_METADATA, title: 'T' }, { removeXmp: true });
     expect(readMetadata(doc).hasXmp).toBe(false);
+    // The packet itself is deleted too, not just unlinked (it would otherwise still be saved).
+    expect(doc.context.lookup(ref)).toBeUndefined();
   });
 
   it('removeAllMetadata strips Info and XMP', async () => {
@@ -136,5 +140,29 @@ describe('datetime-local helpers', () => {
     expect(localInputToIso('garbage')).toBe('');
     expect(isoToLocalInput('')).toBe('');
     expect(isoToLocalInput('not a date')).toBe('');
+  });
+});
+
+describe('customInfoEntries (pdf.js getMetadata().info.Custom)', () => {
+  it('reads the Map that pdf.js 6 returns', () => {
+    const custom = new Map<string, unknown>([
+      ['Company', 'ACME'],
+      ['Approved', true],
+      ['Pages', 12],
+      ['Kind', { name: 'Report' }],
+    ]);
+    expect(customInfoEntries(custom)).toEqual([
+      { key: 'Company', value: 'ACME' },
+      { key: 'Approved', value: 'true' },
+      { key: 'Pages', value: '12' },
+      { key: 'Kind', value: 'Report' },
+    ]);
+  });
+
+  it('still reads plain objects (older pdf.js) and ignores missing values', () => {
+    expect(customInfoEntries({ Company: 'ACME' })).toEqual([{ key: 'Company', value: 'ACME' }]);
+    expect(customInfoEntries(undefined)).toEqual([]);
+    expect(customInfoEntries(null)).toEqual([]);
+    expect(customInfoEntries(new Map())).toEqual([]);
   });
 });

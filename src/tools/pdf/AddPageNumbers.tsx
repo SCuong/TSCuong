@@ -18,6 +18,10 @@ import { PreviewPage } from './components/PreviewPage';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { hexToRgb01 } from './lib/color';
+import { unsupportedCharacters } from './lib/winansi';
+import { unsupportedCharacterMessage } from './lib/errors';
+import { useKeyedResult } from './components/useKeyedResult';
+import { PositionGrid } from './components/PositionGrid';
 
 const FORMATS = ['{n}', 'Page {n}', 'Page {n} of {total}', '{n} / {total}', '- {n} -'] as const;
 const POSITIONS: Array<{ value: NumberPosition; label: string }> = [
@@ -50,12 +54,12 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [start, setStart] = useState<number | ''>(1);
   const [skipFirst, setSkipFirst] = useState(false);
   const [color, setColor] = useState('#333333');
-  const [result, setResult] = useState<OutputFile | null>(null);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'draw');
   const ids = { format: useId(), custom: useId(), size: useId(), margin: useId(), start: useId(), color: useId() };
 
   const format = preset === 'custom' ? custom : preset;
+  const unsupported = unsupportedCharacters(format);
   const pages = useMemo(() => (skipFirst ? scope.pages.filter((p) => p !== 0) : scope.pages), [scope.pages, skipFirst]);
 
   const errors = [
@@ -64,14 +68,18 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
     start === '' || !Number.isInteger(start) || start < 0 ? 'The start number must be a whole number (0 or more).' : null,
     !format.includes('{n}') ? 'The format must contain {n}.' : null,
     format.length > 60 ? 'The format is too long.' : null,
+    unsupported.length ? unsupportedCharacterMessage(unsupported) : null,
   ].filter(Boolean) as string[];
 
   const firstNumbered = pages[0];
   const last = (start === '' ? 1 : start) + pages.length - 1;
   const sampleText = formatPageNumber(format, start === '' ? 1 : start, last);
+  const inputKey = JSON.stringify([pages, position, format, fontSize, marginMm, start, color]);
+  const result = useKeyedResult<OutputFile>(inputKey);
 
   async function run() {
-    setResult(null);
+    const key = inputKey;
+    result.clear();
     const bytes = await job.run(({ signal, progress }) =>
       runPdfOp(
         'addPageNumbers',
@@ -89,7 +97,7 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
         { signal, onProgress: progress },
       ),
     );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'numbered'), data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) result.set(key, { name: outputName(pdf.file.name, 'numbered'), data: pdfBlob(bytes), type: 'application/pdf' });
   }
 
   return (
@@ -100,27 +108,21 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
           <div className="flex flex-col gap-4">
             <div>
               <Label>Position</Label>
-              <div role="radiogroup" aria-label="Position" className="grid max-w-xs grid-cols-3 gap-1.5">
-                {POSITIONS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={position === p.value}
-                    aria-label={p.label}
-                    title={p.label}
-                    onClick={() => setPosition(p.value)}
-                    className={cn(
-                      'flex h-10 items-center rounded-lg border px-2 transition-colors',
-                      p.value.startsWith('bottom') ? 'items-end pb-1.5' : 'items-start pt-1.5',
-                      p.value.endsWith('left') ? 'justify-start' : p.value.endsWith('right') ? 'justify-end' : 'justify-center',
-                      position === p.value ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface-sunken hover:bg-surface-hover',
-                    )}
-                  >
-                    <span className={cn('h-1.5 w-4 rounded-full', position === p.value ? 'bg-accent' : 'bg-fg-muted/50')} />
-                  </button>
-                ))}
-              </div>
+              <PositionGrid
+                label="Position"
+                value={position}
+                onChange={setPosition}
+                options={POSITIONS}
+                className="max-w-xs"
+                cellClassName={(v) =>
+                  cn(
+                    'h-10 px-2',
+                    v.startsWith('bottom') ? 'items-end pb-1.5' : 'items-start pt-1.5',
+                    v.endsWith('left') ? 'justify-start' : v.endsWith('right') ? 'justify-end' : 'justify-center',
+                  )
+                }
+                indicator={(selected) => <span className={cn('h-1.5 w-4 rounded-full', selected ? 'bg-accent' : 'bg-fg-muted/50')} />}
+              />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -229,7 +231,7 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not add page numbers" />
-      {result && <ResultFiles files={[result]} />}
+      {result.value && <ResultFiles files={[result.value]} />}
     </>
   );
 }

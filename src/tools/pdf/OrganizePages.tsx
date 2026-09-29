@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { Kbd } from '@/components/ui/Panel';
 import { toast } from '@/components/ui/Toast';
 import { modKey, pluralize } from '@/lib/utils';
-import { readPdfFile } from './lib/bytes';
+import { looksEncrypted, readPdfFile } from './lib/bytes';
 import { toPdfError } from './lib/errors';
 import { openPdf, type OpenedPdf } from './lib/pdfjs';
 import { docId, releaseThumbnails } from './lib/thumbnails';
@@ -43,6 +43,7 @@ import { CardButton, PageGrid, arrayMove, type GridItem } from './components/Pag
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useHistory } from './components/useHistory';
+import { useKeyedResult } from './components/useKeyedResult';
 
 interface ExtraSource {
   name: string;
@@ -67,26 +68,30 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [extras, setExtras] = useState<ExtraSource[]>([]);
   const [blankSize, setBlankSize] = useState<[number, number]>([595.28, 841.89]);
-  const [result, setResult] = useState<OutputFile | null>(null);
+  // Undo/redo and every edit change the key, so a saved file is only offered while it matches the grid.
+  const inputKey = useMemo(() => JSON.stringify(toOrganizeItems(items)), [items]);
+  const result = useKeyedResult<{ file: OutputFile; count: number }>(inputKey);
   const [inserting, setInserting] = useState(false);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'copy');
   const insertInput = useRef<HTMLInputElement>(null);
   const extrasRef = useRef<ExtraSource[]>([]);
+  const mounted = useRef(true);
 
   useEffect(() => {
     extrasRef.current = extras;
   }, [extras]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       for (const x of extrasRef.current) {
         releaseThumbnails(x.opened.doc);
         x.opened.destroy();
       }
-    },
-    [],
-  );
+    };
+  }, []);
 
   // Blank pages default to the size of the first page.
   useEffect(() => {
@@ -123,7 +128,6 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
   );
 
   function change(next: PageItem[] | ((prev: PageItem[]) => PageItem[])) {
-    setResult(null);
     history.set(next);
   }
 
@@ -144,7 +148,15 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
     setInserting(true);
     try {
       const bytes = await readPdfFile(file);
+      if (looksEncrypted(bytes)) {
+        toast(`"${file.name}" is encrypted, so its pages would come out blank. Remove the protection in your PDF app first.`, 'error', 6000);
+        return;
+      }
       const opened = await openPdf(bytes, { fileName: file.name });
+      if (!mounted.current) {
+        opened.destroy();
+        return;
+      }
       const sourceIndex = extras.length + 1;
       setExtras((list) => [...list, { name: file.name, bytes, opened }]);
       const inserted: PageItem[] = Array.from({ length: opened.doc.numPages }, (_, index) => ({
@@ -165,7 +177,9 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
   }
 
   async function save() {
-    setResult(null);
+    const key = inputKey;
+    const count = items.length;
+    result.clear();
     const bytes = await job.run(({ signal, progress }) =>
       runPdfOp(
         'organize',
@@ -173,7 +187,9 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
         { signal, onProgress: progress },
       ),
     );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'organized'), data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) {
+      result.set(key, { file: { name: outputName(pdf.file.name, 'organized'), data: pdfBlob(bytes), type: 'application/pdf' }, count });
+    }
   }
 
   function onWorkspaceKey(event: KeyboardEvent) {
@@ -205,7 +221,8 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
   }
 
   const hasSel = selected.size > 0;
-  const unchanged = isUnchanged(items, pdf.pageCount) && extras.length === 0;
+  // Inserted pages make the list differ from the original, so undoing an insert counts as unchanged again.
+  const unchanged = isUnchanged(items, pdf.pageCount);
 
   return (
     <div className="flex flex-col gap-4" onKeyDown={onWorkspaceKey}>
@@ -291,7 +308,7 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not save" />
-      {result && <ResultFiles files={[result]} title={`Organized PDF with ${pluralize(items.length, 'page')}`} />}
+      {result.value && <ResultFiles files={[result.value.file]} title={`Organized PDF with ${pluralize(result.value.count, 'page')}`} />}
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong px-6 py-10 text-center">

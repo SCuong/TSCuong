@@ -17,6 +17,11 @@ export interface GridItem {
   state?: 'normal' | 'removed' | 'highlight';
 }
 
+/** Live-region text after a reorder; `to` is the new 0-based index. */
+export function moveAnnouncement(label: string, to: number, count: number): string {
+  return `${label} moved to position ${to + 1} of ${count}.`;
+}
+
 export function arrayMove<T>(list: readonly T[], from: number, to: number): T[] {
   const next = list.slice();
   const [item] = next.splice(from, 1);
@@ -78,6 +83,7 @@ export function PageGrid({
   const suppressClick = useRef(false);
   const scrollTimer = useRef<number | undefined>(undefined);
   const pointer = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [announcement, setAnnouncement] = useState('');
   const selectable = Boolean(onSelectionChange && selected);
   const safeFocus = Math.min(focusIndex, Math.max(0, items.length - 1));
 
@@ -87,6 +93,33 @@ export function PageGrid({
     setFocusIndex(index);
     requestAnimationFrame(() => buttons.current[index]?.focus());
   }, []);
+
+  /**
+   * After an action that may remove the focused card (Delete key, a card's delete button),
+   * move focus to the nearest remaining card instead of letting it fall back to <body>.
+   */
+  function keepFocusNear(index: number) {
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const list = buttons.current;
+      for (let i = Math.min(index, list.length - 1); i >= 0; i--) {
+        const button = list[i];
+        if (button?.isConnected) {
+          setFocusIndex(i);
+          button.focus();
+          return;
+        }
+      }
+    });
+  }
+
+  /** Reorder and tell screen reader users where the page went (drag, keys and move buttons). */
+  function move(from: number, to: number) {
+    if (!onMove || to === from || to < 0 || to >= items.length) return;
+    onMove(from, to);
+    setAnnouncement(moveAnnouncement(items[from].label, to, items.length));
+  }
 
   function toggle(index: number, shift: boolean) {
     if (!selectable) return;
@@ -116,7 +149,10 @@ export function PageGrid({
   }
 
   function onKeyDown(event: KeyboardEvent, index: number) {
-    if (onCardKey?.(event, items[index], index)) return;
+    if (onCardKey?.(event, items[index], index)) {
+      keepFocusNear(index);
+      return;
+    }
     const cols = columns();
     const moveKeys: Record<string, number> = {
       ArrowLeft: -1,
@@ -129,7 +165,7 @@ export function PageGrid({
       const target = Math.max(0, Math.min(items.length - 1, index + moveKeys[event.key]));
       if (onMove && (event.altKey || event.ctrlKey || event.metaKey)) {
         if (target !== index) {
-          onMove(index, target);
+          move(index, target);
           focusCard(target);
         }
         return;
@@ -228,12 +264,53 @@ export function PageGrid({
     if (!commit || !onMove) return;
     const to = d.slot > d.from ? d.slot - 1 : d.slot;
     if (to !== d.from) {
-      onMove(d.from, to);
+      move(d.from, to);
       setFocusIndex(to);
     }
   }
 
   const dragItem = drag ? items[drag.from] : null;
+  const interactive = selectable || Boolean(onMove);
+
+  function cardLabel(item: GridItem): string {
+    const rotation = item.rotation ? `, rotated ${((item.rotation % 360) + 360) % 360} degrees` : '';
+    return `${item.label}${item.sublabel ? `, ${item.sublabel}` : ''}${rotation}${item.state === 'removed' ? ', marked for removal' : ''}`;
+  }
+
+  function cardContent(item: GridItem, isSelected: boolean) {
+    return (
+      <>
+        <Thumbnail
+          doc={item.doc}
+          pageIndex={item.pageIndex}
+          rotation={item.rotation}
+          width={thumbWidth}
+          alt=""
+          className={item.state === 'removed' ? 'opacity-35 grayscale' : undefined}
+        />
+        {item.state === 'removed' && (
+          <span aria-hidden className="absolute inset-0 flex items-center justify-center">
+            <span className="h-1 w-3/4 rotate-[-35deg] rounded-full bg-danger shadow-card" />
+          </span>
+        )}
+        {selectable && (
+          <span
+            aria-hidden
+            className={cn(
+              'absolute top-2.5 left-2.5 flex size-5 items-center justify-center rounded-md border shadow-card',
+              isSelected
+                ? item.state === 'removed'
+                  ? 'border-danger-solid bg-danger-solid text-white'
+                  : 'border-accent bg-accent text-accent-contrast'
+                : 'border-line-strong bg-surface-raised text-transparent',
+            )}
+          >
+            <Check size={13} strokeWidth={3} />
+          </span>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -241,7 +318,9 @@ export function PageGrid({
         aria-label={ariaLabel}
         className={cn(
           'grid gap-2.5 sm:gap-3',
-          'grid-cols-[repeat(auto-fill,minmax(112px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]',
+          // Reorderable cards also hold a grip and two move buttons: keep room for the page label on phones.
+          onMove ? 'grid-cols-[repeat(auto-fill,minmax(140px,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(112px,1fr))]',
+          'sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]',
           drag && 'cursor-grabbing select-none',
           className,
         )}
@@ -282,56 +361,35 @@ export function PageGrid({
                   )}
                 />
               )}
-              <button
-                ref={(el) => {
-                  buttons.current[index] = el;
-                }}
-                type="button"
-                tabIndex={index === safeFocus ? 0 : -1}
-                aria-pressed={selectable ? isSelected : undefined}
-                aria-label={`${item.label}${item.sublabel ? `, ${item.sublabel}` : ''}${item.rotation ? `, rotated ${((item.rotation % 360) + 360) % 360} degrees` : ''}${item.state === 'removed' ? ', marked for removal' : ''}`}
-                onFocus={() => setFocusIndex(index)}
-                onKeyDown={(e) => onKeyDown(e, index)}
-                onClick={(e) => {
-                  if (suppressClick.current) return;
-                  setFocusIndex(index);
-                  toggle(index, e.shiftKey);
-                }}
-                className={cn(
-                  'relative block w-full rounded-lg bg-surface-sunken p-1.5 outline-offset-2',
-                  selectable || onMove ? 'cursor-pointer' : 'cursor-default',
-                  onMove && 'active:cursor-grabbing',
-                )}
-              >
-                <Thumbnail
-                  doc={item.doc}
-                  pageIndex={item.pageIndex}
-                  rotation={item.rotation}
-                  width={thumbWidth}
-                  alt=""
-                  className={item.state === 'removed' ? 'opacity-35 grayscale' : undefined}
-                />
-                {item.state === 'removed' && (
-                  <span aria-hidden className="absolute inset-0 flex items-center justify-center">
-                    <span className="h-1 w-3/4 rotate-[-35deg] rounded-full bg-danger shadow-card" />
-                  </span>
-                )}
-                {selectable && (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'absolute top-2.5 left-2.5 flex size-5 items-center justify-center rounded-md border shadow-card',
-                      isSelected
-                        ? item.state === 'removed'
-                          ? 'border-danger-solid bg-danger-solid text-white'
-                          : 'border-accent bg-accent text-accent-contrast'
-                        : 'border-line-strong bg-surface-raised text-transparent',
-                    )}
-                  >
-                    <Check size={13} strokeWidth={3} />
-                  </span>
-                )}
-              </button>
+              {interactive ? (
+                <button
+                  ref={(el) => {
+                    buttons.current[index] = el;
+                  }}
+                  type="button"
+                  tabIndex={index === safeFocus ? 0 : -1}
+                  aria-pressed={selectable ? isSelected : undefined}
+                  aria-label={cardLabel(item)}
+                  onFocus={() => setFocusIndex(index)}
+                  onKeyDown={(e) => onKeyDown(e, index)}
+                  onClick={(e) => {
+                    if (suppressClick.current) return;
+                    setFocusIndex(index);
+                    toggle(index, e.shiftKey);
+                  }}
+                  className={cn(
+                    'relative block w-full cursor-pointer rounded-lg bg-surface-sunken p-1.5 outline-offset-2',
+                    onMove && 'active:cursor-grabbing',
+                  )}
+                >
+                  {cardContent(item, isSelected)}
+                </button>
+              ) : (
+                // A preview only (nothing to select or move): an image with a description, not a button that does nothing.
+                <div role="img" aria-label={cardLabel(item)} className="relative block w-full rounded-lg bg-surface-sunken p-1.5">
+                  {cardContent(item, isSelected)}
+                </div>
+              )}
               <div className="flex min-h-8 items-center gap-1 px-0.5 pt-1">
                 {onMove && (
                   <span
@@ -352,7 +410,7 @@ export function PageGrid({
                       label={`Move ${item.label} earlier`}
                       disabled={index === 0}
                       onClick={() => {
-                        onMove(index, index - 1);
+                        move(index, index - 1);
                         setFocusIndex(index - 1);
                       }}
                     >
@@ -362,7 +420,7 @@ export function PageGrid({
                       label={`Move ${item.label} later`}
                       disabled={index === items.length - 1}
                       onClick={() => {
-                        onMove(index, index + 1);
+                        move(index, index + 1);
                         setFocusIndex(index + 1);
                       }}
                     >
@@ -372,7 +430,11 @@ export function PageGrid({
                 )}
               </div>
               {renderActions && (
-                <div data-card-action className="flex flex-wrap items-center justify-center gap-0.5 border-t border-line pt-1">
+                <div
+                  data-card-action
+                  className="flex flex-wrap items-center justify-center gap-0.5 border-t border-line pt-1"
+                  onClickCapture={() => keepFocusNear(index)}
+                >
                   {renderActions(item, index)}
                 </div>
               )}
@@ -392,7 +454,7 @@ export function PageGrid({
       )}
       {onMove && (
         <p className="sr-only" aria-live="polite">
-          {drag ? `Moving ${dragItem?.label}. Release to drop.` : ''}
+          {drag ? `Moving ${dragItem?.label}. Release to drop.` : announcement}
         </p>
       )}
     </>

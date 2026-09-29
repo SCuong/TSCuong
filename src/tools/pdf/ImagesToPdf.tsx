@@ -12,13 +12,14 @@ import { formatBytes, pluralize } from '@/lib/utils';
 import { throwIfAborted } from '@/lib/hooks';
 import { toPdfError } from './lib/errors';
 import { probeImage, prepareImage } from './lib/imagePrep';
-import { ensureExtension, pdfBlob, type OutputFile } from './lib/files';
+import { ensureExtension, pdfBlob } from './lib/files';
 import type { ImageLayout, ImagePageInput } from './lib/ops';
 import { runPdfOp } from './lib/runner';
 import { SortableList, GripIcon } from './components/SortableList';
 import { arrayMove } from './components/PageGrid';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,.jpg,.jpeg,.png,.webp,.gif,.avif,.bmp';
 
@@ -43,7 +44,6 @@ export default function ImagesToPdf() {
   const [orientation, setOrientation] = useState<ImageLayout['orientation']>('auto');
   const [margin, setMargin] = useState<MarginKey>('small');
   const [name, setName] = useState('images.pdf');
-  const [result, setResult] = useState<OutputFile | null>(null);
   const job = usePdfJob();
   const nameId = useId();
   const live = useRef<Entry[]>([]);
@@ -58,7 +58,6 @@ export default function ImagesToPdf() {
   }
 
   async function addFiles(files: File[]) {
-    setResult(null);
     const added: Entry[] = files.map((file) => ({ id: `img${++seq}`, file, url: URL.createObjectURL(file), status: 'loading' }));
     setEntries((list) => [...list, ...added]);
     for (const entry of added) {
@@ -72,7 +71,6 @@ export default function ImagesToPdf() {
   }
 
   function remove(id: string) {
-    setResult(null);
     setEntries((list) => {
       const e = list.find((x) => x.id === id);
       if (e) URL.revokeObjectURL(e.url);
@@ -83,14 +81,17 @@ export default function ImagesToPdf() {
   function clearAll() {
     entries.forEach((e) => URL.revokeObjectURL(e.url));
     setEntries([]);
-    setResult(null);
   }
 
   const ready = entries.filter((e) => e.status === 'ready');
   const loading = entries.some((e) => e.status === 'loading');
+  // Images, their order and the page setup: a PDF is only offered while it matches them.
+  const inputKey = JSON.stringify([ready.map((e) => e.id), pageSize, orientation, margin]);
+  const result = useKeyedResult<Blob>(inputKey);
 
   async function convert() {
-    setResult(null);
+    const key = inputKey;
+    result.clear();
     const layout: ImageLayout = { pageSize, orientation, margin: MARGINS[margin] };
     const bytes = await job.run(async ({ signal, progress }) => {
       const images: ImagePageInput[] = [];
@@ -109,7 +110,7 @@ export default function ImagesToPdf() {
         { signal, onProgress: (v, label) => progress(0.6 + v * 0.4, label) },
       );
     });
-    if (bytes) setResult({ name: ensureExtension(name || 'images', 'pdf'), data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) result.set(key, pdfBlob(bytes));
   }
 
   if (entries.length === 0) {
@@ -146,10 +147,7 @@ export default function ImagesToPdf() {
             getLabel={(e) => e.file.name}
             ariaLabel="Images in page order"
             className="divide-y divide-line"
-            onMove={(from, to) => {
-              setResult(null);
-              setEntries((list) => arrayMove(list, from, to));
-            }}
+            onMove={(from, to) => setEntries((list) => arrayMove(list, from, to))}
             renderItem={(entry, index, sortable) => (
               <div className="flex min-w-0 items-center gap-3 px-3 py-2">
                 <span {...sortable.handleProps}>
@@ -209,10 +207,7 @@ export default function ImagesToPdf() {
               <Segmented
                 label="Page size"
                 value={pageSize}
-                onChange={(v) => {
-                  setPageSize(v);
-                  setResult(null);
-                }}
+                onChange={setPageSize}
                 options={[
                   { value: 'fit', label: 'Fit image' },
                   { value: 'a4', label: 'A4' },
@@ -228,10 +223,7 @@ export default function ImagesToPdf() {
                 <Segmented
                   label="Orientation"
                   value={orientation}
-                  onChange={(v) => {
-                    setOrientation(v);
-                    setResult(null);
-                  }}
+                  onChange={setOrientation}
                   options={[
                     { value: 'auto', label: 'Auto' },
                     { value: 'portrait', label: 'Portrait' },
@@ -245,10 +237,7 @@ export default function ImagesToPdf() {
               <Segmented
                 label="Margin"
                 value={margin}
-                onChange={(v) => {
-                  setMargin(v);
-                  setResult(null);
-                }}
+                onChange={setMargin}
                 options={[
                   { value: 'none', label: 'None' },
                   { value: 'small', label: 'Small' },
@@ -278,7 +267,9 @@ export default function ImagesToPdf() {
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not create the PDF" />
-      {result && <ResultFiles files={[result]} />}
+      {result.value && (
+        <ResultFiles files={[{ name: ensureExtension(name || 'images', 'pdf'), data: result.value, type: 'application/pdf' }]} />
+      )}
     </ToolStack>
   );
 }

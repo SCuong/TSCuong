@@ -1,4 +1,5 @@
 import { zipSync, type Zippable } from 'fflate';
+import { formatPageList } from './ranges';
 
 /** Remove characters that are invalid in file names on common systems. */
 export function sanitizeFileName(name: string): string {
@@ -31,6 +32,23 @@ export function ensureExtension(name: string, ext: string): string {
 /** Zero-padded index so files sort correctly: pad(3, 120) → "003". */
 export function padIndex(n: number, total: number): string {
   return String(n).padStart(String(total).length, '0');
+}
+
+/**
+ * Names for the files Split creates from `inputName` (the original file name, with its extension):
+ * one per group of 1-based pages. "report.v2.pdf" keeps its "report.v2" base.
+ */
+export function splitFileNames(
+  inputName: string,
+  mode: 'single' | 'every' | 'ranges',
+  groups: readonly number[][],
+  pageCount: number,
+): string[] {
+  return groups.map((g, i) => {
+    if (mode === 'single') return outputName(inputName, `page-${padIndex(g[0], pageCount)}`);
+    if (mode === 'every') return outputName(inputName, `part-${padIndex(i + 1, groups.length)}`);
+    return outputName(inputName, `pages-${formatPageList(g).replace(/, /g, '_')}`.slice(0, 80));
+  });
 }
 
 export interface OutputFile {

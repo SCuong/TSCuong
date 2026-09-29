@@ -13,7 +13,7 @@ import { toPdfError } from './lib/errors';
 import { openPdf, type OpenedPdf } from './lib/pdfjs';
 import { releaseThumbnails } from './lib/thumbnails';
 import { parsePageRange } from './lib/ranges';
-import { ensureExtension, pdfBlob, type OutputFile } from './lib/files';
+import { ensureExtension, pdfBlob } from './lib/files';
 import { runPdfOp } from './lib/runner';
 import { PDF_ACCEPT } from './components/PdfInput';
 import { Thumbnail } from './components/Thumbnail';
@@ -21,6 +21,7 @@ import { SortableList, GripIcon } from './components/SortableList';
 import { arrayMove } from './components/PageGrid';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
 
 interface Entry {
   id: string;
@@ -40,21 +41,22 @@ export default function MergePdf() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [outputName, setOutputName] = useState('merged.pdf');
   const [allowEncrypted, setAllowEncrypted] = useState(false);
-  const [result, setResult] = useState<OutputFile | null>(null);
   const job = usePdfJob();
   const nameId = useId();
   const live = useRef<Entry[]>([]);
+  const mounted = useRef(true);
   useEffect(() => {
     live.current = entries;
   }, [entries]);
 
-  // Destroy every pdf.js document on unmount.
-  useEffect(
-    () => () => {
+  // Destroy every pdf.js document on unmount (files still loading are destroyed when they finish).
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       for (const e of live.current) dispose(e);
-    },
-    [],
-  );
+    };
+  }, []);
 
   function dispose(entry: Entry) {
     if (entry.opened) {
@@ -68,14 +70,15 @@ export default function MergePdf() {
   }
 
   async function addFiles(files: File[]) {
-    setResult(null);
     const added: Entry[] = files.map((file) => ({ id: `f${++seq}`, file, status: 'loading', range: '' }));
     setEntries((list) => [...list, ...added]);
     for (const entry of added) {
+      if (!mounted.current) return;
       try {
         const bytes = await readPdfFile(entry.file);
         const opened = await openPdf(bytes, { fileName: entry.file.name });
-        if (!live.current.some((e) => e.id === entry.id)) {
+        // Removed from the list (or the tool was closed) while it was loading.
+        if (!mounted.current || !live.current.some((e) => e.id === entry.id)) {
           opened.destroy();
           continue;
         }
@@ -100,7 +103,6 @@ export default function MergePdf() {
   }
 
   function remove(id: string) {
-    setResult(null);
     setEntries((list) => {
       const entry = list.find((e) => e.id === id);
       if (entry) dispose(entry);
@@ -111,7 +113,6 @@ export default function MergePdf() {
   function clearAll() {
     for (const e of entries) dispose(e);
     setEntries([]);
-    setResult(null);
   }
 
   const ready = entries.filter((e) => e.status === 'ready');
@@ -139,10 +140,14 @@ export default function MergePdf() {
 
   const canMerge =
     ready.length > 0 && !loading && plan.errors.length === 0 && plan.pages > 0 && (!hasEncrypted || allowEncrypted) && !job.running;
+  // Order, files and page ranges: a merged file is only offered while it matches the list.
+  const inputKey = JSON.stringify(plan.files.map((f) => [f.entry.id, f.pages ?? null]));
+  const result = useKeyedResult<{ data: Blob; pages: number; files: number }>(inputKey);
 
   async function merge() {
-    setResult(null);
-    const name = ensureExtension(outputName || 'merged', 'pdf');
+    const key = inputKey;
+    const summary = { pages: plan.pages, files: plan.files.length };
+    result.clear();
     const bytes = await job.run(({ signal, progress }) =>
       runPdfOp(
         'merge',
@@ -153,7 +158,7 @@ export default function MergePdf() {
         { signal, onProgress: progress },
       ),
     );
-    if (bytes) setResult({ name, data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) result.set(key, { data: pdfBlob(bytes), ...summary });
   }
 
   if (entries.length === 0) {
@@ -188,10 +193,7 @@ export default function MergePdf() {
           getKey={(e) => e.id}
           getLabel={(e) => e.file.name}
           ariaLabel="Files to merge, in order"
-          onMove={(from, to) => {
-            setResult(null);
-            setEntries((list) => arrayMove(list, from, to));
-          }}
+          onMove={(from, to) => setEntries((list) => arrayMove(list, from, to))}
           className="divide-y divide-line"
           renderItem={(entry, index, sortable) => (
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:flex-nowrap">
@@ -228,10 +230,7 @@ export default function MergePdf() {
                 )}
               </div>
               {entry.status === 'ready' && (
-                <RangeInput entry={entry} onChange={(range) => {
-                  setResult(null);
-                  update(entry.id, { range });
-                }} />
+                <RangeInput entry={entry} onChange={(range) => update(entry.id, { range })} />
               )}
               <div className="ml-auto flex shrink-0 items-center">
                 {sortable.moveUp}
@@ -256,7 +255,8 @@ export default function MergePdf() {
 
       {hasEncrypted && (
         <Alert tone="warning" title="Some files are encrypted">
-          Encrypted PDFs cannot be decrypted by the in-browser editor, so their pages may come out blank or unreadable.
+          Pages copied out of an encrypted PDF come out blank or unreadable, because the in-browser PDF editor cannot decrypt them.
+          Remove the protection in your PDF app first (for example by printing to a new PDF), then add that copy here.
           <Checkbox className="mt-2" label="Merge them anyway" checked={allowEncrypted} onChange={setAllowEncrypted} />
         </Alert>
       )}
@@ -285,8 +285,13 @@ export default function MergePdf() {
 
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Merge failed" />
-      {result && <ResultFiles files={[result]} title={`Merged ${pluralize(plan.pages, 'page')} from ${pluralize(ready.length, 'file')}`} />}
-      {!result && !job.running && ready.length === 0 && !loading && (
+      {result.value && (
+        <ResultFiles
+          files={[{ name: ensureExtension(outputName || 'merged', 'pdf'), data: result.value.data, type: 'application/pdf' }]}
+          title={`Merged ${pluralize(result.value.pages, 'page')} from ${pluralize(result.value.files, 'file')}`}
+        />
+      )}
+      {!result.value && !job.running && ready.length === 0 && !loading && (
         <EmptyState icon={Combine} title="No readable PDFs yet">
           Remove the files with errors or add other PDFs.
         </EmptyState>

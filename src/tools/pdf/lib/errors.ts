@@ -63,11 +63,11 @@ export function toPdfError(error: unknown, fileName?: string): PdfError {
     return new PdfError('corrupt', `${subject} appears to be damaged and could not be read as a PDF.`);
   }
   if (/cannot encode|WinAnsi cannot encode/i.test(message)) {
-    const ch = /cannot encode "(.+?)"/.exec(message)?.[1];
-    return new PdfError(
-      'font',
-      `The built-in PDF font cannot draw ${ch ? `the character "${ch}"` : 'some of these characters'}. Use Latin letters, digits and common punctuation.`,
-    );
+    // pdf-lib: `WinAnsi cannot encode "Ε" (0x0395)`. Its quoted character is broken for code points
+    // above U+FFFF (emoji), so rebuild it from the hex code when present.
+    const hex = /\(0x([0-9a-f]+)\)/i.exec(message)?.[1];
+    const ch = hex ? String.fromCodePoint(parseInt(hex, 16)) : /cannot encode "(.+?)"/.exec(message)?.[1];
+    return new PdfError('font', unsupportedCharacterMessage(ch ? [ch] : []));
   }
   if (
     (error instanceof RangeError && /array buffer|allocation|memory|invalid array length/i.test(message)) ||
@@ -84,6 +84,19 @@ export function toPdfError(error: unknown, fileName?: string): PdfError {
     return new PdfError('corrupt', `${subject} appears to be damaged: ${shorten(message)}`);
   }
   return new PdfError('unknown', message ? shorten(message) : 'Something went wrong while processing the PDF.');
+}
+
+/** `"Ε" (U+0395)`: look-alike letters from other scripts are otherwise impossible to spot. */
+export function describeCharacter(ch: string): string {
+  const cp = ch.codePointAt(0) ?? 0;
+  return `"${ch}" (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
+}
+
+/** The sentence shown when text uses characters the built-in (WinAnsi) PDF fonts cannot draw. */
+export function unsupportedCharacterMessage(chars: readonly string[]): string {
+  const list = chars.slice(0, 3).map(describeCharacter).join(', ');
+  const what = chars.length === 0 ? 'some of these characters' : chars.length === 1 ? `the character ${list}` : `the characters ${list}${chars.length > 3 ? '…' : ''}`;
+  return `The built-in PDF font cannot draw ${what}. Use Latin letters, digits and common punctuation.`;
 }
 
 function shorten(message: string): string {

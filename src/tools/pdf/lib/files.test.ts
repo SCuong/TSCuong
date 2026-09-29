@@ -7,6 +7,7 @@ import {
   padIndex,
   sanitizeFileName,
   sniffImage,
+  splitFileNames,
   uniqueNames,
   zipFiles,
 } from './files';
@@ -88,5 +89,16 @@ describe('jpegOrientation', () => {
     expect(jpegOrientation(Uint8Array.from([0x89, 0x50]))).toBe(1);
     expect(jpegOrientation(jpegWithOrientation(42))).toBe(1);
     expect(jpegOrientation(jpegWithOrientation(6).slice(0, 20))).toBe(1);
+  });
+});
+
+describe('splitFileNames', () => {
+  it('keeps dots in the base name (only the extension is removed)', () => {
+    expect(splitFileNames('report.v2.pdf', 'single', [[1], [2]], 12)).toEqual(['report.v2-page-01.pdf', 'report.v2-page-02.pdf']);
+    expect(splitFileNames('scan 2024.01.pdf', 'every', [[1, 2], [3]], 3)).toEqual(['scan 2024.01-part-1.pdf', 'scan 2024.01-part-2.pdf']);
+  });
+
+  it('describes custom ranges in the name', () => {
+    expect(splitFileNames('a.pdf', 'ranges', [[1, 2, 3, 5], [4, 3, 2]], 5)).toEqual(['a-pages-1-3_5.pdf', 'a-pages-4_3_2.pdf']);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, PDFName, PDFRawStream, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream, PDFString, StandardFonts } from 'pdf-lib';
 import {
   addPageNumbers,
   addTextLayer,
@@ -19,7 +19,7 @@ import {
 } from './ops';
 import { EMPTY_METADATA, readMetadata } from './metadata';
 import { PdfError } from './errors';
-import { load, makePdf, pageIds } from './fixtures.test-util';
+import { encryptRc4, load, makePdf, pageIds } from './fixtures.test-util';
 
 // 1×1 red PNG
 const PNG_1PX = Uint8Array.from(
@@ -378,5 +378,93 @@ describe('inspectStructure', () => {
     expect(info.encrypted).toBe(false);
     expect(info.hasAcroForm).toBe(false);
     expect(info.objectCount).toBeGreaterThan(3);
+  });
+});
+
+/** Every object in the file — reachable or not — as text, with streams decoded. */
+async function everyObjectText(bytes: Uint8Array): Promise<string> {
+  const { decodePDFRawStream } = await import('pdf-lib');
+  const doc = await PDFDocument.load(bytes, { updateMetadata: false, ignoreEncryption: true });
+  const parts: string[] = [];
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (obj instanceof PDFRawStream) {
+      parts.push(obj.dict.toString());
+      try {
+        parts.push(new TextDecoder('latin1').decode(decodePDFRawStream(obj).decode()));
+      } catch {
+        parts.push(new TextDecoder('latin1').decode(obj.contents));
+      }
+    } else {
+      parts.push(obj.toString());
+    }
+  }
+  return parts.join('\n');
+}
+
+describe('metadata privacy', () => {
+  async function withLeftovers(): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    doc.setTitle('Current title');
+    doc.setAuthor('Current Author');
+    const xmp = doc.context.stream('<x:xmpmeta><dc:creator>XMP Secret Author</dc:creator></x:xmpmeta>', { Type: 'Metadata', Subtype: 'XML' });
+    doc.catalog.set(PDFName.of('Metadata'), doc.context.register(xmp));
+    // An older Info dictionary left behind by an incremental save: nothing refers to it any more.
+    doc.context.register(doc.context.obj({ Author: PDFString.of('Orphan Old Author') }));
+    return doc.save({ useObjectStreams: false });
+  }
+
+  it('does not keep the removed XMP packet or orphaned Info dictionaries in the saved file', async () => {
+    const src = await withLeftovers();
+    expect(await everyObjectText(src)).toMatch(/XMP Secret Author[\s\S]*Orphan Old Author|Orphan Old Author[\s\S]*XMP Secret Author/);
+    const out = await setMetadata({ bytes: src, fields: { ...EMPTY_METADATA, title: 'New title' }, removeAll: false, removeXmp: true });
+    const text = await everyObjectText(out);
+    expect(text).not.toContain('XMP Secret Author');
+    expect(text).not.toContain('Orphan Old Author');
+    expect(readMetadata(await load(out)).fields.title).toBe('New title');
+  });
+
+  it('"remove all" leaves none of the old values anywhere in the file', async () => {
+    const out = await setMetadata({ bytes: await withLeftovers(), fields: EMPTY_METADATA, removeAll: true, removeXmp: true });
+    const text = await everyObjectText(out);
+    for (const old of ['Current title', 'Current Author', 'XMP Secret Author', 'Orphan Old Author']) expect(text).not.toContain(old);
+    expect((await load(out)).getPageCount()).toBe(1);
+  });
+});
+
+describe('encrypted input', () => {
+  it('saves edits of an encrypted file without object streams, keeping /Encrypt, /ID and the encrypted content', async () => {
+    const enc = await encryptRc4(await makePdf(2), '', 'owner');
+    const before = await PDFDocument.load(enc, { ignoreEncryption: true, updateMetadata: false });
+    const out = await rotate({ bytes: enc, pages: [0], angle: 90, ignoreEncryption: true });
+    const text = new TextDecoder('latin1').decode(out);
+    // Objects packed into a new (unencrypted) object stream would be "decrypted" into garbage by readers.
+    expect(text).not.toContain('/ObjStm');
+    const after = await PDFDocument.load(out, { ignoreEncryption: true, updateMetadata: false });
+    expect(after.getPage(0).getRotation().angle).toBe(90);
+    expect(after.context.trailerInfo.Encrypt?.toString()).toBe(before.context.trailerInfo.Encrypt?.toString());
+    expect(after.context.trailerInfo.ID?.toString()).toBe(before.context.trailerInfo.ID?.toString());
+    // Same object number, same encrypted bytes: the page content still decrypts with the original key.
+    const contents = (d: PDFDocument) => d.getPage(0).node.get(PDFName.of('Contents'))!.toString();
+    expect(contents(after)).toBe(contents(before));
+  });
+
+  it('keeps the protection when compressing or stripping metadata', async () => {
+    const enc = await encryptRc4(await makePdf(1, { title: 'Secret' }), 'user', 'owner', -4);
+    const { bytes } = await compressLossless({ bytes: enc, ignoreEncryption: true });
+    expect(new TextDecoder('latin1').decode(bytes)).toMatch(/\/Encrypt \d+ 0 R/);
+    const stripped = await setMetadata({ bytes: enc, fields: EMPTY_METADATA, removeAll: true, removeXmp: true, ignoreEncryption: true });
+    const text = new TextDecoder('latin1').decode(stripped);
+    expect(text).toMatch(/\/Encrypt \d+ 0 R/);
+    expect(text).not.toContain('/ObjStm');
+  });
+
+  it('explains an encrypted file pdf-lib cannot parse instead of calling it damaged', async () => {
+    const text = '%PDF-1.7\n1 0 obj << /Length 5 >>\nstream\n\x01\x02garbage\ntrailer << /Root 9 0 R /Encrypt 7 0 R >>\n%%EOF';
+    const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0));
+    const error = await rotate({ bytes, pages: [0], angle: 90, ignoreEncryption: true }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PdfError);
+    expect((error as PdfError).kind).toBe('encrypted');
+    expect((error as PdfError).message).toMatch(/encrypted/);
   });
 });

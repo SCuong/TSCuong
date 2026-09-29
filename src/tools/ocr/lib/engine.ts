@@ -6,6 +6,7 @@
  */
 import Tesseract from 'tesseract.js';
 import { cleanText, flattenBlocks, meanConfidence, type OcrPageResult, type TesseractBlock } from './result';
+import { PendingJobs, cancelledError } from './cancellable';
 
 export const OCR_LANGUAGE = 'eng';
 
@@ -25,8 +26,20 @@ const STATUS: Record<string, string> = {
 };
 
 export interface OcrEngine {
+  /** Rejects with an AbortError when the engine is terminated while recognizing. */
   recognize: (image: HTMLCanvasElement | Blob, onProgress?: OcrProgress) => Promise<OcrPageResult>;
   terminate: () => Promise<void>;
+}
+
+/** PNG (or the blob's own) bytes of the image to recognize. */
+async function encodeImage(image: HTMLCanvasElement | Blob): Promise<Uint8Array> {
+  const blob =
+    image instanceof Blob
+      ? image
+      : await new Promise<Blob>((resolve, reject) =>
+          image.toBlob((b) => (b ? resolve(b) : reject(new Error('The image is too large to process in this browser.'))), 'image/png'),
+        );
+  return new Uint8Array(await blob.arrayBuffer());
 }
 
 /** Create a tesseract worker. Call terminate() when done (or to cancel). */
@@ -52,10 +65,17 @@ export async function createOcrEngine(onLoadProgress?: OcrProgress): Promise<Ocr
     );
   }
   let terminated = false;
+  const pending = new PendingJobs();
   return {
     async recognize(image, onProgress) {
+      if (terminated) throw cancelledError();
       current = onProgress;
-      const { data } = await worker.recognize(image, {}, { text: true, blocks: true });
+      // tesseract.js encodes a canvas or blob asynchronously *before* posting the job to its
+      // worker; a terminate() in that window makes it post to a null worker (an unhandled
+      // rejection). Encode here instead, and never start a job once the engine is terminated.
+      const bytes = await encodeImage(image);
+      if (terminated) throw cancelledError();
+      const { data } = await pending.track(worker.recognize(bytes as unknown as Tesseract.ImageLike, {}, { text: true, blocks: true }));
       const lines = flattenBlocks(data.blocks as unknown as TesseractBlock[]);
       const words = lines.flatMap((l) => l.words);
       let width = 0;
@@ -76,6 +96,8 @@ export async function createOcrEngine(onLoadProgress?: OcrProgress): Promise<Ocr
       if (terminated) return;
       terminated = true;
       current = undefined;
+      // Settle in-flight recognitions first: tesseract.js never settles them after terminate().
+      pending.cancelAll();
       await worker.terminate().catch(() => {});
     },
   };

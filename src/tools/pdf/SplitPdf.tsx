@@ -8,13 +8,14 @@ import { Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { pluralize } from '@/lib/utils';
 import { chunkPages, formatPageList, parseRangeGroups } from './lib/ranges';
-import { outputName, padIndex, pdfBlob, stripExtension, type OutputFile } from './lib/files';
+import { outputName, pdfBlob, splitFileNames, type OutputFile } from './lib/files';
 import { runPdfOp } from './lib/runner';
 import { docId } from './lib/thumbnails';
 import { PdfInput, useEncryptionGate } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
 
 type Mode = 'single' | 'every' | 'ranges';
 
@@ -33,9 +34,8 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [mode, setMode] = useState<Mode>(pdf.pageCount > 1 ? 'single' : 'ranges');
   const [every, setEvery] = useState<number | ''>(2);
   const [ranges, setRanges] = useState('');
-  const [results, setResults] = useState<OutputFile[]>([]);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'copy');
   const everyId = useId();
   const rangesId = useId();
 
@@ -50,18 +50,13 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
     return r.ok ? { groups: r.groups, error: null } : { groups: [], error: r.error };
   }, [mode, every, ranges, pdf.pageCount]);
 
-  function names(groups: number[][]): string[] {
-    const base = stripExtension(pdf.file.name);
-    return groups.map((g, i) => {
-      if (mode === 'single') return outputName(base, `page-${padIndex(g[0], pdf.pageCount)}`);
-      if (mode === 'every') return outputName(base, `part-${padIndex(i + 1, groups.length)}`);
-      return outputName(base, `pages-${formatPageList(g).replace(/, /g, '_')}`.slice(0, 80));
-    });
-  }
+  const inputKey = `${mode}|${JSON.stringify(plan.groups)}`;
+  const result = useKeyedResult<OutputFile[]>(inputKey);
 
   async function run() {
-    setResults([]);
+    const key = inputKey;
     const groups = plan.groups;
+    result.clear();
     const out = await job.run(({ signal, progress }) =>
       runPdfOp(
         'split',
@@ -70,8 +65,11 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
       ),
     );
     if (out) {
-      const fileNames = names(groups);
-      setResults(out.map((bytes, i) => ({ name: fileNames[i], data: pdfBlob(bytes), type: 'application/pdf' })));
+      const fileNames = splitFileNames(pdf.file.name, mode, groups, pdf.pageCount);
+      result.set(
+        key,
+        out.map((bytes, i) => ({ name: fileNames[i], data: pdfBlob(bytes), type: 'application/pdf' })),
+      );
     }
   }
 
@@ -86,10 +84,7 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
             className="self-start"
             label="Split mode"
             value={mode}
-            onChange={(m) => {
-              setMode(m);
-              setResults([]);
-            }}
+            onChange={setMode}
             options={[
               { value: 'single', label: 'Every page' },
               { value: 'every', label: 'Every N pages' },
@@ -115,10 +110,7 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 mono
                 value={ranges}
                 placeholder="e.g. 1-3, 4-6, 7-  or  odd, even"
-                onChange={(e) => {
-                  setRanges(e.target.value);
-                  setResults([]);
-                }}
+                onChange={(e) => setRanges(e.target.value)}
                 aria-invalid={plan.error ? true : undefined}
               />
               <p className="mt-1.5 text-[12.5px] text-fg-muted">
@@ -162,7 +154,7 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Split failed" />
-      <ResultFiles files={results} zipName={outputName(pdf.file.name, 'split', 'zip')} />
+      <ResultFiles files={result.value ?? []} zipName={outputName(pdf.file.name, 'split', 'zip')} />
     </>
   );
 }

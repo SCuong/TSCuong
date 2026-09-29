@@ -43,10 +43,16 @@ export default function ImageOcr() {
     let canvas: HTMLCanvasElement | null = null;
     try {
       canvas = await imageFileToCanvas(target);
-      if (!engine.current) {
-        engine.current = await createOcrEngine((v, label) => id === runId.current && setProgress({ value: v * 0.3, label }));
-      }
       if (id !== runId.current) return;
+      if (!engine.current) {
+        const created = await createOcrEngine((v, label) => id === runId.current && setProgress({ value: v * 0.3, label }));
+        // Cancelled (or replaced by a newer run) while the engine was loading: do not keep an orphan worker.
+        if (id !== runId.current) {
+          void created.terminate();
+          return;
+        }
+        engine.current = created;
+      }
       const out = await engine.current.recognize(canvas, (v, label) =>
         id === runId.current && setProgress({ value: label === 'Recognizing text' ? 0.3 + v * 0.7 : null, label }),
       );

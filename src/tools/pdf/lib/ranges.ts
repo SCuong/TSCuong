@@ -22,8 +22,9 @@ export interface RangeOptions {
 
 function normalize(input: string): string {
   return input
+    .normalize('NFKC') // full-width digits and punctuation (e.g. typed with a CJK input method)
     .toLowerCase()
-    .replace(/[‒-―−]/g, '-') // figure/en/em dashes, minus sign
+    .replace(/[‐-―−﹣－]/g, '-') // hyphens (e.g. pasted from a word processor), figure/en/em dashes, minus signs
     .replace(/\s+to\s+/g, '-')
     .replace(/\s*-\s*/g, '-')
     .trim();

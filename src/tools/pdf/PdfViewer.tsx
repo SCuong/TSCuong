@@ -133,6 +133,17 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
 
   useEffect(() => setPageInput(String(currentPage + 1)), [currentPage]);
 
+  // Keep the current page's thumbnail in view (scrolls the thumbnail list only, not the window).
+  const thumbList = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const list = thumbList.current;
+    const el = list?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!list || !el) return;
+    const r = el.getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    if (r.top < box.top || r.bottom > box.bottom) list.scrollBy({ top: r.top - box.top - (box.height - r.height) / 2 });
+  }, [currentPage, sidebar]);
+
   // Keep the reading position when the scale changes.
   const anchor = useRef<{ page: number; offset: number } | null>(null);
   useLayoutEffect(() => {
@@ -162,8 +173,12 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
   );
 
   // ---- Search -------------------------------------------------------------
+  // The text index is built once, the first time a query is entered, and kept for later queries.
+  // (Partial results are published every 20 pages; they must not restart the indexing loop.)
+  const [indexRequested, setIndexRequested] = useState(false);
+  if (debouncedQuery && !indexRequested) setIndexRequested(true);
   useEffect(() => {
-    if (!debouncedQuery || indexes.length === pdf.pageCount) return;
+    if (!indexRequested) return;
     let alive = true;
     setIndexing(true);
     (async () => {
@@ -185,7 +200,7 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
     return () => {
       alive = false;
     };
-  }, [debouncedQuery, pdf, indexes.length]);
+  }, [indexRequested, pdf]);
 
   const hits = useMemo<Hit[]>(() => {
     if (!debouncedQuery) return [];
@@ -335,6 +350,7 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
       <div className="relative flex h-[min(78dvh,960px)] min-h-[420px]">
         {sidebar && (
           <aside
+            ref={thumbList}
             aria-label="Page thumbnails"
             className={cn(
               'z-10 w-36 shrink-0 overflow-y-auto border-r border-line bg-surface-sunken p-2',
@@ -425,6 +441,7 @@ const ViewerPage = memo(function ViewerPage({
   const [textIndex, setTextIndex] = useState<PageTextIndex | null>(null);
   /** The text layer's divs, aligned 1:1 with the text items (empty items have detached divs). */
   const textDivs = useRef<HTMLElement[]>([]);
+  const wasActive = useRef(false);
 
   useEffect(() => {
     if (!active) {
@@ -437,8 +454,17 @@ const ViewerPage = memo(function ViewerPage({
       if (textRef.current) textRef.current.replaceChildren();
       textDivs.current = [];
       setTextIndex(null);
+      // Free the page's parsed content and fonts once it scrolls far away (long documents).
+      if (wasActive.current) {
+        wasActive.current = false;
+        doc
+          .getPage(index + 1)
+          .then((page) => page.cleanup())
+          .catch(() => {});
+      }
       return;
     }
+    wasActive.current = true;
     let cancelled = false;
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
     let textLayer: { cancel: () => void } | null = null;
@@ -514,12 +540,13 @@ const ViewerPage = memo(function ViewerPage({
       className="lk-pdf-page relative h-full w-full overflow-hidden bg-white shadow-raised ring-1 ring-line"
       style={{ ['--scale-factor' as string]: String(scale) }}
       aria-label={`Page ${index + 1}`}
-      role="region"
+      role="group"
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden />
       <div ref={textRef} className="textLayer" />
       {!rendered && (
-        <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-black/50">
+        // The page is always white paper (both themes), so a fixed dark gray keeps AA contrast.
+        <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-neutral-600">
           {failed ? 'This page could not be rendered.' : active ? <Spinner size={16} /> : `Page ${index + 1}`}
         </div>
       )}

@@ -10,7 +10,7 @@ import { formatBytes, pluralize } from '@/lib/utils';
 import { throwIfAborted } from '@/lib/hooks';
 import { OPS, canvasToBlob, releaseCanvas, type PDFPageProxy } from './lib/pdfjs';
 import { pixelHash, toRgba, type RawImage } from './lib/imageData';
-import { outputName, stripExtension, type OutputFile } from './lib/files';
+import { outputName, type OutputFile } from './lib/files';
 import { docId } from './lib/thumbnails';
 import { PdfInput } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
@@ -98,7 +98,6 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
   async function run() {
     revokeAll();
     setFound(null);
-    const base = stripExtension(pdf.file.name);
     const out = await job.run(async ({ signal, progress }) => {
       const results: Found[] = [];
       const seenIds = new Set<string>();
@@ -156,7 +155,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
             const url = URL.createObjectURL(converted.blob);
             urls.current.push(url);
             results.push({
-              name: outputName(base, `p${pageNo}-img${n}`, 'png'),
+              name: outputName(pdf.file.name, `p${pageNo}-img${n}`, 'png'),
               data: converted.blob,
               type: 'image/png',
               page: pageNo,

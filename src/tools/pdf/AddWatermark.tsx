@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils';
 import { anchorCenter, rotatedBounds, tileCenters, type Position } from './lib/geometry';
 import { hexToRgb01 } from './lib/color';
 import { prepareImage, type PreparedImage } from './lib/imagePrep';
-import { toPdfError } from './lib/errors';
+import { toPdfError, unsupportedCharacterMessage } from './lib/errors';
+import { unsupportedCharacters } from './lib/winansi';
 import { outputName, pdfBlob, type OutputFile } from './lib/files';
 import { runPdfOp } from './lib/runner';
 import { docId } from './lib/thumbnails';
@@ -22,17 +23,19 @@ import { PageScopeControl, usePageScope } from './components/PageScope';
 import { PreviewPage } from './components/PreviewPage';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
+import { PositionGrid } from './components/PositionGrid';
 
-const POSITIONS: Position[] = [
-  'top-left',
-  'top-center',
-  'top-right',
-  'middle-left',
-  'center',
-  'middle-right',
-  'bottom-left',
-  'bottom-center',
-  'bottom-right',
+const POSITIONS: Array<{ value: Position; label: string }> = [
+  { value: 'top-left', label: 'Top left' },
+  { value: 'top-center', label: 'Top center' },
+  { value: 'top-right', label: 'Top right' },
+  { value: 'middle-left', label: 'Middle left' },
+  { value: 'center', label: 'Center' },
+  { value: 'middle-right', label: 'Middle right' },
+  { value: 'bottom-left', label: 'Bottom left' },
+  { value: 'bottom-center', label: 'Bottom center' },
+  { value: 'bottom-right', label: 'Bottom right' },
 ];
 
 let measureCtx: CanvasRenderingContext2D | null = null;
@@ -69,9 +72,8 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [image, setImage] = useState<PreparedImage | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageScale, setImageScale] = useState(0.4);
-  const [result, setResult] = useState<OutputFile | null>(null);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'draw');
   const imageUrl = useObjectUrl(imageFile);
   const ids = { text: useId(), size: useId(), color: useId(), opacity: useId(), angle: useId(), scale: useId() };
 
@@ -95,16 +97,28 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
   }, [imageFile]);
 
   const margin = 36;
+  const unsupported = unsupportedCharacters(text);
   const errors = [
     kind === 'text' && !text.trim() ? 'Enter the watermark text.' : null,
+    kind === 'text' && unsupported.length ? unsupportedCharacterMessage(unsupported) : null,
     kind === 'text' && (fontSize === '' || fontSize < 4 || fontSize > 400) ? 'Font size must be between 4 and 400 pt.' : null,
     kind === 'image' && !image ? (imageError ?? 'Choose an image for the watermark.') : null,
   ].filter(Boolean) as string[];
 
   const previewPage = scope.pages[0];
+  const inputKey = JSON.stringify([
+    kind,
+    kind === 'text' ? [text, fontSize, bold, color] : [imageFile?.name, imageFile?.size, imageFile?.lastModified, imageScale],
+    opacity,
+    angle,
+    tile ? 'tile' : position,
+    scope.pages,
+  ]);
+  const result = useKeyedResult<OutputFile>(inputKey);
 
   async function run() {
-    setResult(null);
+    const key = inputKey;
+    result.clear();
     const mark =
       kind === 'text'
         ? { kind: 'text' as const, text, fontSize: Number(fontSize), color: hexToRgb01(color), bold }
@@ -116,10 +130,8 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
         { signal, onProgress: progress },
       ),
     );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'watermarked'), data: pdfBlob(bytes), type: 'application/pdf' });
+    if (bytes) result.set(key, { name: outputName(pdf.file.name, 'watermarked'), data: pdfBlob(bytes), type: 'application/pdf' });
   }
-
-  const reset = () => setResult(null);
 
   return (
     <>
@@ -131,10 +143,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
               className="self-start"
               label="Watermark type"
               value={kind}
-              onChange={(k) => {
-                setKind(k);
-                reset();
-              }}
+              onChange={setKind}
               options={[
                 { value: 'text', label: 'Text', icon: Type },
                 { value: 'image', label: 'Image', icon: ImageIcon },
@@ -182,10 +191,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   <FileDrop
                     compact
                     accept="image/png,image/jpeg,image/webp,image/gif,image/avif,.png,.jpg,.jpeg,.webp,.gif,.avif"
-                    onFiles={(files) => {
-                      setImageFile(files[0]);
-                      reset();
-                    }}
+                    onFiles={(files) => setImageFile(files[0])}
                     icon={ImageIcon}
                     title="Drop a logo or image"
                     hint="PNG with transparency works best."
@@ -237,31 +243,16 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
             <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
               <div>
                 <Label>Position</Label>
-                <div
-                  role="radiogroup"
-                  aria-label="Position"
-                  className={cn('grid w-32 grid-cols-3 gap-1', tile && 'pointer-events-none opacity-40')}
-                  aria-disabled={tile || undefined}
-                >
-                  {POSITIONS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      role="radio"
-                      aria-checked={position === p}
-                      aria-label={p.replace('-', ' ')}
-                      title={p.replace('-', ' ')}
-                      disabled={tile}
-                      onClick={() => setPosition(p)}
-                      className={cn(
-                        'flex h-8 items-center justify-center rounded-md border transition-colors',
-                        position === p ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface-sunken hover:bg-surface-hover',
-                      )}
-                    >
-                      <span className={cn('size-2 rounded-full', position === p ? 'bg-accent' : 'bg-fg-muted/50')} />
-                    </button>
-                  ))}
-                </div>
+                <PositionGrid
+                  label="Position"
+                  value={position}
+                  onChange={setPosition}
+                  options={POSITIONS}
+                  disabled={tile}
+                  className="w-32 gap-1"
+                  cellClassName={() => 'h-8 justify-center rounded-md'}
+                  indicator={(selected) => <span className={cn('size-2 rounded-full', selected ? 'bg-accent' : 'bg-fg-muted/50')} />}
+                />
               </div>
               <Checkbox
                 label="Tile across the page"
@@ -319,7 +310,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Could not add the watermark" />
-      {result && <ResultFiles files={[result]} />}
+      {result.value && <ResultFiles files={[result.value]} />}
     </>
   );
 }

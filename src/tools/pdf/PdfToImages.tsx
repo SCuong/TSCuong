@@ -9,13 +9,14 @@ import { Segmented } from '@/components/ui/Segmented';
 import { formatBytes, pluralize } from '@/lib/utils';
 import { throwIfAborted } from '@/lib/hooks';
 import { MAX_CANVAS_AREA, MAX_CANVAS_SIDE, canvasToBlob, releaseCanvas, renderPageToCanvas } from './lib/pdfjs';
-import { outputName, padIndex, stripExtension, type OutputFile } from './lib/files';
+import { outputName, padIndex, type OutputFile } from './lib/files';
 import { docId } from './lib/thumbnails';
 import { PdfInput } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PageScopeControl, usePageScope } from './components/PageScope';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
 
 type Format = 'png' | 'jpeg' | 'webp';
 const MIME: Record<Format, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' };
@@ -47,7 +48,6 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const [preset, setPreset] = useState<DpiPreset>('150');
   const [customDpi, setCustomDpi] = useState<number | ''>(240);
   const [sizes, setSizes] = useState<Array<{ w: number; h: number }> | null>(null);
-  const [results, setResults] = useState<OutputFile[]>([]);
   const job = usePdfJob();
   const dpiId = useId();
   const qualityId = useId();
@@ -96,10 +96,13 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
   const heavy = estimate && (estimate.bytes > 400 * 1024 * 1024 || estimate.largest > 40e6);
 
+  const inputKey = JSON.stringify([scope.pages, format, format === 'png' ? null : quality, dpi]);
+  const result = useKeyedResult<OutputFile[]>(inputKey);
+
   async function run() {
-    setResults([]);
+    const key = inputKey;
+    result.clear();
     const type = MIME[format];
-    const base = stripExtension(pdf.file.name);
     const files: OutputFile[] = [];
     const pages = scope.pages;
     const ok = await job.run(async ({ signal, progress }) => {
@@ -110,7 +113,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
         const canvas = await renderPageToCanvas(page, { scale: dpi / 72, signal, intent: 'print' });
         try {
           const blob = await canvasToBlob(canvas, type, format === 'png' ? undefined : quality);
-          files.push({ name: outputName(base, `page-${padIndex(pages[k] + 1, pdf.pageCount)}`, EXT[format]), data: blob, type });
+          files.push({ name: outputName(pdf.file.name, `page-${padIndex(pages[k] + 1, pdf.pageCount)}`, EXT[format]), data: blob, type });
         } finally {
           releaseCanvas(canvas);
           page.cleanup();
@@ -118,7 +121,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
       }
       return true;
     });
-    if (ok) setResults(files);
+    if (ok) result.set(key, files);
   }
 
   return (
@@ -218,7 +221,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Conversion failed" />
-      <ResultFiles files={results} zipName={outputName(pdf.file.name, EXT[format], 'zip')} />
+      <ResultFiles files={result.value ?? []} zipName={outputName(pdf.file.name, EXT[format], 'zip')} />
     </>
   );
 }

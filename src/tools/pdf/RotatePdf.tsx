@@ -16,6 +16,8 @@ import { PagePicker, PageScopeControl, pageId, usePageScope } from './components
 import { PageGrid, type GridItem } from './components/PageGrid';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { useKeyedResult } from './components/useKeyedResult';
+import { verifyEncryptedEdit } from './components/verifyEdit';
 
 type Angle = '90' | '180' | '270';
 
@@ -33,9 +35,10 @@ export default function RotatePdf() {
 function RotateWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const scope = usePageScope(pdf.pageCount, 'all');
   const [angle, setAngle] = useState<Angle>('90');
-  const [result, setResult] = useState<OutputFile | null>(null);
+  const inputKey = `${angle}|${scope.pages.join(',')}`;
+  const result = useKeyedResult<OutputFile>(inputKey);
   const job = usePdfJob();
-  const gate = useEncryptionGate(pdf);
+  const gate = useEncryptionGate(pdf, 'structure');
 
   const affected = useMemo(() => new Set(scope.pages), [scope.pages]);
   const rotationOf = useCallback((i: number) => (affected.has(i) ? Number(angle) : 0), [affected, angle]);
@@ -54,15 +57,18 @@ function RotateWorkspace({ pdf }: { pdf: LoadedPdf }) {
   );
 
   async function run() {
-    setResult(null);
-    const bytes = await job.run(({ signal, progress }) =>
-      runPdfOp(
+    const key = inputKey;
+    result.clear();
+    const bytes = await job.run(async ({ signal, progress }) => {
+      const out = await runPdfOp(
         'rotate',
         { bytes: pdf.bytes, pages: scope.pages, angle: Number(angle), ignoreEncryption: gate.ignoreEncryption },
         { signal, onProgress: progress },
-      ),
-    );
-    if (bytes) setResult({ name: outputName(pdf.file.name, 'rotated'), data: pdfBlob(bytes), type: 'application/pdf' });
+      );
+      await verifyEncryptedEdit(pdf, out);
+      return out;
+    });
+    if (bytes) result.set(key, { name: outputName(pdf.file.name, 'rotated'), data: pdfBlob(bytes), type: 'application/pdf' });
   }
 
   return (
@@ -76,10 +82,7 @@ function RotateWorkspace({ pdf }: { pdf: LoadedPdf }) {
               <Segmented
                 label="Rotation"
                 value={angle}
-                onChange={(a) => {
-                  setAngle(a);
-                  setResult(null);
-                }}
+                onChange={setAngle}
                 options={[
                   { value: '270', label: '90° left', icon: RotateCcw },
                   { value: '90', label: '90° right', icon: RotateCw },
@@ -105,7 +108,7 @@ function RotateWorkspace({ pdf }: { pdf: LoadedPdf }) {
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
       <ErrorMessage error={job.error} title="Rotation failed" />
-      {result && <ResultFiles files={[result]} />}
+      {result.value && <ResultFiles files={[result.value]} />}
       {scope.mode === 'pick' ? (
         <PagePicker pdf={pdf} selected={scope.picked} onChange={scope.setPicked} rotation={rotationOf} />
       ) : (

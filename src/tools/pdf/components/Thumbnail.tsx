@@ -81,7 +81,11 @@ export function Thumbnail({
       className={cn('relative flex aspect-square items-center justify-center overflow-hidden', className)}
     >
       {!doc ? (
-        <div className="aspect-[1/1.414] h-[88%] rounded-[2px] bg-white shadow-card ring-1 ring-line-strong" aria-label={alt} role="img" />
+        <div
+          className="aspect-[1/1.414] h-[88%] rounded-[2px] bg-white shadow-card ring-1 ring-line-strong"
+          // An empty alt means the surrounding control already names the page (like <img alt="">).
+          {...((alt ?? 'Blank page') ? { role: 'img', 'aria-label': alt ?? 'Blank page' } : { 'aria-hidden': true })}
+        />
       ) : current?.url ? (
         <img
           src={current.url}

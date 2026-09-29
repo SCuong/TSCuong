@@ -9,6 +9,7 @@ import { headerVersion, isLinearized } from './lib/bytes';
 import { parsePdfDate } from './lib/metadata';
 import { describeSize, groupSizes, orientation, type PageSizeInfo } from './lib/pageSizes';
 import { formatPageList } from './lib/ranges';
+import { describePermissions, permissionList } from './lib/permissions';
 import type { StructureInfo } from './lib/ops';
 import { runPdfOp } from './lib/runner';
 import { docId } from './lib/thumbnails';
@@ -46,17 +47,6 @@ interface Report {
   structureError: string | null;
 }
 
-const PERMISSIONS: Record<number, string> = {
-  4: 'Print',
-  8: 'Modify contents',
-  16: 'Copy text and images',
-  32: 'Add or modify annotations',
-  256: 'Fill form fields',
-  512: 'Extract for accessibility',
-  1024: 'Assemble (insert, rotate, delete pages)',
-  2048: 'High-quality print',
-};
-
 function countOutline(items: Array<{ items?: unknown[] }> | null): number {
   if (!items) return 0;
   let n = 0;
@@ -76,9 +66,11 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
 
   useEffect(() => {
     let alive = true;
+    // Terminates the structure worker if the user leaves before the analysis finishes.
+    const ctrl = new AbortController();
     (async () => {
       const doc = pdf.doc;
-      const structurePromise = runPdfOp('inspectStructure', { bytes: pdf.bytes }).then(
+      const structurePromise = runPdfOp('inspectStructure', { bytes: pdf.bytes }, { signal: ctrl.signal }).then(
         (s) => ({ s, e: null as string | null }),
         (e: unknown) => ({ s: null, e: toPdfError(e).message }),
       );
@@ -127,13 +119,14 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
         xfa: Boolean(info.IsXFAPresent),
         signatures: Boolean(info.IsSignaturesPresent),
         pageLabels: Boolean(labels),
-        permissions: permissions as number[] | null,
+        permissions: permissionList(permissions),
         structure: structure.s,
         structureError: structure.e,
       });
     })().catch((e: unknown) => alive && setError(toPdfError(e).message));
     return () => {
       alive = false;
+      ctrl.abort();
     };
   }, [pdf]);
 
@@ -216,10 +209,7 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
                 ? [
                     {
                       label: 'Allowed',
-                      value: Object.entries(PERMISSIONS)
-                        .filter(([flag]) => report.permissions!.includes(Number(flag)))
-                        .map(([, label]) => label)
-                        .join(', ') || 'Nothing',
+                      value: describePermissions(report.permissions),
                     },
                   ]
                 : []),
@@ -239,7 +229,7 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
       </div>
 
       <Panel title="Page sizes" description={groups.length === 1 ? 'All pages have the same size.' : `${groups.length} different sizes`} bodyClassName="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Page sizes table">
           <table className="w-full min-w-[560px] text-left text-[13px]">
             <thead className="border-b border-line text-[12px] text-fg-muted">
               <tr>
@@ -278,7 +268,7 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
         ) : report.structure.fonts.length === 0 ? (
           <p className="px-4 py-3 text-[13px] text-fg-muted">No fonts are used (the document may contain only images, e.g. a scan).</p>
         ) : (
-          <div className="max-h-96 overflow-auto">
+          <div className="max-h-96 overflow-auto" tabIndex={0} role="region" aria-label="Fonts table">
             <table className="w-full min-w-[560px] text-left text-[13px]">
               <thead className="sticky top-0 border-b border-line bg-surface text-[12px] text-fg-muted">
                 <tr>
