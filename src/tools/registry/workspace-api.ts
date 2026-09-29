@@ -1,3 +1,62 @@
+import { Send } from 'lucide-react';
 import type { ToolDefinition } from '../types';
 
-export const workspaceApiTools: ToolDefinition[] = [];
+export const workspaceApiTools: ToolDefinition[] = [
+  {
+    id: 'api-client',
+    name: 'API Client',
+    description:
+      'Send HTTP requests with params, headers, bodies, auth and environments; save collections, import Postman or curl and generate code.',
+    category: 'workspace',
+    icon: Send,
+    route: 'api',
+    keywords: [
+      'api',
+      'rest',
+      'http',
+      'request',
+      'client',
+      'postman',
+      'insomnia',
+      'curl',
+      'fetch',
+      'get',
+      'post',
+      'put',
+      'patch',
+      'delete',
+      'headers',
+      'json',
+      'bearer',
+      'basic auth',
+      'api key',
+      'environment',
+      'variables',
+      'collection',
+      'cors',
+      'webhook',
+      'endpoint',
+      'test api',
+      'code generation',
+      'httpie',
+      'axios',
+    ],
+    aliases: [
+      'postman alternative',
+      'rest client',
+      'http client',
+      'api tester',
+      'test an api',
+      'send http request',
+      'curl to request',
+      'online postman',
+      'api request builder',
+    ],
+    load: () => import('../api/ApiClient'),
+    network: 'required',
+    networkNote:
+      'Requests go only to the URLs you send, directly from your browser or via the optional local companion. Collections and history stay in this browser.',
+    requires: ['indexedDB'],
+    layout: 'full',
+  },
+];
