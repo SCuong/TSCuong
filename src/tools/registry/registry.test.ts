@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES } from '../categories';
 import { getToolByRoute, TOOLS } from './index';
+import { PALETTE_SUGGESTED_TOOL_IDS } from '@/app/paletteSuggestions';
 
 const REGISTRY_DIR = resolve(__dirname);
 const TOOLS_DIR = resolve(__dirname, '..');
@@ -75,6 +76,11 @@ describe('tool registry', () => {
     }
     expect(problems).toEqual([]);
     expect(count).toBe(TOOLS.length);
+  });
+
+  it('only suggests tools that exist', () => {
+    const ids = new Set(TOOLS.map((t) => t.id));
+    expect(PALETTE_SUGGESTED_TOOL_IDS.filter((id) => !ids.has(id))).toEqual([]);
   });
 
   it('keeps heavy engines out of registry files (they are in the main bundle)', () => {

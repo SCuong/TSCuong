@@ -40,6 +40,19 @@ test('Escape closes the palette and returns focus', async ({ page }) => {
   await expect(filter).toBeFocused();
 });
 
+test('palette quick actions copy generated values without opening a tool', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  await openPalette(page);
+  await page.keyboard.type('copy uuid');
+  await expect(page.getByRole('option', { name: /Copy a new UUID/ })).toBeVisible();
+  await page.keyboard.press('Enter');
+  const uuid = await page.evaluate(() => navigator.clipboard.readText());
+  expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  await expect(page.getByText(`Copied ${uuid}`)).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test('palette shows a helpful empty state', async ({ page }) => {
   await page.goto('/');
   await openPalette(page);

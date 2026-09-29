@@ -2,8 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import { useNavigate } from 'react-router';
 import {
   ArrowRight,
+  CalendarClock,
+  Clock,
   CornerDownLeft,
+  Eraser,
+  FingerprintPattern as Fingerprint,
   History,
+  KeyRound,
   LayoutGrid,
   Monitor,
   Moon,
@@ -14,15 +19,24 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { closePalette, getPaletteInitialQuery, usePaletteOpen } from './paletteStore';
+import { PALETTE_SUGGESTED_TOOL_IDS } from './paletteSuggestions';
+import { toast } from '@/components/ui/Toast';
+import { cn, copyText } from '@/lib/utils';
+import { buildAlphabet, generateStrings } from '@/tools/generators/lib/randomString';
+
+/** Copies a generated value and confirms it without leaving the keyboard flow. */
+async function copyAndConfirm(value: string, message: string) {
+  if (await copyText(value)) toast(message);
+  else toast('The clipboard is not available here. Open the matching tool to copy it manually.', 'error');
+}
 import { preloadTool, resolveTools, searchTools, toolPath, TOOLS } from '@/tools/registry';
 import { getCategory } from '@/tools/categories';
 import type { ToolDefinition } from '@/tools/types';
-import { recordSearch, useFavorites, usePinned, useRecentSearches, useRecentTools } from '@/lib/userPrefs';
+import { clearHistory, recordSearch, useFavorites, usePinned, useRecentSearches, useRecentTools } from '@/lib/userPrefs';
 import { setThemePreference, useTheme } from '@/lib/theme';
 import { normalize } from '@/lib/search';
 import { ToolIcon } from '@/components/ToolIcon';
 import { Kbd } from '@/components/ui/Panel';
-import { cn } from '@/lib/utils';
 
 interface ActionItem {
   kind: 'action';
@@ -140,6 +154,64 @@ function PaletteBody() {
         keywords: 'settings preferences backup export import restore data clear',
         run: () => navigate('/settings'),
       },
+      {
+        kind: 'action',
+        id: 'action:copy-uuid',
+        label: 'Copy a new UUID',
+        icon: Fingerprint,
+        keywords: 'uuid guid v4 generate new random id copy',
+        run: () => {
+          const value = crypto.randomUUID();
+          void copyAndConfirm(value, `Copied ${value}`);
+        },
+      },
+      {
+        kind: 'action',
+        id: 'action:copy-unix',
+        label: 'Copy the current Unix timestamp',
+        icon: Clock,
+        keywords: 'unix epoch timestamp now current time seconds copy',
+        run: () => {
+          const value = String(Math.floor(Date.now() / 1000));
+          void copyAndConfirm(value, `Copied ${value}`);
+        },
+      },
+      {
+        kind: 'action',
+        id: 'action:copy-iso',
+        label: 'Copy the current time (ISO 8601)',
+        icon: CalendarClock,
+        keywords: 'iso 8601 date time now current timestamp utc copy',
+        run: () => {
+          const value = new Date().toISOString();
+          void copyAndConfirm(value, `Copied ${value}`);
+        },
+      },
+      {
+        kind: 'action',
+        id: 'action:copy-password',
+        label: 'Copy a strong random password',
+        icon: KeyRound,
+        keywords: 'password generate random secure strong passphrase copy',
+        run: () => {
+          const alphabet = buildAlphabet('alnumSymbols', '', true);
+          if (!alphabet.ok) return;
+          const [value] = generateStrings(alphabet.alphabet, 20, 1);
+          // Never echo the password itself on screen.
+          if (value) void copyAndConfirm(value, 'Copied a 20-character password');
+        },
+      },
+      {
+        kind: 'action',
+        id: 'action:clear-history',
+        label: 'Clear recent tools and searches',
+        icon: Eraser,
+        keywords: 'clear history recent searches usage reset forget',
+        run: () => {
+          clearHistory();
+          toast('Recent tools and searches cleared');
+        },
+      },
     ],
     [navigate, resolved],
   );
@@ -162,9 +234,9 @@ function PaletteBody() {
           items: recentSearches.slice(0, 4).map((s) => ({ kind: 'query', id: `query:${s}`, query: s })),
         });
       if (result.length === 0) {
-        const suggestions = ['json-formatter', 'pdf-merge', 'image-compress', 'regex-tester', 'jwt-decoder', 'base64']
-          .map((id) => TOOLS.find((t) => t.id === id))
-          .filter((t): t is ToolDefinition => Boolean(t));
+        const suggestions = PALETTE_SUGGESTED_TOOL_IDS.map((id) => TOOLS.find((t) => t.id === id)).filter(
+          (t): t is ToolDefinition => Boolean(t),
+        );
         const fallback = suggestions.length ? suggestions : TOOLS.slice(0, 6);
         result.push({ title: 'Suggestions', items: fallback.map(toolItem) });
       }
