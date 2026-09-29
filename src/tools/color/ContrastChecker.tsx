@@ -101,7 +101,8 @@ export default function ContrastChecker() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
           <Panel bodyClassName="p-0">
             <div className="lk-checker overflow-hidden rounded-xl">
-              <div className="flex flex-col gap-4 p-6 sm:p-8" style={{ background: bgCss, color: fgCss }}>
+              {/* Rendered in the user's own colors on purpose, even when they fail WCAG (excluded from axe). */}
+              <div data-contrast-sample className="flex flex-col gap-4 p-6 sm:p-8" style={{ background: bgCss, color: fgCss }}>
                 <p className="text-[32px] leading-tight font-bold tracking-tight">Large text, 24px bold</p>
                 <p className="text-[16px] leading-relaxed">
                   Normal body text at 16px. The quick brown fox jumps over the lazy dog, and readable contrast helps everyone —

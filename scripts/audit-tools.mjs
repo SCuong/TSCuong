@@ -6,8 +6,11 @@
 //   node scripts/audit-tools.mjs [--base=http://localhost:5173] [--filter=pdf/]
 //        [--files=pdf.ts,image.ts] [--skip-files=web.ts]
 //        [--themes=dark,light] [--viewports=desktop,mobile] [--shots=dir]
-//        [--concurrency=4] [--json=report.json]
+//        [--concurrency=4] [--json=report.json] [--axe]
+//
+// --axe additionally runs axe-core (WCAG 2.1 A/AA) on each tool's <main> and reports violations.
 import { chromium } from '@playwright/test';
+import { AxeBuilder } from '@axe-core/playwright';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -94,6 +97,22 @@ async function auditOne(context, tool, theme, viewport) {
     const ph = info.text.match(PLACEHOLDER);
     if (ph && !/lorem/i.test(tool.id) && !PLACEHOLDER_EXCEPTIONS[tool.id]?.test(ph[0]))
       problems.push(`placeholder text "${ph[0]}"`);
+    if (args.axe) {
+      const axe = await new AxeBuilder({ page })
+        .include('#main')
+        // Previews that must render user-chosen colors, even failing pairs (e.g. the contrast checker).
+        .exclude('[data-contrast-sample]')
+        // Iframes only hold sandboxed previews of user content; axe cannot inject into them
+        // (the sandbox blocks it, logging a console error and stalling until axe's frame timeout).
+        // Frame traversal follows the include/exclude context, so exclude them here.
+        .exclude('iframe')
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      for (const v of axe.violations) {
+        const example = v.nodes[0]?.target?.join(' ') ?? '';
+        problems.push(`axe ${v.impact ?? 'minor'} ${v.id} ×${v.nodes.length} (${example.slice(0, 90)})`);
+      }
+    }
     if (shotsDir) {
       const name = `${tool.route.replace(/[^a-z0-9]+/gi, '_')}-${theme}-${viewport}.png`;
       await page.screenshot({ path: join(shotsDir, name), fullPage: false });

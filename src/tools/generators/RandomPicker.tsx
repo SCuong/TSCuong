@@ -184,7 +184,7 @@ function ListSection({ shuffle }: { shuffle: boolean }) {
                 actions={<CopyButton value={picked.join('\n')} label="Copy" />}
                 bodyClassName="p-0!"
               >
-                <ol className="max-h-[420px] divide-y divide-line overflow-y-auto">
+                <ol className="max-h-[420px] divide-y divide-line overflow-y-auto" tabIndex={0} aria-label="Picked items">
                   {picked.map((item, i) => (
                     <li key={i} className="flex items-baseline gap-3 px-4 py-2 text-[14px]">
                       <span className="w-8 shrink-0 text-right font-mono text-[12.5px] text-fg-muted tabular-nums">{i + 1}.</span>

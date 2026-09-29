@@ -331,7 +331,7 @@ export default function RobotsTxtGenerator() {
           />
           <Tester generated={output} />
           <Panel title="AI crawler tokens" description="Used by the “Block AI crawlers” preset. Blocking them does not affect regular search engines.">
-            <div className="max-h-[280px] overflow-auto">
+            <div className="max-h-[280px] overflow-auto" tabIndex={0} role="region" aria-label="AI crawler tokens">
               <table className="w-full min-w-[380px] text-left text-[13px]">
                 <thead className="sticky top-0 bg-surface text-[12px] text-fg-muted">
                   <tr className="border-b border-line">

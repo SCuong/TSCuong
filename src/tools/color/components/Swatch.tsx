@@ -47,7 +47,7 @@ export function SwatchButton({
         </span>
       )}
       {label && <span className="text-[12.5px] font-semibold">{label}</span>}
-      <span className="flex items-center gap-1 font-mono text-[12px] opacity-90">
+      <span className="flex items-center gap-1 font-mono text-[12px]">
         {copied ? (
           <>
             <Check size={12} aria-hidden /> Copied
@@ -56,7 +56,7 @@ export function SwatchButton({
           hex
         )}
       </span>
-      {sublabel && <span className="text-[11px] opacity-75">{sublabel}</span>}
+      {sublabel && <span className="text-[11px]">{sublabel}</span>}
     </button>
   );
 }

@@ -373,7 +373,7 @@ export default function MockData() {
             description={`First ${Math.min(PREVIEW_ROWS, result.count)} of ${formatNumber(result.count)} rows`}
             bodyClassName="p-0!"
           >
-            <div className="max-h-[420px] overflow-auto">
+            <div className="max-h-[420px] overflow-auto" tabIndex={0} role="region" aria-label="Preview rows">
               <table className="w-full text-left text-[12.5px]">
                 <thead className="sticky top-0 z-[1] bg-surface-sunken text-fg-muted shadow-[0_1px_0_var(--lk-border)]">
                   <tr>

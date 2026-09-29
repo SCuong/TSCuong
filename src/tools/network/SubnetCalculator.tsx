@@ -46,10 +46,13 @@ function compute(input: string): Result {
 
 function Row({ label, value, copy = true, mono = true }: { label: ReactNode; value: ReactNode; copy?: boolean; mono?: boolean }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 py-2 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
-      <dt className="col-span-2 text-[13px] text-fg-muted sm:col-span-1">{label}</dt>
-      <dd className={cn('min-w-0 text-[13px] break-all text-fg', mono && 'font-mono text-[12.5px]')}>{value}</dd>
-      <div className="flex justify-end">{copy && typeof value === 'string' && <CopyButton value={value} iconOnly />}</div>
+    // A <dl> group may only contain <dt>/<dd>, so the copy button lives inside the <dd>.
+    <div className="grid grid-cols-1 gap-y-0.5 py-2 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center sm:gap-x-3">
+      <dt className="text-[13px] text-fg-muted">{label}</dt>
+      <dd className="flex min-w-0 items-center justify-between gap-3">
+        <span className={cn('min-w-0 text-[13px] break-all text-fg', mono && 'font-mono text-[12.5px]')}>{value}</span>
+        {copy && typeof value === 'string' && <CopyButton value={value} iconOnly />}
+      </dd>
     </div>
   );
 }

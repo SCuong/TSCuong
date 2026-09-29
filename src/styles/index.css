@@ -25,9 +25,9 @@
   --lk-accent-soft: rgb(37 99 235 / 0.08);
   --lk-accent-line: rgb(37 99 235 / 0.35);
   --lk-brand-warm: #d97706;
-  --lk-success: #15803d;
+  --lk-success: #137739;
   --lk-success-soft: rgb(21 128 61 / 0.09);
-  --lk-warning: #b45309;
+  --lk-warning: #a94e08;
   --lk-warning-soft: rgb(217 119 6 / 0.1);
   --lk-danger: #c42b2b;
   --lk-danger-solid: #dc2626;
@@ -47,7 +47,7 @@
   --lk-syn-keyword: #cf222e;
   --lk-syn-string: #0a3069;
   --lk-syn-number: #0550ae;
-  --lk-syn-comment: #6e7781;
+  --lk-syn-comment: #666e78;
   --lk-syn-function: #8250df;
   --lk-syn-property: #0550ae;
   --lk-syn-tag: #116329;
@@ -75,7 +75,7 @@
   --lk-border-strong: #2d3646;
   --lk-text-primary: #e6eaf2;
   --lk-text-secondary: #a7b1c2;
-  --lk-text-muted: #7c879b;
+  --lk-text-muted: #8590a4; /* ≥ 4.5:1 on every dark surface and tint (scripts/check-contrast.mjs) */
   --lk-accent: #2f6fed;
   --lk-accent-hover: #3d7bf5;
   --lk-accent-contrast: #ffffff;

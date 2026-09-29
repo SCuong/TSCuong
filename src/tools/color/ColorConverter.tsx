@@ -91,7 +91,7 @@ export default function ColorConverter() {
           <div className="lk-checker relative h-44 overflow-hidden rounded-xl border border-line sm:h-52">
             <div className="absolute inset-0 flex flex-col justify-end p-4" style={{ background: preview, color: textColor }}>
               <span className="font-mono text-[20px] font-semibold tracking-tight">{values.hex}</span>
-              <span className="text-[13px] opacity-80">
+              <span className="text-[13px]">
                 {named.exact ? named.name : `≈ ${named.name}`}
                 {alpha < 1 && ` · ${Math.round(alpha * 100)}% opacity`}
               </span>

@@ -157,7 +157,11 @@ export function CodeEditor({
     lineWrapping ? EditorView.lineWrapping : [],
     showLineNumbers ? [lineNumbers(), highlightActiveLineGutter(), foldGutter()] : [],
     placeholder ? placeholderExt(placeholder) : [],
-    EditorView.contentAttributes.of({ 'aria-label': ariaLabel }),
+    // Read-only content is not contenteditable, so it would not be focusable: keep it in the tab
+    // order so keyboard users can reach, scroll and select output.
+    EditorView.contentAttributes.of(
+      readOnly ? { 'aria-label': ariaLabel, 'aria-readonly': 'true', tabindex: '0' } : { 'aria-label': ariaLabel },
+    ),
   ];
 
   useEffect(() => {
