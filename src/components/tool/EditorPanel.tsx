@@ -36,6 +36,8 @@ export interface EditorPanelProps {
   /** CSS height of the editing area, e.g. "320px" or "100%". */
   height?: string;
   lineWrapping?: boolean;
+  /** Show the line-number gutter in CodeMirror mode (default true). */
+  lineNumbers?: boolean;
   invalid?: boolean;
   ariaLabel?: string;
   /** Extra CodeMirror extensions (e.g. error markers). Keep the array reference stable. Implies `code`. */
@@ -62,6 +64,7 @@ export function EditorPanel({
   className,
   height = '360px',
   lineWrapping = true,
+  lineNumbers = true,
   invalid,
   ariaLabel,
   extensions,
@@ -136,6 +139,7 @@ export function EditorPanel({
             readOnly={readOnly}
             placeholder={placeholder}
             lineWrapping={lineWrapping}
+            lineNumbers={lineNumbers}
             ariaLabel={label}
             className="h-full"
             extensions={extensions}
