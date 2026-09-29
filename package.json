@@ -18,7 +18,8 @@
     "check": "npm run typecheck && npm run lint && npm run check:contrast && npm run test && npm run build",
     "companion": "node companion/server.mjs",
     "postinstall": "node scripts/copy-engine-assets.mjs",
-    "check:contrast": "node scripts/check-contrast.mjs"
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "docs:tools": "node scripts/generate-tool-catalog.mjs"
   },
   "engines": {
     "node": ">=20"
