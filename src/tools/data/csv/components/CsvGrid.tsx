@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 import type { Table } from '../lib/csv';
 import type { SortState } from '../lib/table';
+import { t } from '@/lib/i18n';
 
 const ROW_HEIGHT = 32;
 const NUM_MIN = 48;
@@ -233,9 +234,9 @@ export function CsvGrid({
                       type="button"
                       onClick={() => onSort(c)}
                       className="group flex h-full w-full min-w-0 items-center gap-1.5 px-2.5 text-left text-[12.5px] font-semibold text-fg hover:bg-surface-hover"
-                      title={`${name || '(unnamed)'} · click to sort`}
+                      title={t('{name} · click to sort', { name: name || t('unnamed') })}
                     >
-                      <span className={cn('truncate', !name && 'text-fg-muted italic')}>{name || 'unnamed'}</span>
+                      <span className={cn('truncate', !name && 'text-fg-muted italic')}>{name || t('unnamed')}</span>
                       <SortIcon
                         size={12}
                         aria-hidden
@@ -281,7 +282,7 @@ export function CsvGrid({
                   isSelRow ? 'bg-accent-soft text-accent-text' : 'bg-surface-sunken text-fg-muted',
                 )}
                 style={{ width: numWidth }}
-                title={`Row ${rowIndex + 1} in the file`}
+                title={t('Row {rowIndex} in the file', { rowIndex: rowIndex + 1 })}
               >
                 {formatNumber(rowIndex + 1, 0)}
               </div>
@@ -319,7 +320,7 @@ export function CsvGrid({
                       {isEditing ? (
                         <input
                           ref={editRef}
-                          aria-label={`Edit ${table.headers[c] || `column ${c + 1}`}, row ${rowIndex + 1}`}
+                          aria-label={t('Edit {headers}, row {rowIndex}', { headers: table.headers[c] || t('Column {i}', { i: c + 1 }), rowIndex: rowIndex + 1 })}
                           value={editing.value}
                           onChange={(e) => setEditing({ cell: editing.cell, value: e.target.value })}
                           onBlur={() => commit()}

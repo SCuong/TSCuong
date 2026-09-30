@@ -4,6 +4,7 @@ import type { EditorLanguage } from '@/components/editor/languages';
 import { CopyButton, DownloadButton } from '@/components/ui/Actions';
 import { Textarea } from '@/components/ui/Field';
 import { formatBytes } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /** Above this size the output is not loaded into an editor; a preview is shown and copy/download use the full text. */
 export const PREVIEW_LIMIT = 1_500_000;
@@ -81,19 +82,18 @@ export function OutputPanel({
         <h2 className="text-[13px] font-semibold tracking-tight text-fg">{title}</h2>
         <div className="flex flex-wrap items-center gap-1">
           {actions}
-          <DownloadButton data={value} filename={downloadName} type={downloadType} label="Save" variant="ghost" />
+          <DownloadButton data={value} filename={downloadName} type={downloadType} label={t('Save')} variant="ghost" />
           <CopyButton value={value} iconOnly />
         </div>
       </header>
       <p className="border-b border-line bg-accent-soft px-4 py-2 text-[12.5px] text-fg-secondary">
-        The result is {formatBytes(bytes ?? new Blob([value]).size)}, so only the beginning is shown here. Save and Copy use the complete
-        output.
+        {t('The result is {size}, so only the beginning is shown here. Save and Copy use the complete output.', { size: formatBytes(bytes ?? new Blob([value]).size) })}
       </p>
       <div className="min-h-0 p-2" style={{ height }}>
         <Textarea
           value={preview.text}
           readOnly
-          aria-label="Output preview"
+          aria-label={t('Output preview')}
           className="h-full resize-none whitespace-pre"
           wrap={lineWrapping ? 'soft' : 'off'}
         />

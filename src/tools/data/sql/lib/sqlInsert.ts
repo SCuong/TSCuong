@@ -1,5 +1,6 @@
 import { parseCsv, uniqueHeaders } from '@/tools/data/csv/lib/csv';
 import { parseJson, stripBom } from '@/tools/json/lib/json';
+import { t } from '@/lib/i18n';
 
 /** Target databases for generated INSERT statements (MariaDB uses the MySQL rules). */
 export type InsertDialect = 'ansi' | 'postgresql' | 'mysql' | 'sqlite' | 'sqlserver' | 'oracle';
@@ -8,12 +9,12 @@ export type InsertDialect = 'ansi' | 'postgresql' | 'mysql' | 'sqlite' | 'sqlser
 export type IdentifierQuoting = 'auto' | 'double' | 'backtick' | 'bracket' | 'minimal';
 
 export const INSERT_DIALECTS: Array<{ value: InsertDialect; label: string }> = [
-  { value: 'postgresql', label: 'PostgreSQL' },
-  { value: 'mysql', label: 'MySQL / MariaDB' },
-  { value: 'sqlite', label: 'SQLite' },
-  { value: 'sqlserver', label: 'SQL Server' },
-  { value: 'oracle', label: 'Oracle' },
-  { value: 'ansi', label: 'Standard SQL' },
+  { value: 'postgresql', label: t('PostgreSQL') },
+  { value: 'mysql', label: t('MySQL / MariaDB') },
+  { value: 'sqlite', label: t('SQLite') },
+  { value: 'sqlserver', label: t('SQL Server') },
+  { value: 'oracle', label: t('Oracle') },
+  { value: 'ansi', label: t('Standard SQL') },
 ];
 
 // ---------------------------------------------------------------------------

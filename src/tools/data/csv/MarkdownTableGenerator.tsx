@@ -10,6 +10,7 @@ import { blankTable, normalizeTable } from './lib/importTable';
 import { toMarkdownTable, type Align } from './lib/markdownTable';
 import { OutputPanel } from './components/OutputPanel';
 import { TableEditor } from './components/TableEditor';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'markdown-table-generator';
 
@@ -33,30 +34,29 @@ export default function MarkdownTableGenerator() {
 
   return (
     <ToolStack>
-      <Panel title="Table" bodyClassName="p-3">
+      <Panel title={t('Table')} bodyClassName="p-3">
         <TableEditor table={table} onChange={setTable} align={align} onAlignChange={setAlign} />
       </Panel>
       <ToolBar>
         <div>
-          <Label>Source style</Label>
+          <Label>{t('Source style')}</Label>
           <Segmented
-            label="Source style"
+            label={t('Source style')}
             value={style}
             onChange={setStyle}
             options={[
-              { value: 'pretty', label: 'Aligned columns' },
-              { value: 'compact', label: 'Compact' },
+              { value: 'pretty', label: t('Aligned columns') },
+              { value: 'compact', label: t('Compact') },
             ]}
           />
         </div>
         <p className="self-center text-[12.5px] text-fg-muted">
-          Click the alignment icon in a header to cycle default → left → center → right. Pipes are escaped and line breaks become
-          &lt;br&gt;.
+          {t('Click the alignment icon in a header to cycle default → left → center → right. Pipes are escaped and line breaks become <br>.')}
         </p>
       </ToolBar>
       {view === 'markdown' ? (
         <OutputPanel
-          title="Markdown"
+          title={t('Markdown')}
           value={markdown}
           actions={<ViewToggle view={view} onChange={setView} />}
           downloadName="table.md"
@@ -65,14 +65,14 @@ export default function MarkdownTableGenerator() {
           lineWrapping={false}
         />
       ) : (
-        <Panel title="Preview" actions={<ViewToggle view={view} onChange={setView} />} bodyClassName="p-4">
+        <Panel title={t('Preview')} actions={<ViewToggle view={view} onChange={setView} />} bodyClassName="p-4">
           <div className="overflow-x-auto">
             <table className="border-collapse text-[14px]">
               <thead>
                 <tr>
                   {table.headers.map((h, i) => (
                     <th key={i} className={cn('border border-line bg-surface-hover px-3 py-1.5 font-semibold', alignClass(align[i]))}>
-                      {h || `Column ${i + 1}`}
+                      {h || t('Column {i}', { i: i + 1 })}
                     </th>
                   ))}
                 </tr>
@@ -92,7 +92,7 @@ export default function MarkdownTableGenerator() {
           </div>
           {table.rows.length > 500 && (
             <p className="mt-3 text-[12.5px] text-fg-muted">
-              The preview shows the first 500 rows; the Markdown includes all {table.rows.length.toLocaleString()}.
+              {t('The preview shows the first 500 rows; the Markdown includes all {count}.', { count: table.rows.length.toLocaleString() })}
             </p>
           )}
         </Panel>
@@ -108,13 +108,13 @@ function alignClass(a: Align | undefined) {
 function ViewToggle({ view, onChange }: { view: 'markdown' | 'preview'; onChange: (v: 'markdown' | 'preview') => void }) {
   return (
     <Segmented
-      label="Output view"
+      label={t('Output view')}
       size="sm"
       value={view}
       onChange={onChange}
       options={[
-        { value: 'markdown', label: 'Markdown' },
-        { value: 'preview', label: 'Preview' },
+        { value: 'markdown', label: t('Markdown') },
+        { value: 'preview', label: t('Preview') },
       ]}
     />
   );

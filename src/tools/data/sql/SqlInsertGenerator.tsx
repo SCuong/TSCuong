@@ -20,6 +20,7 @@ import {
   type InsertDialect,
   type InsertOptions,
 } from './lib/sqlInsert';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'sql-insert-generator';
 
@@ -82,9 +83,9 @@ export default function SqlInsertGenerator() {
   return (
     <ToolStack>
       <ToolBar>
-        <Option label="Input">
+        <Option label={t('Input')}>
           <Segmented
-            label="Input"
+            label={t('Input')}
             value={format}
             onChange={setFormat}
             options={[
@@ -93,7 +94,7 @@ export default function SqlInsertGenerator() {
             ]}
           />
         </Option>
-        <Option label="Database" htmlFor="ins-dialect" className="w-40">
+        <Option label={t('Database')} htmlFor="ins-dialect" className="w-40">
           <Select id="ins-dialect" value={o.dialect} onChange={(e) => set('dialect', e.target.value as InsertDialect)} className="h-8 py-1 text-[13px]">
             {INSERT_DIALECTS.map((d) => (
               <option key={d.value} value={d.value}>
@@ -102,7 +103,7 @@ export default function SqlInsertGenerator() {
             ))}
           </Select>
         </Option>
-        <Option label="Table" htmlFor="ins-table" className="w-40">
+        <Option label={t('Table')} htmlFor="ins-table" className="w-40">
           <Input
             id="ins-table"
             value={o.table}
@@ -112,16 +113,16 @@ export default function SqlInsertGenerator() {
             className="h-8 py-1 font-mono text-[13px]"
           />
         </Option>
-        <Option label="Quote names" htmlFor="ins-quote" className="w-40">
+        <Option label={t('Quote names')} htmlFor="ins-quote" className="w-40">
           <Select id="ins-quote" value={o.quoting} onChange={(e) => set('quoting', e.target.value as IdentifierQuoting)} className="h-8 py-1 text-[13px]">
-            <option value="auto">{`Always ${QUOTE_LABELS[autoStyle]}`}</option>
-            <option value="minimal">Only when needed</option>
-            <option value="double">Always "name"</option>
-            <option value="backtick">Always `name`</option>
-            <option value="bracket">Always [name]</option>
+            <option value="auto">{t('Always {QUOTE_LABELS}', { QUOTE_LABELS: QUOTE_LABELS[autoStyle] })}</option>
+            <option value="minimal">{t('Only when needed')}</option>
+            <option value="double">{t('Always "name"')}</option>
+            <option value="backtick">{t('Always `name`')}</option>
+            <option value="bracket">{t('Always [name]')}</option>
           </Select>
         </Option>
-        <Option label="Rows per INSERT" htmlFor="ins-batch" className="w-32">
+        <Option label={t('Rows per INSERT')} htmlFor="ins-batch" className="w-32">
           <NumberInput
             id="ins-batch"
             min={1}
@@ -133,24 +134,24 @@ export default function SqlInsertGenerator() {
           />
         </Option>
         <div className="flex w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
-          <Switch label="CREATE TABLE with inferred types" checked={o.createTable} onChange={(v) => set('createTable', v)} />
-          <Switch label="Column list" checked={o.includeColumns} onChange={(v) => set('includeColumns', v)} />
-          <Switch label="Wrap in a transaction" checked={o.transaction} onChange={(v) => set('transaction', v)} />
-          <Switch label="Detect dates" checked={o.detectDates} onChange={(v) => set('detectDates', v)} />
+          <Switch label={t('CREATE TABLE with inferred types')} checked={o.createTable} onChange={(v) => set('createTable', v)} />
+          <Switch label={t('Column list')} checked={o.includeColumns} onChange={(v) => set('includeColumns', v)} />
+          <Switch label={t('Wrap in a transaction')} checked={o.transaction} onChange={(v) => set('transaction', v)} />
+          <Switch label={t('Detect dates')} checked={o.detectDates} onChange={(v) => set('detectDates', v)} />
           {format === 'csv' && (
             <>
-              <Switch label="Numbers & booleans" checked={c.detectTypes} onChange={(v) => setCsv('detectTypes', v)} />
-              <Switch label="Empty cells as NULL" checked={c.emptyAsNull} onChange={(v) => setCsv('emptyAsNull', v)} />
+              <Switch label={t('Numbers & booleans')} checked={c.detectTypes} onChange={(v) => setCsv('detectTypes', v)} />
+              <Switch label={t('Empty cells as NULL')} checked={c.emptyAsNull} onChange={(v) => setCsv('emptyAsNull', v)} />
               <div className="flex items-center gap-2">
                 <label htmlFor="ins-delim" className="text-sm text-fg">
-                  Delimiter
+                  {t('Delimiter')}
                 </label>
                 <Select id="ins-delim" value={c.delimiter} onChange={(e) => setCsv('delimiter', e.target.value)} className="h-8 w-32 py-1 text-[13px]">
-                  <option value="">Auto-detect</option>
-                  <option value=",">Comma</option>
-                  <option value=";">Semicolon</option>
+                  <option value="">{t('Auto-detect')}</option>
+                  <option value=",">{t('Comma')}</option>
+                  <option value=";">{t('Semicolon')}</option>
                   <option value={'\t'}>Tab</option>
-                  <option value="|">Pipe</option>
+                  <option value="|">{t('Pipe')}</option>
                 </Select>
               </div>
             </>
@@ -159,26 +160,26 @@ export default function SqlInsertGenerator() {
       </ToolBar>
 
       {looksLikeCsv && (
-        <DirectionHint actionLabel="Read as CSV" onAction={() => setFormat('csv')}>
-          This input looks like CSV rather than JSON.
+        <DirectionHint actionLabel={t('Read as CSV')} onAction={() => setFormat('csv')}>
+          {t('This input looks like CSV rather than JSON.')}
         </DirectionHint>
       )}
       {looksLikeJsonInput && (
-        <DirectionHint actionLabel="Read as JSON" onAction={() => setFormat('json')}>
-          This input looks like JSON rather than CSV.
+        <DirectionHint actionLabel={t('Read as JSON')} onAction={() => setFormat('json')}>
+          {t('This input looks like JSON rather than CSV.')}
         </DirectionHint>
       )}
-      <ErrorPanel title={format === 'json' ? 'Invalid JSON' : 'Cannot read this CSV'} error={inputError} onReveal={() => editor.reveal(inputError?.line, inputError?.column)} />
-      <ErrorPanel title="Cannot generate SQL" error={result && !result.ok ? { message: result.error } : null} />
-      <NotesPanel notes={notes} title="Notes" />
+      <ErrorPanel title={format === 'json' ? t('Invalid JSON') : t('Cannot read this CSV')} error={inputError} onReveal={() => editor.reveal(inputError?.line, inputError?.column)} />
+      <ErrorPanel title={t('Cannot generate SQL')} error={result && !result.ok ? { message: result.error } : null} />
+      <NotesPanel notes={notes} title={t('Notes')} />
 
       <SplitPanes>
         <EditorPanel code
-          title={format === 'json' ? 'JSON records' : 'CSV with a header row'}
+          title={format === 'json' ? t('JSON records') : t('CSV with a header row')}
           value={input}
           onChange={setInput}
           language={format === 'json' ? 'json' : 'plain'}
-          placeholder={format === 'json' ? 'Paste a JSON array of objects…' : 'Paste CSV (first row = column names)…'}
+          placeholder={format === 'json' ? t('Paste a JSON array of objects…') : t('Paste CSV (first row = column names)…')}
           sample={format === 'json' ? SAMPLE_JSON : SAMPLE_CSV}
           fileAccept={format === 'json' ? '.json,application/json,text/plain' : '.csv,.tsv,.txt,text/csv,text/plain'}
           invalid={Boolean(inputError)}
@@ -194,14 +195,14 @@ export default function SqlInsertGenerator() {
           language="sql"
           downloadName={`${(o.table.trim() || 'data').replace(/[^\w.-]+/g, '_')}.sql`}
           downloadType="application/sql"
-          placeholder="INSERT statements appear here"
+          placeholder={t('INSERT statements appear here')}
           height="480px"
           bytes={outBytes}
           footer={
             result?.ok ? (
               <>
-                <span>{pluralize(result.rows, 'row')}</span>
-                <span>{pluralize(result.statements, 'INSERT statement')}</span>
+                <span>{pluralize(result.rows, t('row'), t('rows'))}</span>
+                <span>{pluralize(result.statements, t('INSERT statement'), t('INSERT statements'))}</span>
                 <span>{formatBytes(outBytes)}</span>
               </>
             ) : undefined
@@ -210,36 +211,36 @@ export default function SqlInsertGenerator() {
       </SplitPanes>
 
       {result?.ok && dataset?.ok && dataset.data.columns.length > 0 && (
-        <Panel title="Columns" description="Types are inferred from every value; nested objects and arrays are stored as JSON text." bodyClassName="p-0">
+        <Panel title={t('Columns')} description={t('Types are inferred from every value; nested objects and arrays are stored as JSON text.')} bodyClassName="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-[13px]">
               <thead className="border-b border-line text-[12px] text-fg-muted">
                 <tr>
                   <th scope="col" className="px-4 py-2 font-medium">
-                    Column
+                    {t('Column')}
                   </th>
                   <th scope="col" className="px-4 py-2 font-medium">
-                    SQL type ({INSERT_DIALECTS.find((d) => d.value === o.dialect)?.label})
+                    {t('SQL type ({label})', { label: INSERT_DIALECTS.find((d) => d.value === o.dialect)?.label })}
                   </th>
                   <th scope="col" className="px-4 py-2 font-medium">
-                    Values
+                    {t('Values')}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {dataset.data.columns.slice(0, 200).map((name, i) => {
-                  const t = result.types[i];
+                  const colType = result.types[i];
                   return (
                     <tr key={`${name}-${i}`}>
                       <td className="px-4 py-1.5 font-mono text-[12.5px] break-all text-fg">{quoteIdentifier(name, o.dialect, o.quoting)}</td>
-                      <td className="px-4 py-1.5 font-mono text-[12.5px] text-fg-secondary">{sqlTypeName(t, o.dialect)}</td>
+                      <td className="px-4 py-1.5 font-mono text-[12.5px] text-fg-secondary">{sqlTypeName(colType, o.dialect)}</td>
                       <td className="px-4 py-1.5">
-                        {t.kind === 'unknown' ? (
-                          <Badge tone="warning">all NULL</Badge>
-                        ) : t.nullable ? (
-                          <Badge>has NULLs</Badge>
+                        {colType.kind === 'unknown' ? (
+                          <Badge tone="warning">{t('all NULL')}</Badge>
+                        ) : colType.nullable ? (
+                          <Badge>{t('has NULLs')}</Badge>
                         ) : (
-                          <Badge tone="success">no NULLs</Badge>
+                          <Badge tone="success">{t('no NULLs')}</Badge>
                         )}
                       </td>
                     </tr>
@@ -250,7 +251,7 @@ export default function SqlInsertGenerator() {
           </div>
           {dataset.data.columns.length > 200 && (
             <p className="border-t border-line px-4 py-2 text-[12.5px] text-fg-muted">
-              Showing 200 of {formatNumber(dataset.data.columns.length)} columns.
+              {t('Showing 200 of {count} columns.', { count: formatNumber(dataset.data.columns.length) })}
             </p>
           )}
         </Panel>

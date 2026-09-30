@@ -6,6 +6,7 @@ import { useToolState } from '@/lib/hooks';
 import { looksLikeJson, type IndentOption } from './lib/common';
 import { jsonToToml, tomlToJson, type TomlNullMode } from './lib/toml';
 import { DirectionHint, DirectionSwitch, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'toml-json-converter';
 type Direction = 'toml2json' | 'json2toml';
@@ -93,9 +94,9 @@ export default function TomlJsonConverter() {
           canSwap={Boolean(output)}
         />
         {toJson ? (
-          <Option label="Indent">
+          <Option label={t('Indent')}>
             <Segmented
-              label="Indent"
+              label={t('Indent')}
               value={s.indent}
               onChange={(v) => set('indent', v)}
               options={[
@@ -107,43 +108,43 @@ export default function TomlJsonConverter() {
           </Option>
         ) : (
           <>
-            <Option label="JSON null" htmlFor="tj-nulls" className="w-44">
+            <Option label={t('JSON null')} htmlFor="tj-nulls" className="w-44">
               <Select id="tj-nulls" value={s.nulls} onChange={(e) => set('nulls', e.target.value as TomlNullMode)} className="h-8 py-1 text-[13px]">
-                <option value="omit">Leave the key out</option>
-                <option value="empty">Write an empty string</option>
+                <option value="omit">{t('Leave the key out')}</option>
+                <option value="empty">{t('Write an empty string')}</option>
               </Select>
             </Option>
-            <Switch label="Dates as TOML dates" checked={s.detectDates} onChange={(v) => set('detectDates', v)} className="h-8" />
-            <Switch label="Sort keys" checked={s.sortKeys} onChange={(v) => set('sortKeys', v)} className="h-8" />
+            <Switch label={t('Dates as TOML dates')} checked={s.detectDates} onChange={(v) => set('detectDates', v)} className="h-8" />
+            <Switch label={t('Sort keys')} checked={s.sortKeys} onChange={(v) => set('sortKeys', v)} className="h-8" />
           </>
         )}
       </ToolBar>
 
       {!toJson && !result && (
         <p className="px-1 text-[12.5px] text-fg-muted">
-          TOML has no null value: JSON nulls are left out (or written as empty strings). Arrays of objects become [[tables]].
+          {t('TOML has no null value: JSON nulls are left out (or written as empty strings). Arrays of objects become [[tables]].')}
         </p>
       )}
       {jsonInToml && (
-        <DirectionHint actionLabel="Convert JSON → TOML" onAction={() => setDirection('json2toml')}>
-          This input is JSON. Did you mean to convert it to TOML?
+        <DirectionHint actionLabel={t('Convert JSON → TOML')} onAction={() => setDirection('json2toml')}>
+          {t('This input is JSON. Did you mean to convert it to TOML?')}
         </DirectionHint>
       )}
       {tomlInJson && (
-        <DirectionHint actionLabel="Convert TOML → JSON" onAction={() => setDirection('toml2json')}>
-          This input looks like TOML. Did you mean to convert it to JSON?
+        <DirectionHint actionLabel={t('Convert TOML → JSON')} onAction={() => setDirection('toml2json')}>
+          {t('This input looks like TOML. Did you mean to convert it to JSON?')}
         </DirectionHint>
       )}
-      <ErrorPanel title={toJson ? 'Invalid TOML' : 'Cannot convert this JSON'} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
+      <ErrorPanel title={toJson ? t('Invalid TOML') : t('Cannot convert this JSON')} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
       <NotesPanel notes={result?.ok ? result.warnings : []} />
 
       <SplitPanes>
         <EditorPanel code
-          title={toJson ? 'TOML input' : 'JSON input'}
+          title={toJson ? t('TOML input') : t('JSON input')}
           value={input}
           onChange={setInput}
           language={toJson ? 'toml' : 'json'}
-          placeholder={toJson ? 'Paste TOML (Cargo.toml, pyproject.toml, config.toml…)' : 'Paste JSON…'}
+          placeholder={toJson ? t('Paste TOML (Cargo.toml, pyproject.toml, config.toml…)') : t('Paste JSON…')}
           sample={toJson ? SAMPLE_TOML : SAMPLE_JSON}
           fileAccept={toJson ? '.toml,application/toml,text/plain' : '.json,application/json,text/plain'}
           invalid={Boolean(error)}
@@ -158,7 +159,7 @@ export default function TomlJsonConverter() {
           language={toJson ? 'json' : 'toml'}
           downloadName={toJson ? 'data.json' : 'config.toml'}
           downloadType={toJson ? 'application/json' : 'application/toml'}
-          placeholder={toJson ? 'JSON appears here' : 'TOML appears here'}
+          placeholder={toJson ? t('JSON appears here') : t('TOML appears here')}
           height="480px"
           lineWrapping={false}
           footer={output ? <TextStats text={output} /> : undefined}

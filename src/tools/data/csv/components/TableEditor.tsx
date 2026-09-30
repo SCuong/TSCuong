@@ -9,6 +9,7 @@ import type { Table } from '../lib/csv';
 import { importTable, type ImportedTable } from '../lib/importTable';
 import type { Align } from '../lib/markdownTable';
 import { deleteColumn, deleteRows, insertColumn, insertRow, renameColumn, setCell } from '../lib/table';
+import { t } from '@/lib/i18n';
 
 /** Rows rendered as inputs; bigger imports still go into the output in full. */
 export const EDITOR_MAX_ROWS = 300;
@@ -62,7 +63,7 @@ export function TableEditor({
 
   function addColumn(at: number) {
     if (cols >= MAX_COLS) return;
-    onChange(insertColumn(table, at, `Header ${cols + 1}`));
+    onChange(insertColumn(table, at, t('Header {c}', { c: cols + 1 })));
     if (align && onAlignChange) {
       const next = Array.from({ length: cols }, (_, i) => align[i] ?? 'none');
       next.splice(at, 0, 'none');
@@ -91,11 +92,11 @@ export function TableEditor({
   function runImport() {
     const imported = importTable(importText, importHeader);
     if (!imported) {
-      setImportError('Paste a Markdown table or CSV/TSV text first.');
+      setImportError(t('Paste a Markdown table or CSV/TSV text first.'));
       return;
     }
     if (imported.table.headers.length > MAX_COLS) {
-      setImportError(`That table has ${imported.table.headers.length} columns; the editor supports up to ${MAX_COLS}.`);
+      setImportError(t('That table has {count} columns; the editor supports up to {MAX_COLS}.', { count: imported.table.headers.length, MAX_COLS }));
       return;
     }
     onImport?.(imported);
@@ -113,16 +114,16 @@ export function TableEditor({
     <div ref={rootRef} className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" icon={Plus} onClick={() => onChange(insertRow(table, table.rows.length))}>
-          Row
+          {t('Row')}
         </Button>
         <Button size="sm" icon={Plus} disabled={cols >= MAX_COLS} onClick={() => addColumn(cols)}>
-          Column
+          {t('Column')}
         </Button>
         <Button size="sm" icon={ClipboardPaste} onClick={() => setImportOpen(true)}>
-          Import CSV / Markdown
+          {t('Import CSV / Markdown')}
         </Button>
         <Button size="sm" variant="ghost" icon={Eraser} className="ml-auto" onClick={() => setConfirmClear(true)}>
-          Clear cells
+          {t('Clear cells')}
         </Button>
       </div>
 
@@ -130,7 +131,7 @@ export function TableEditor({
         <table className="w-full border-collapse text-left">
           <thead className="sticky top-0 z-10 bg-surface-raised">
             <tr>
-              <th scope="col" className="w-10 min-w-10 border-r border-b border-line-strong" aria-label="Row" />
+              <th scope="col" className="w-10 min-w-10 border-r border-b border-line-strong" aria-label={t('Row')} />
               {table.headers.map((h, c) => {
                 const a = align?.[c] ?? 'none';
                 const AlignIcon = a === 'none' ? TextAlignStart : ALIGN_ICON[a];
@@ -140,7 +141,7 @@ export function TableEditor({
                       <input
                         value={h}
                         data-pos={`-1:${c}`}
-                        aria-label={`Header ${c + 1}`}
+                        aria-label={t('Header {c}', { c: c + 1 })}
                         onChange={(e) => onChange(renameColumn(table, c, e.target.value))}
                         onKeyDown={(e) => onCellKey(e, -1, c)}
                         className={cn(cellClass, 'font-semibold')}
@@ -149,7 +150,7 @@ export function TableEditor({
                         <IconButton
                           icon={AlignIcon}
                           size="sm"
-                          label={`Column ${c + 1} alignment: ${a === 'none' ? 'default' : a}. Click to change.`}
+                          label={t('Column {c} alignment: {value}. Click to change.', { c: c + 1, value: a === 'none' ? t('Default') : a === 'left' ? t('Left') : a === 'center' ? t('Center') : t('Right') })}
                           className={cn('shrink-0', a === 'none' ? 'opacity-50' : 'text-accent-text')}
                           onClick={() => setAlign(c, NEXT_ALIGN[a])}
                         />
@@ -157,7 +158,7 @@ export function TableEditor({
                       <IconButton
                         icon={X}
                         size="sm"
-                        label={`Delete column ${c + 1}`}
+                        label={t('Delete column {c}', { c: c + 1 })}
                         className="mr-0.5 shrink-0"
                         disabled={cols <= 1}
                         onClick={() => removeColumn(c)}
@@ -175,7 +176,7 @@ export function TableEditor({
                   <div className="flex h-8 items-center justify-center">
                     <span className="group-focus-within:hidden group-hover:hidden">{r + 1}</span>
                     <span className="hidden group-focus-within:flex group-hover:flex">
-                      <IconButton icon={X} size="sm" label={`Delete row ${r + 1}`} onClick={() => onChange(deleteRows(table, [r]))} />
+                      <IconButton icon={X} size="sm" label={t('Delete row {r}', { r: r + 1 })} onClick={() => onChange(deleteRows(table, [r]))} />
                     </span>
                   </div>
                 </th>
@@ -184,7 +185,7 @@ export function TableEditor({
                     <input
                       value={row[c] ?? ''}
                       data-pos={`${r}:${c}`}
-                      aria-label={`Row ${r + 1}, ${table.headers[c] || `column ${c + 1}`}`}
+                      aria-label={t('Row {r}, {headers}', { r: r + 1, headers: table.headers[c] || t('Column {i}', { i: c + 1 }) })}
                       onChange={(e) => onChange(setCell(table, r, c, e.target.value))}
                       onKeyDown={(e) => onCellKey(e, r, c)}
                       className={cn(cellClass, align?.[c] === 'right' && 'text-right', align?.[c] === 'center' && 'text-center')}
@@ -198,26 +199,26 @@ export function TableEditor({
       </div>
       {table.rows.length > shown && (
         <Alert tone="info">
-          Showing the first {EDITOR_MAX_ROWS} of {pluralize(table.rows.length, 'row')} for editing. The output below includes every row.
+          {t('Showing the first {EDITOR_MAX_ROWS} of {count} for editing. The output below includes every row.', { EDITOR_MAX_ROWS, count: pluralize(table.rows.length, t('row'), t('rows')) })}
         </Alert>
       )}
       <p className="text-[12.5px] text-fg-muted">
-        {pluralize(table.rows.length, 'row')} × {pluralize(cols, 'column')} · Enter moves down and adds rows at the end
+        {t('{count} × {count2} · Enter moves down and adds rows at the end', { count: pluralize(table.rows.length, t('row'), t('rows')), count2: pluralize(cols, t('column'), t('columns')) })}
       </p>
 
       <Dialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        title="Import a table"
-        description="Paste a Markdown table, CSV, TSV or cells copied from a spreadsheet."
+        title={t('Import a table')}
+        description={t('Paste a Markdown table, CSV, TSV or cells copied from a spreadsheet.')}
         size="lg"
         footer={
           <>
             <Button variant="ghost" onClick={() => setImportOpen(false)}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button variant="primary" onClick={runImport} disabled={!importText.trim()}>
-              Import
+              {t('Import')}
             </Button>
           </>
         }
@@ -229,13 +230,13 @@ export function TableEditor({
               setImportText(e.target.value);
               setImportError(null);
             }}
-            aria-label="Table to import"
-            placeholder={'name,role\nAda,Engineer'}
+            aria-label={t('Table to import')}
+            placeholder={t('name,role\nAda,Engineer')}
             className="h-56 resize-y whitespace-pre"
             wrap="off"
             autoFocus
           />
-          <Switch label="First row is header (CSV)" checked={importHeader} onChange={setImportHeader} />
+          <Switch label={t('First row is header (CSV)')} checked={importHeader} onChange={setImportHeader} />
           {importError && (
             <p role="alert" className="text-[13px] text-danger">
               {importError}
@@ -246,15 +247,15 @@ export function TableEditor({
 
       <ConfirmDialog
         open={confirmClear}
-        title="Clear all cells?"
-        confirmLabel="Clear"
+        title={t('Clear all cells?')}
+        confirmLabel={t('Clear')}
         onCancel={() => setConfirmClear(false)}
         onConfirm={() => {
           setConfirmClear(false);
           onChange({ headers: table.headers, rows: table.rows.map((r) => r.map(() => '')) });
         }}
       >
-        Headers are kept; every cell is emptied.
+        {t('Headers are kept; every cell is emptied.')}
       </ConfirmDialog>
     </div>
   );

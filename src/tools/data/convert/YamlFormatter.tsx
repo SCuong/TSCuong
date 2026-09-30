@@ -11,6 +11,7 @@ import { cn, formatNumber, pluralize } from '@/lib/utils';
 import type { EditorProblem } from '@/tools/json/shared/errorMarkers';
 import { describeDifference, formatYaml, validateYaml, type YamlDiagnostic, type YamlVersion } from './lib/yaml';
 import { Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'yaml-formatter';
 
@@ -108,32 +109,32 @@ export default function YamlFormatter() {
   return (
     <ToolStack>
       <ToolBar>
-        <Option label="Indent">
+        <Option label={t('Indent')}>
           <Segmented
-            label="Indent"
+            label={t('Indent')}
             value={s.indent}
             onChange={(v) => set('indent', v)}
             options={[
-              { value: '2', label: '2 spaces' },
-              { value: '4', label: '4 spaces' },
+              { value: '2', label: t('2 spaces') },
+              { value: '4', label: t('4 spaces') },
             ]}
           />
         </Option>
-        <Option label="YAML version">
+        <Option label={t('YAML version')}>
           <Segmented
-            label="YAML version"
+            label={t('YAML version')}
             value={s.version}
             onChange={(v) => set('version', v)}
             options={[
-              { value: '1.2', label: 'YAML 1.2', title: 'Current spec: yes/no/on/off are strings' },
-              { value: '1.1', label: 'YAML 1.1', title: 'PyYAML, go-yaml v2: yes/no/on/off are booleans' },
+              { value: '1.2', label: 'YAML 1.2', title: t('Current spec: yes/no/on/off are strings') },
+              { value: '1.1', label: 'YAML 1.1', title: t('PyYAML, go-yaml v2: yes/no/on/off are booleans') },
             ]}
           />
         </Option>
-        <Switch label="Sort keys" checked={s.sortKeys} onChange={(v) => set('sortKeys', v)} className="h-8" />
-        <Switch label="Indent lists" checked={s.indentSeq} onChange={(v) => set('indentSeq', v)} className="h-8" />
-        <Switch label="Expand {…} and […] to block style" checked={s.blockStyle} onChange={(v) => set('blockStyle', v)} className="h-8" />
-        <Switch label="Fold long strings" checked={s.foldLines} onChange={(v) => set('foldLines', v)} className="h-8" />
+        <Switch label={t('Sort keys')} checked={s.sortKeys} onChange={(v) => set('sortKeys', v)} className="h-8" />
+        <Switch label={t('Indent lists')} checked={s.indentSeq} onChange={(v) => set('indentSeq', v)} className="h-8" />
+        <Switch label={t('Expand {…} and […] to block style')} checked={s.blockStyle} onChange={(v) => set('blockStyle', v)} className="h-8" />
+        <Switch label={t('Fold long strings')} checked={s.foldLines} onChange={(v) => set('foldLines', v)} className="h-8" />
       </ToolBar>
 
       {validation && (
@@ -149,18 +150,18 @@ export default function YamlFormatter() {
             )}
             <div className="min-w-0">
               <p className="text-sm font-semibold text-fg">
-                {firstError ? `Invalid YAML — ${pluralize(validation.errors.length, 'error')}` : 'Valid YAML'}
+                {firstError ? t('Invalid YAML — {count}', { count: pluralize(validation.errors.length, t('error'), t('errors')) }) : t('Valid YAML')}
               </p>
               <p className="mt-0.5 text-[13px] break-words text-fg-secondary">
                 {firstError
-                  ? `${firstError.message}${firstError.line ? ` (line ${firstError.line}, column ${firstError.column ?? 1})` : ''}`
-                  : `${pluralize(validation.documents, 'document')}${warningCount ? ` · ${pluralize(warningCount, 'warning')}` : ' · no warnings'}`}
+                  ? firstError.line ? t('{message} (line {line}, column {column})', { message: firstError.message, line: firstError.line, column: firstError.column ?? 1 }) : firstError.message
+                  : `${pluralize(validation.documents, t('document'), t('documents'))} · ${warningCount ? pluralize(warningCount, t('warning'), t('warnings')) : t('No warnings')}`}
               </p>
             </div>
           </div>
           {firstError?.line && (
             <Button size="sm" icon={Crosshair} onClick={() => editor.reveal(firstError.line, firstError.column)}>
-              Go to error
+              {t('Go to error')}
             </Button>
           )}
         </div>
@@ -172,7 +173,7 @@ export default function YamlFormatter() {
           value={input}
           onChange={setInput}
           language="yaml"
-          placeholder="Paste YAML to validate and format…"
+          placeholder={t('Paste YAML to validate and format…')}
           sample={SAMPLE}
           fileAccept=".yaml,.yml,text/yaml,application/yaml,text/plain"
           invalid={Boolean(firstError)}
@@ -182,22 +183,22 @@ export default function YamlFormatter() {
           footer={input ? <TextStats text={input} /> : undefined}
         />
         <EditorPanel
-          title="Formatted YAML"
+          title={t('Formatted YAML')}
           value={output}
           language="yaml"
           downloadName="formatted.yaml"
           downloadType="application/yaml"
-          placeholder={firstError ? 'Fix the errors to see the formatted YAML' : 'Formatted YAML appears here'}
+          placeholder={firstError ? t('Fix the errors to see the formatted YAML') : t('Formatted YAML appears here')}
           height="480px"
           lineWrapping={false}
-          footer={output ? <TextStats text={output} extra={<span>Comments and anchors kept</span>} /> : undefined}
+          footer={output ? <TextStats text={output} extra={<span>{t('Comments and anchors kept')}</span>} /> : undefined}
         />
       </SplitPanes>
 
       {!validation ? (
-        <Panel title="Problems">
-          <EmptyState icon={FileCheck} title="Nothing to check yet">
-            Paste YAML, open a .yml file or load the sample. Syntax errors, duplicate keys and values that YAML 1.1 and 1.2 read differently are pinpointed here.
+        <Panel title={t('Problems')}>
+          <EmptyState icon={FileCheck} title={t('Nothing to check yet')}>
+            {t('Paste YAML, open a .yml file or load the sample. Syntax errors, duplicate keys and values that YAML 1.1 and 1.2 read differently are pinpointed here.')}
           </EmptyState>
         </Panel>
       ) : (
@@ -206,14 +207,14 @@ export default function YamlFormatter() {
             title={
               <span className="inline-flex items-center gap-1.5">
                 {problems.length ? <TriangleAlert size={14} className={firstError ? 'text-danger' : 'text-warning'} aria-hidden /> : null}
-                {problems.length ? pluralize(problems.length, 'problem') : 'No problems'}
+                {problems.length ? pluralize(problems.length, t('problem'), t('problems')) : t('No problems')}
               </span>
             }
-            description={problems.length ? 'Select a problem to jump to it.' : undefined}
+            description={problems.length ? t('Select a problem to jump to it.') : undefined}
             bodyClassName="p-0"
           >
             {problems.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-fg-muted">No syntax errors, duplicate keys or version-dependent values were found.</p>
+              <p className="px-4 py-3 text-[13px] text-fg-muted">{t('No syntax errors, duplicate keys or version-dependent values were found.')}</p>
             ) : (
               <ul className="max-h-72 divide-y divide-line overflow-y-auto">
                 {problems.map((p, i) => (
@@ -225,10 +226,10 @@ export default function YamlFormatter() {
                       className="flex w-full items-start gap-3 px-4 py-2 text-left hover:bg-surface-hover disabled:cursor-default"
                     >
                       <Badge tone={p.kind === 'error' ? 'danger' : 'warning'} className="mt-0.5">
-                        {p.kind === 'error' ? 'Error' : p.kind === 'version' ? '1.1 vs 1.2' : 'Warning'}
+                        {p.kind === 'error' ? t('Error') : p.kind === 'version' ? t('1.1 vs 1.2') : t('Warning')}
                       </Badge>
                       <span className="min-w-0 flex-1 text-[13px] break-words text-fg">{p.message}</span>
-                      {p.line !== undefined && <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">line {p.line}</span>}
+                      {p.line !== undefined && <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">{t('line {line}', { line: p.line })}</span>}
                     </button>
                   </li>
                 ))}
@@ -236,25 +237,25 @@ export default function YamlFormatter() {
             )}
             {validation.differences.total > validation.differences.items.length && (
               <p className="border-t border-line px-4 py-2 text-[12.5px] text-fg-muted">
-                Showing the first {formatNumber(validation.differences.items.length)} of {formatNumber(validation.differences.total)} version-dependent values.
+                {t('Showing the first {count} of {total} version-dependent values.', { count: formatNumber(validation.differences.items.length), total: formatNumber(validation.differences.total) })}
               </p>
             )}
           </Panel>
-          <Panel title="Statistics">
+          <Panel title={t('Statistics')}>
             {stats ? (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <Stat label="Documents" value={formatNumber(stats.documents)} />
-                <Stat label="Mappings" value={formatNumber(stats.mappings)} />
-                <Stat label="Sequences" value={formatNumber(stats.sequences)} />
-                <Stat label="Keys" value={formatNumber(stats.keys)} />
-                <Stat label="Scalars" value={formatNumber(stats.scalars)} />
-                <Stat label="Max depth" value={formatNumber(stats.maxDepth)} />
-                <Stat label="Anchors" value={formatNumber(stats.anchors)} />
-                <Stat label="Aliases" value={formatNumber(stats.aliases)} />
-                <Stat label="Comments" value={formatNumber(stats.comments)} />
+                <Stat label={t('Documents')} value={formatNumber(stats.documents)} />
+                <Stat label={t('Mappings')} value={formatNumber(stats.mappings)} />
+                <Stat label={t('Sequences')} value={formatNumber(stats.sequences)} />
+                <Stat label={t('Keys')} value={formatNumber(stats.keys)} />
+                <Stat label={t('Scalars')} value={formatNumber(stats.scalars)} />
+                <Stat label={t('Max depth')} value={formatNumber(stats.maxDepth)} />
+                <Stat label={t('Anchors')} value={formatNumber(stats.anchors)} />
+                <Stat label={t('Aliases')} value={formatNumber(stats.aliases)} />
+                <Stat label={t('Comments')} value={formatNumber(stats.comments)} />
               </div>
             ) : (
-              <p className="text-[13px] text-fg-muted">Statistics appear once the YAML is valid.</p>
+              <p className="text-[13px] text-fg-muted">{t('Statistics appear once the YAML is valid.')}</p>
             )}
           </Panel>
         </div>

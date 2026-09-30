@@ -9,20 +9,21 @@ import { useAsyncJob, useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { buildTable, DELIMITERS, delimiterName, parseCsv, type ParseIssue, type Table } from '../lib/csv';
 import { MAX_ROWS, parseCsvFile, type ParsedFile } from './parseFile';
+import { t } from '@/lib/i18n';
 
 export const CSV_ACCEPT = '.csv,.tsv,.tab,.txt,.dsv,.psv,text/csv,text/tab-separated-values,text/plain';
 
 export const ENCODINGS = [
   { value: 'utf-8', label: 'UTF-8' },
-  { value: 'windows-1252', label: 'Windows-1252 (Western)' },
-  { value: 'iso-8859-15', label: 'ISO-8859-15 (Latin-9)' },
+  { value: 'windows-1252', label: t('Windows-1252 (Western)') },
+  { value: 'iso-8859-15', label: t('ISO-8859-15 (Latin-9)') },
   { value: 'utf-16le', label: 'UTF-16 LE' },
   { value: 'utf-16be', label: 'UTF-16 BE' },
-  { value: 'windows-1250', label: 'Windows-1250 (Central European)' },
-  { value: 'windows-1251', label: 'Windows-1251 (Cyrillic)' },
-  { value: 'shift_jis', label: 'Shift JIS (Japanese)' },
-  { value: 'gbk', label: 'GBK (Chinese)' },
-  { value: 'euc-kr', label: 'EUC-KR (Korean)' },
+  { value: 'windows-1250', label: t('Windows-1250 (Central European)') },
+  { value: 'windows-1251', label: t('Windows-1251 (Cyrillic)') },
+  { value: 'shift_jis', label: t('Shift JIS (Japanese)') },
+  { value: 'gbk', label: t('GBK (Chinese)') },
+  { value: 'euc-kr', label: t('EUC-KR (Korean)') },
 ];
 
 export interface CsvData {
@@ -87,12 +88,12 @@ export function useCsvSource(toolId: string): CsvSource {
     let active = true;
     run(async ({ signal, progress }) => {
       setFileError(null);
-      progress(0, 'Reading file…');
+      progress(0, t('Reading file…'));
       const parsed = await parseCsvFile(file, { delimiter, encoding, signal, onProgress: progress });
       if (active) setParsedFile(parsed);
     }).catch((error: unknown) => {
       if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
-      setFileError(errorMessage(error, 'Could not read the file.'));
+      setFileError(errorMessage(error, t('Could not read the file.')));
     });
     return () => {
       active = false;
@@ -153,20 +154,20 @@ export function useCsvSource(toolId: string): CsvSource {
 /** Status text such as "120 rows × 4 columns · Comma". */
 export function describeData(data: CsvData): string {
   const { table } = data;
-  return `${pluralize(table.rows.length, 'row')} × ${pluralize(table.headers.length, 'column')} · ${delimiterName(data.delimiter)}`;
+  return `${pluralize(table.rows.length, t('row'), t('rows'))} × ${pluralize(table.headers.length, t('column'), t('columns'))} · ${t(delimiterName(data.delimiter))}`;
 }
 
 /** Warnings about how the input was read (ragged rows, unclosed quotes, truncation). */
 export function dataNotes(data: CsvData): string[] {
   const notes: string[] = [];
-  if (data.truncated) notes.push(`Only the first ${MAX_ROWS.toLocaleString()} rows were loaded.`);
+  if (data.truncated) notes.push(t('Only the first {count} rows were loaded.', { count: MAX_ROWS.toLocaleString() }));
   if (data.raggedRows) {
     notes.push(
-      `${pluralize(data.raggedRows, 'row')} had a different number of fields and ${data.raggedRows === 1 ? 'was' : 'were'} padded with empty cells.`,
+      t('{count} had a different number of fields and were padded with empty cells.', { count: pluralize(data.raggedRows, t('row'), t('rows')) }),
     );
   }
-  for (const issue of data.issues.slice(0, 3)) notes.push(issue.row ? `Row ${issue.row}: ${issue.message}` : issue.message);
-  if (data.issues.length > 3) notes.push(`…and ${data.issues.length - 3} more parse warnings.`);
+  for (const issue of data.issues.slice(0, 3)) notes.push(issue.row ? t('Row {row}: {message}', { row: issue.row, message: issue.message }) : issue.message);
+  if (data.issues.length > 3) notes.push(t('…and {count} more parse warnings.', { count: data.issues.length - 3 }));
   return notes;
 }
 
@@ -185,10 +186,10 @@ export function DelimiterSelect({
 }) {
   return (
     <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={cn('h-8 py-1 text-[13px]', className)}>
-      <option value="">{detected && !value ? `Auto (${delimiterName(detected)})` : 'Auto-detect'}</option>
+      <option value="">{detected && !value ? t('Auto ({delimiterName})', { delimiterName: t(delimiterName(detected)) }) : t('Auto-detect')}</option>
       {DELIMITERS.map((d) => (
         <option key={d.label} value={d.value}>
-          {d.label}
+          {t(d.label)}
         </option>
       ))}
     </Select>
@@ -198,7 +199,7 @@ export function DelimiterSelect({
 /** Input card for CSV tools: paste or open a file, with delimiter and header options. */
 export function CsvSourcePanel({
   source,
-  title = 'CSV input',
+  title = t('CSV input'),
   sample,
   height = '360px',
   footerExtra,
@@ -222,20 +223,20 @@ export function CsvSourcePanel({
         <h2 className="text-[13px] font-semibold tracking-tight text-fg">{title}</h2>
         <div className="flex flex-wrap items-center gap-1">
           <Segmented
-            label="Input source"
+            label={t('Input source')}
             size="sm"
             value={mode}
             onChange={source.setMode}
             options={[
-              { value: 'paste', label: 'Paste', icon: ClipboardPaste },
-              { value: 'file', label: 'File', icon: FileUp },
+              { value: 'paste', label: t('Paste'), icon: ClipboardPaste },
+              { value: 'file', label: t('File'), icon: FileUp },
             ]}
           />
           {mode === 'paste' && sample !== undefined && (
-            <IconButton icon={FlaskConical} label="Load sample" size="sm" onClick={() => source.setText(sample)} />
+            <IconButton icon={FlaskConical} label={t('Load sample')} size="sm" onClick={() => source.setText(sample)} />
           )}
           {mode === 'paste' && (
-            <IconButton icon={Eraser} label="Clear" size="sm" disabled={!source.text} onClick={() => source.setText('')} />
+            <IconButton icon={Eraser} label={t('Clear')} size="sm" disabled={!source.text} onClick={() => source.setText('')} />
           )}
         </div>
       </header>
@@ -248,8 +249,8 @@ export function CsvSourcePanel({
           <Textarea
             value={source.text}
             onChange={(e) => source.setText(e.target.value)}
-            placeholder="Paste CSV, TSV or other delimited text…"
-            aria-label="CSV text"
+            placeholder={t('Paste CSV, TSV or other delimited text…')}
+            aria-label={t('CSV text')}
             className="h-full resize-none whitespace-pre"
             wrap="off"
           />
@@ -268,9 +269,9 @@ export function CsvSourcePanel({
                   {data ? ` · ${describeData(data)}` : ''}
                 </p>
               </div>
-              <IconButton icon={X} label="Remove file" size="sm" onClick={() => source.setFile(null)} />
+              <IconButton icon={X} label={t('Remove file')} size="sm" onClick={() => source.setFile(null)} />
             </div>
-            {source.busy && <ProgressBar value={source.progress} label={source.progressLabel || 'Parsing…'} onCancel={source.cancel} />}
+            {source.busy && <ProgressBar value={source.progress} label={source.progressLabel || t('Parsing…')} onCancel={source.cancel} />}
             {source.error && (
               <p role="alert" className="text-[13px] text-danger">
                 {source.error}
@@ -282,8 +283,8 @@ export function CsvSourcePanel({
             className="h-full [&>div]:h-full"
             accept={CSV_ACCEPT}
             onFiles={(files) => source.setFile(files[0] ?? null)}
-            title="Drop a CSV or TSV file"
-            hint="Parsed on this device in a background thread. Large files are fine."
+            title={t('Drop a CSV or TSV file')}
+            hint={t('Parsed on this device in a background thread. Large files are fine.')}
           />
         )}
       </div>
@@ -291,14 +292,14 @@ export function CsvSourcePanel({
       <footer className="flex flex-wrap items-end gap-x-4 gap-y-2 border-t border-line px-4 py-2.5">
         <div className="w-40">
           <Label htmlFor={delimiterId} className="mb-1 text-[12px]">
-            Delimiter
+            {t('Delimiter')}
           </Label>
           <DelimiterSelect id={delimiterId} value={source.delimiter} onChange={source.setDelimiter} detected={data?.delimiter} />
         </div>
         {mode === 'file' && (
           <div className="w-48">
             <Label htmlFor={encodingId} className="mb-1 text-[12px]">
-              Encoding
+              {t('Character encoding')}
             </Label>
             <Select
               id={encodingId}
@@ -314,7 +315,7 @@ export function CsvSourcePanel({
             </Select>
           </div>
         )}
-        <Switch label="First row is header" checked={source.header} onChange={source.setHeader} className="h-8" />
+        <Switch label={t('First row is header')} checked={source.header} onChange={source.setHeader} className="h-8" />
         {footerExtra}
         {data && mode === 'paste' && <span className="ml-auto self-center text-[12.5px] text-fg-muted">{describeData(data)}</span>}
       </footer>

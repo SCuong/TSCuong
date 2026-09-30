@@ -29,6 +29,7 @@ import { CSV_ACCEPT, DelimiterSelect, ENCODINGS } from './components/CsvSource';
 import { MAX_ROWS, parseCsvFile } from './components/parseFile';
 import { SAMPLE_CSV } from './components/samples';
 import { EXPORT_TYPES, exportTable, FilterBar, useTableView, viewSummary, type ExportFormat } from './components/TableTools';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'csv-viewer';
 /** Editing copies row arrays, so it is limited to tables that stay snappy. */
@@ -91,12 +92,12 @@ export default function CsvViewer() {
       });
     } else {
       run(async ({ signal, progress }) => {
-        progress(0, 'Reading file…');
+        progress(0, t('Reading file…'));
         const parsed = await parseCsvFile(origin.file, { delimiter, encoding, signal, onProgress: progress });
         if (!active) return;
-        const { table: t, raggedRows } = buildTable(parsed.records, headerPref);
+        const { table: loadedTable, raggedRows } = buildTable(parsed.records, headerPref);
         setDoc({
-          table: t,
+          table: loadedTable,
           header: headerPref,
           delimiter: parsed.delimiter,
           linebreak: parsed.linebreak,
@@ -107,7 +108,7 @@ export default function CsvViewer() {
         setError(null);
       }).catch((e: unknown) => {
         if (!active || (e instanceof DOMException && e.name === 'AbortError')) return;
-        setError(errorMessage(e, 'Could not read the file.'));
+        setError(errorMessage(e, t('Could not read the file.')));
       });
     }
     return () => {
@@ -152,7 +153,7 @@ export default function CsvViewer() {
   }
 
   function changeParse(apply: () => void) {
-    guard('Re-read the data?', 'Discard edits', () => {
+    guard(t('Re-read the data?'), t('Discard edits'), () => {
       setUndo([]);
       setRedo([]);
       setDirty(false);
@@ -218,30 +219,30 @@ export default function CsvViewer() {
             accept={CSV_ACCEPT}
             onFiles={(files) => files[0] && openFile(files[0])}
             icon={FileSpreadsheet}
-            title="Drop a CSV or TSV file"
-            hint="Parsed in a background thread on this device. Millions of rows are fine."
+            title={t('Drop a CSV or TSV file')}
+            hint={t('Parsed in a background thread on this device. Millions of rows are fine.')}
           />
           <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card">
             <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line py-1.5 pr-2 pl-4">
-              <h2 className="text-[13px] font-semibold tracking-tight text-fg">Or paste CSV</h2>
-              <IconButton icon={FlaskConical} label="Load sample" size="sm" onClick={() => openText(SAMPLE_CSV, 'sample.csv')} />
+              <h2 className="text-[13px] font-semibold tracking-tight text-fg">{t('Or paste CSV')}</h2>
+              <IconButton icon={FlaskConical} label={t('Load sample')} size="sm" onClick={() => openText(SAMPLE_CSV, 'sample.csv')} />
             </header>
             <div className="p-2">
               <Textarea
                 value={paste}
                 onChange={(e) => setPaste(e.target.value)}
-                placeholder={'name,email\nAda,ada@example.com'}
-                aria-label="CSV text"
+                placeholder={t('name,email\nAda,ada@example.com')}
+                aria-label={t('CSV text')}
                 className="h-44 resize-none whitespace-pre"
                 wrap="off"
               />
             </div>
             <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2">
               <span className="text-[12.5px] text-fg-muted">
-                {paste ? formatBytes(new Blob([paste]).size) : 'Commas, semicolons, tabs or pipes'}
+                {paste ? formatBytes(new Blob([paste]).size) : t('Commas, semicolons, tabs or pipes')}
               </span>
               <Button variant="primary" size="sm" disabled={!paste.trim()} onClick={() => openText(paste, 'pasted.csv')}>
-                Open table
+                {t('Open table')}
               </Button>
             </footer>
           </section>
@@ -277,11 +278,11 @@ export default function CsvViewer() {
               <span className="truncate" title={name}>
                 {name}
               </span>
-              {dirty && <Badge tone="accent">Edited</Badge>}
+              {dirty && <Badge tone="accent">{t('Edited')}</Badge>}
             </p>
             <p className="text-[12px] text-fg-muted">
-              {origin.kind === 'file' ? formatBytes(origin.file.size) : 'Pasted text'}
-              {doc && ` · ${delimiterName(doc.delimiter)} · ${doc.linebreak === '\r\n' ? 'CRLF' : doc.linebreak === '\r' ? 'CR' : 'LF'}`}
+              {origin.kind === 'file' ? formatBytes(origin.file.size) : t('Pasted text')}
+              {doc && ` · ${t(delimiterName(doc.delimiter))} · ${doc.linebreak === '\r\n' ? 'CRLF' : doc.linebreak === '\r' ? 'CR' : 'LF'}`}
             </p>
           </div>
           <div className="order-last w-full lg:order-none lg:w-auto">
@@ -305,17 +306,17 @@ export default function CsvViewer() {
               }}
             />
           </div>
-          <IconButton icon={X} label="Close table" size="sm" onClick={() => guard('Close this table?', 'Discard edits', close)} />
+          <IconButton icon={X} label={t('Close table')} size="sm" onClick={() => guard(t('Close this table?'), t('Discard edits'), close)} />
         </header>
 
         {job.running && (
           <div className="p-4">
-            <ProgressBar value={job.progress} label={job.label || 'Parsing…'} onCancel={close} />
+            <ProgressBar value={job.progress} label={job.label || t('Parsing…')} onCancel={close} />
           </div>
         )}
         {error && (
           <div className="p-4">
-            <ErrorMessage error={error} title="Could not open this file" />
+            <ErrorMessage error={error} title={t('Could not open this file')} />
           </div>
         )}
 
@@ -325,10 +326,10 @@ export default function CsvViewer() {
             <div className="flex flex-wrap items-center gap-2">
               <FilterBar view={view} headers={table.headers} className="w-full min-w-0 md:w-auto md:flex-1" />
               {editable && (
-                <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label="Edit table">
+                <div className="flex flex-wrap items-center gap-1" role="toolbar" aria-label={t('Edit table')}>
                   <IconButton
                     icon={Undo2}
-                    label="Undo (Ctrl+Z)"
+                    label={t('Undo (Ctrl+Z)')}
                     size="md"
                     className="size-8"
                     disabled={!undo.length}
@@ -336,7 +337,7 @@ export default function CsvViewer() {
                   />
                   <IconButton
                     icon={Redo2}
-                    label="Redo (Ctrl+Y)"
+                    label={t('Redo (Ctrl+Y)')}
                     size="md"
                     className="size-8"
                     disabled={!redo.length}
@@ -345,7 +346,7 @@ export default function CsvViewer() {
                   <span className="mx-1 h-5 w-px bg-line" aria-hidden />
                   <IconButton
                     icon={BetweenHorizontalStart}
-                    label={selRow !== undefined ? 'Insert row below selection' : 'Add row at the end'}
+                    label={selRow !== undefined ? t('Insert row below selection') : t('Add row at the end')}
                     size="md"
                     className="size-8"
                     onClick={() => {
@@ -356,7 +357,7 @@ export default function CsvViewer() {
                   />
                   <IconButton
                     icon={TableRowsSplit}
-                    label="Delete selected row"
+                    label={t('Delete selected row')}
                     size="md"
                     className="size-8"
                     disabled={selRow === undefined}
@@ -368,7 +369,7 @@ export default function CsvViewer() {
                   />
                   <IconButton
                     icon={BetweenVerticalStart}
-                    label={selCol !== undefined ? 'Insert column right of selection' : 'Add column at the end'}
+                    label={selCol !== undefined ? t('Insert column right of selection') : t('Add column at the end')}
                     size="md"
                     className="size-8"
                     onClick={() => {
@@ -380,7 +381,7 @@ export default function CsvViewer() {
                   />
                   <IconButton
                     icon={TableColumnsSplit}
-                    label="Delete selected column"
+                    label={t('Delete selected column')}
                     size="md"
                     className="size-8"
                     disabled={selCol === undefined || table.headers.length <= 1}
@@ -393,7 +394,7 @@ export default function CsvViewer() {
                   />
                   <IconButton
                     icon={PencilLine}
-                    label="Rename selected column"
+                    label={t('Rename selected column')}
                     size="md"
                     className="size-8"
                     disabled={selCol === undefined || !doc.header}
@@ -407,7 +408,7 @@ export default function CsvViewer() {
               <CsvGrid
                 table={table}
                 view={view.indices}
-                label={`Table ${name}`}
+                label={t('Table {name}', { name })}
                 selected={selected}
                 onSelect={setSelected}
                 sort={view.sort}
@@ -416,22 +417,22 @@ export default function CsvViewer() {
                 height={600}
               />
             ) : (
-              <p className="py-8 text-center text-[13px] text-fg-muted">This file has no rows.</p>
+              <p className="py-8 text-center text-[13px] text-fg-muted">{t('This file has no rows.')}</p>
             )}
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-fg-muted">
               <span>
-                {viewSummary(view, table.rows.length)} × {pluralize(table.headers.length, 'column')}
+                {viewSummary(view, table.rows.length)} × {pluralize(table.headers.length, t('column'), t('columns'))}
               </span>
               {selected && selRow !== undefined && selCol !== undefined && (
                 <span className="font-mono">
-                  R{selRow + 1} · {table.headers[selCol] || `Column ${selCol + 1}`}
+                  R{selRow + 1} · {table.headers[selCol] || t('Column {selCol}', { selCol: selCol + 1 })}
                 </span>
               )}
-              {editable && <span className="hidden lg:inline">Double-click or Enter to edit · Delete clears a cell</span>}
+              {editable && <span className="hidden lg:inline">{t('Double-click or Enter to edit · Delete clears a cell')}</span>}
               <div className="ml-auto flex flex-wrap items-center gap-1.5">
                 {view.active && (
-                  <Switch label="Export filtered rows only" checked={exportVisible} onChange={setExportVisible} className="mr-2" />
+                  <Switch label={t('Export filtered rows only')} checked={exportVisible} onChange={setExportVisible} className="mr-2" />
                 )}
                 {(['csv', 'tsv', 'json'] as const).map((format) => (
                   <DownloadButton
@@ -442,7 +443,7 @@ export default function CsvViewer() {
                     label={format.toUpperCase()}
                   />
                 ))}
-                <CopyButton value={() => exportTable(table, 'csv', doc.header, exportIndices)} label="Copy CSV" />
+                <CopyButton value={() => exportTable(table, 'csv', doc.header, exportIndices)} label={t('Copy CSV')} />
               </div>
             </div>
           </div>
@@ -460,18 +461,18 @@ export default function CsvViewer() {
           action?.();
         }}
       >
-        Your edits to this table have not been exported and will be lost.
+        {t('Your edits to this table have not been exported and will be lost.')}
       </ConfirmDialog>
 
       <Dialog
         open={Boolean(renaming)}
         onClose={() => setRenaming(null)}
-        title="Rename column"
+        title={t('Rename column')}
         size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setRenaming(null)}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button
               variant="primary"
@@ -480,7 +481,7 @@ export default function CsvViewer() {
                 setRenaming(null);
               }}
             >
-              Rename
+              {t('Rename')}
             </Button>
           </>
         }
@@ -493,7 +494,7 @@ export default function CsvViewer() {
               setRenaming(null);
             }}
           >
-            <Label htmlFor="csv-rename">Column name</Label>
+            <Label htmlFor="csv-rename">{t('Column name')}</Label>
             <Input id="csv-rename" autoFocus value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} />
           </form>
         )}
@@ -504,15 +505,15 @@ export default function CsvViewer() {
 
 function Notes({ doc, editable }: { doc: Doc; editable: boolean }) {
   const notes: string[] = [];
-  if (doc.truncated) notes.push(`Only the first ${MAX_ROWS.toLocaleString()} rows were loaded.`);
+  if (doc.truncated) notes.push(t('Only the first {count} rows were loaded.', { count: MAX_ROWS.toLocaleString() }));
   if (doc.raggedRows)
-    notes.push(`${pluralize(doc.raggedRows, 'row')} had a different number of fields and ${doc.raggedRows === 1 ? 'was' : 'were'} padded.`);
-  for (const issue of doc.issues.slice(0, 3)) notes.push(issue.row ? `Row ${issue.row}: ${issue.message}` : issue.message);
-  if (doc.issues.length > 3) notes.push(`…and ${doc.issues.length - 3} more parse warnings.`);
+    notes.push(t('{count} had a different number of fields and were padded with empty cells.', { count: pluralize(doc.raggedRows, t('row'), t('rows')) }));
+  for (const issue of doc.issues.slice(0, 3)) notes.push(issue.row ? t('Row {row}: {message}', { row: issue.row, message: issue.message }) : issue.message);
+  if (doc.issues.length > 3) notes.push(t('…and {count} more parse warnings.', { count: doc.issues.length - 3 }));
   return (
     <>
       {notes.length > 0 && (
-        <Alert tone="warning" title="Parse notes">
+        <Alert tone="warning" title={t('Parse notes')}>
           <ul className="list-disc pl-4">
             {notes.map((n) => (
               <li key={n}>{n}</li>
@@ -520,7 +521,7 @@ function Notes({ doc, editable }: { doc: Doc; editable: boolean }) {
           </ul>
         </Alert>
       )}
-      {!editable && <Alert tone="info">This table is large, so it opened read-only. Sorting, filtering and export still work.</Alert>}
+      {!editable && <Alert tone="info">{t('This table is large, so it opened read-only. Sorting, filtering and export still work.')}</Alert>}
     </>
   );
 }
@@ -549,7 +550,7 @@ function ParseOptions({
     <div className={compact ? 'flex flex-wrap items-center gap-x-4 gap-y-2' : 'flex flex-wrap items-end gap-x-4 gap-y-3'}>
       <div className={compact ? 'flex items-center gap-2' : 'w-40'}>
         <Label htmlFor="csvv-delim" className={labelClass}>
-          Delimiter
+          {t('Delimiter')}
         </Label>
         <DelimiterSelect
           id="csvv-delim"
@@ -562,7 +563,7 @@ function ParseOptions({
       {encoding !== undefined && (
         <div className={compact ? 'flex items-center gap-2' : 'w-52'}>
           <Label htmlFor="csvv-enc" className={labelClass}>
-            {compact ? 'Encoding' : 'File encoding'}
+            {compact ? t('Character encoding') : t('File encoding')}
           </Label>
           <Select
             id="csvv-enc"
@@ -578,7 +579,7 @@ function ParseOptions({
           </Select>
         </div>
       )}
-      <Switch label="First row is header" checked={header} onChange={setHeader} className="h-8" />
+      <Switch label={t('First row is header')} checked={header} onChange={setHeader} className="h-8" />
     </div>
   );
   if (compact) return body;

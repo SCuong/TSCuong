@@ -9,15 +9,16 @@ import { countUnsafeUnquoted, delimiterName, normalizeCustomDelimiter, validateD
 import { CsvSourcePanel, dataNotes, useCsvSource } from './components/CsvSource';
 import { OutputPanel } from './components/OutputPanel';
 import { SAMPLE_CSV } from './components/samples';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'csv-delimiter-converter';
 
 const TARGETS = [
-  { value: ',', label: 'Comma' },
-  { value: ';', label: 'Semicolon' },
+  { value: ',', label: t('Comma') },
+  { value: ';', label: t('Semicolon') },
   { value: '\t', label: 'Tab' },
-  { value: '|', label: 'Pipe' },
-  { value: 'custom', label: 'Custom' },
+  { value: '|', label: t('Pipe') },
+  { value: 'custom', label: t('Custom') },
 ] as const;
 
 export default function CsvDelimiterConverter() {
@@ -58,9 +59,9 @@ export default function CsvDelimiterConverter() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Output delimiter</Label>
+          <Label>{t('Output delimiter')}</Label>
           <Segmented
-            label="Output delimiter"
+            label={t('Output delimiter')}
             value={target}
             onChange={setTarget}
             options={TARGETS.map((t) => ({ value: t.value, label: t.label }))}
@@ -68,42 +69,42 @@ export default function CsvDelimiterConverter() {
         </div>
         {target === 'custom' && (
           <div className="w-28">
-            <Label htmlFor="dc-custom">Custom</Label>
+            <Label htmlFor="dc-custom">{t('Custom')}</Label>
             <Input
               id="dc-custom"
               value={custom}
               onChange={(e) => setCustom(e.target.value.slice(0, 8))}
               className="h-8 py-1 font-mono text-[13px]"
-              placeholder="e.g. ~ or \t"
+              placeholder={t('e.g. ~ or \\t')}
               aria-invalid={Boolean(delimiterError) || undefined}
             />
           </div>
         )}
         <div className="w-44">
-          <Label htmlFor="dc-quote">Quoting</Label>
+          <Label htmlFor="dc-quote">{t('Quoting')}</Label>
           <Select id="dc-quote" value={quote} onChange={(e) => setQuote(e.target.value as QuoteMode)} className="h-8 py-1 text-[13px]">
-            <option value="minimal">Only when needed</option>
-            <option value="all">Quote every field</option>
-            <option value="nonnumeric">Quote non-numeric</option>
-            <option value="none">Never quote</option>
+            <option value="minimal">{t('Only when needed')}</option>
+            <option value="all">{t('Quote every field')}</option>
+            <option value="nonnumeric">{t('Quote non-numeric')}</option>
+            <option value="none">{t('Never quote')}</option>
           </Select>
         </div>
         <div>
-          <Label>Quote char</Label>
+          <Label>{t('Quote char')}</Label>
           <Segmented
-            label="Quote character"
+            label={t('Quote character')}
             value={quoteChar}
             onChange={setQuoteChar}
             options={[
-              { value: '"', label: '" Double' },
-              { value: "'", label: "' Single" },
+              { value: '"', label: t('" Double') },
+              { value: "'", label: t('\' Single') },
             ]}
           />
         </div>
         <div>
-          <Label>Line endings</Label>
+          <Label>{t('Line endings')}</Label>
           <Segmented
-            label="Line endings"
+            label={t('Line endings')}
             value={newline}
             onChange={setNewline}
             options={[
@@ -112,19 +113,20 @@ export default function CsvDelimiterConverter() {
             ]}
           />
         </div>
-        {source.header && <Switch label="Include header" checked={includeHeader} onChange={setIncludeHeader} className="h-8" />}
-        <Switch label="UTF-8 BOM (Excel)" checked={bom} onChange={setBom} className="h-8" />
-        <Switch label="Escape formulas" checked={escapeFormulae} onChange={setEscapeFormulae} className="h-8" />
+        {source.header && <Switch label={t('Include header')} checked={includeHeader} onChange={setIncludeHeader} className="h-8" />}
+        <Switch label={t('UTF-8 BOM (Excel)')} checked={bom} onChange={setBom} className="h-8" />
+        <Switch label={t('Escape formulas')} checked={escapeFormulae} onChange={setEscapeFormulae} className="h-8" />
       </ToolBar>
-      {delimiterError && <ErrorMessage error={delimiterError} title="Invalid delimiter" />}
+      {delimiterError && <ErrorMessage error={delimiterError} title={t('Invalid delimiter')} />}
       {result && result.unsafe > 0 && (
-        <Alert tone="warning" title="Output may not read back correctly">
-          {pluralize(result.unsafe, 'cell')} contain{result.unsafe === 1 ? 's' : ''} the delimiter, a quote or a line break. Without
-          quoting, other programs will split {result.unsafe === 1 ? 'it' : 'them'} into extra fields or rows.
+        <Alert tone="warning" title={t('Output may not read back correctly')}>
+          {result.unsafe === 1
+            ? t('{count} contains the delimiter, a quote or a line break. Without quoting, other programs will split it into extra fields or rows.', { count: pluralize(result.unsafe, t('cell'), t('cells')) })
+            : t('{count} contain the delimiter, a quote or a line break. Without quoting, other programs will split them into extra fields or rows.', { count: pluralize(result.unsafe, t('cell'), t('cells')) })}
         </Alert>
       )}
       {notes.length > 0 && (
-        <Alert tone="warning" title="Input notes">
+        <Alert tone="warning" title={t('Input notes')}>
           <ul className="list-disc pl-4">
             {notes.map((n) => (
               <li key={n}>{n}</li>
@@ -135,17 +137,17 @@ export default function CsvDelimiterConverter() {
       <SplitPanes>
         <CsvSourcePanel source={source} sample={SAMPLE_CSV} height="440px" />
         <OutputPanel
-          title={`Output · ${delimiterError ? '—' : delimiterName(delimiter)}`}
+          title={t('Output · {value}', { value: delimiterError ? '—' : t(delimiterName(delimiter)) })}
           value={result?.text ?? ''}
           downloadName={fileName}
           downloadType={ext === 'tsv' ? 'text/tab-separated-values' : ext === 'csv' ? 'text/csv' : 'text/plain'}
-          placeholder={source.busy ? 'Parsing…' : 'Converted text appears here'}
+          placeholder={source.busy ? t('Parsing…') : t('Converted text appears here')}
           height="440px"
           lineWrapping={false}
           footer={
             result && data ? (
               <>
-                <span>{pluralize(data.table.rows.length, 'row')}</span>
+                <span>{pluralize(data.table.rows.length, t('row'), t('rows'))}</span>
                 <span>{formatBytes(result.bytes)}</span>
               </>
             ) : undefined

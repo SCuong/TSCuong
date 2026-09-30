@@ -15,6 +15,7 @@ import { SPREADSHEET_ACCEPT, type SheetData } from './lib/spreadsheet';
 import { CsvGrid, type GridCell } from './components/CsvGrid';
 import { parseWorkbook } from './components/parseWorkbook';
 import { EXPORT_TYPES, exportTable, FilterBar, useTableView, viewSummary, type ExportFormat } from './components/TableTools';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'spreadsheet-viewer';
 const MAX_FILE = 200 * 1024 * 1024;
@@ -35,7 +36,7 @@ export default function SpreadsheetViewer() {
     setSelected(null);
     try {
       const parsed = await job.run(({ signal, progress }) => {
-        progress(null, 'Reading workbook…');
+        progress(null, t('Reading workbook…'));
         return parseWorkbook(next, signal);
       });
       setSheets(parsed);
@@ -43,7 +44,7 @@ export default function SpreadsheetViewer() {
       setActive(firstVisible >= 0 ? firstVisible : 0);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return;
-      setError(errorMessage(e, 'Could not read the workbook.'));
+      setError(errorMessage(e, t('Could not read the workbook.')));
     }
   }
 
@@ -67,8 +68,8 @@ export default function SpreadsheetViewer() {
           maxSize={MAX_FILE}
           onFiles={(files) => files[0] && void open(files[0])}
           icon={FileSpreadsheet}
-          title="Drop an Excel or OpenDocument spreadsheet"
-          hint="XLSX, XLSM, XLSB, XLS and ODS up to 200 MB. Read on this device, never uploaded."
+          title={t('Drop an Excel or OpenDocument spreadsheet')}
+          hint={t('XLSX, XLSM, XLSB, XLS and ODS up to 200 MB. Read on this device, never uploaded.')}
         />
       </ToolStack>
     );
@@ -91,25 +92,25 @@ export default function SpreadsheetViewer() {
             </p>
             <p className="text-[12px] text-fg-muted">
               {formatBytes(file.size)}
-              {sheets && ` · ${pluralize(sheets.length, 'sheet')}`}
+              {sheets && ` · ${pluralize(sheets.length, t('sheet'), t('sheets'))}`}
             </p>
           </div>
-          <IconButton icon={X} label="Close file" size="sm" onClick={close} />
+          <IconButton icon={X} label={t('Close file')} size="sm" onClick={close} />
         </header>
 
         {job.running && (
           <div className="p-4">
-            <ProgressBar value={job.progress} label={job.label || 'Reading workbook…'} onCancel={close} />
+            <ProgressBar value={job.progress} label={job.label || t('Reading workbook…')} onCancel={close} />
           </div>
         )}
         {error && (
           <div className="p-4">
-            <ErrorMessage error={error} title="Could not open this file" />
+            <ErrorMessage error={error} title={t('Could not open this file')} />
           </div>
         )}
 
         {sheets && (
-          <div role="tablist" aria-label="Sheets" className="flex gap-1 overflow-x-auto border-b border-line px-2 pt-2">
+          <div role="tablist" aria-label={t('Sheets')} className="flex gap-1 overflow-x-auto border-b border-line px-2 pt-2">
             {sheets.map((s, i) => (
               <button
                 key={`${i}:${s.name}`}
@@ -129,7 +130,7 @@ export default function SpreadsheetViewer() {
               >
                 <Sheet size={13} aria-hidden />
                 {s.name}
-                {s.hidden && <EyeOff size={12} aria-label="Hidden sheet" className="text-fg-muted" />}
+                {s.hidden && <EyeOff size={12} aria-label={t('Hidden sheet')} className="text-fg-muted" />}
               </button>
             ))}
           </div>
@@ -139,15 +140,15 @@ export default function SpreadsheetViewer() {
           <div className="flex min-w-0 flex-col gap-3 p-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <FilterBar view={view} headers={table.headers} className="w-full min-w-0 md:w-auto md:flex-1" />
-              <Switch label="First row is header" checked={header} onChange={setHeader} />
+              <Switch label={t('First row is header')} checked={header} onChange={setHeader} />
             </div>
             {table.headers.length === 0 ? (
-              <EmptyState icon={Sheet} title="This sheet is empty" />
+              <EmptyState icon={Sheet} title={t('This sheet is empty')} />
             ) : (
               <CsvGrid
                 table={table}
                 view={view.indices}
-                label={`Sheet ${sheet.name}`}
+                label={t('Sheet {name}', { name: sheet.name })}
                 selected={selected}
                 onSelect={setSelected}
                 sort={view.sort}
@@ -157,13 +158,13 @@ export default function SpreadsheetViewer() {
             )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-fg-muted">
               <span>
-                {viewSummary(view, table.rows.length)} × {pluralize(table.headers.length, 'column')}
+                {viewSummary(view, table.rows.length)} × {pluralize(table.headers.length, t('column'), t('columns'))}
               </span>
-              {sheet.range && <span className="font-mono">Range {sheet.range}</span>}
-              {sheet.hidden && <Badge>Hidden sheet</Badge>}
+              {sheet.range && <span className="font-mono">{t('Range {range}', { range: sheet.range })}</span>}
+              {sheet.hidden && <Badge>{t('Hidden sheet')}</Badge>}
               {table.headers.length > 0 && (
                 <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                  {view.active && <span className="mr-1">Exports use the filtered, sorted rows</span>}
+                  {view.active && <span className="mr-1">{t('Exports use the filtered, sorted rows')}</span>}
                   {(['csv', 'tsv', 'json'] as const).map((format) => (
                     <DownloadButton
                       key={format}
@@ -173,7 +174,7 @@ export default function SpreadsheetViewer() {
                       label={format.toUpperCase()}
                     />
                   ))}
-                  <CopyButton value={() => exportTable(table, 'tsv', header, exportIndices)} label="Copy" />
+                  <CopyButton value={() => exportTable(table, 'tsv', header, exportIndices)} label={t('Copy')} />
                 </div>
               )}
             </div>

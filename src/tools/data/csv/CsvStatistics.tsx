@@ -9,9 +9,10 @@ import { Badge, Stat } from '@/components/ui/Panel';
 import { useDebouncedValue } from '@/lib/hooks';
 import { cn, formatNumber, withExtension } from '@/lib/utils';
 import { writeCsv } from './lib/csv';
-import { tableStats, TYPE_LABELS, type ColumnStats, type ColumnType } from './lib/stats';
+import { tableStats, type ColumnStats, type ColumnType } from './lib/stats';
 import { CsvSourcePanel, dataNotes, useCsvSource } from './components/CsvSource';
 import { SAMPLE_CSV } from './components/samples';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'csv-statistics';
 
@@ -102,7 +103,7 @@ export default function CsvStatistics() {
     <ToolStack>
       <CsvSourcePanel source={source} sample={SAMPLE_CSV} height="220px" />
       {notes.length > 0 && (
-        <Alert tone="warning" title="Input notes">
+        <Alert tone="warning" title={t('Input notes')}>
           <ul className="list-disc pl-4">
             {notes.map((n) => (
               <li key={n}>{n}</li>
@@ -113,17 +114,17 @@ export default function CsvStatistics() {
 
       {!stats || !data || !summary ? (
         <div className="rounded-xl border border-line bg-surface shadow-card">
-          <EmptyState icon={ChartColumn} title={source.busy ? 'Parsing…' : 'No data yet'}>
-            Paste CSV or open a file to profile every column: inferred type, empty and unique counts, min, max, mean and median.
+          <EmptyState icon={ChartColumn} title={source.busy ? t('Parsing…') : t('No data yet')}>
+            {t('Paste CSV or open a file to profile every column: inferred type, empty and unique counts, min, max, mean and median.')}
           </EmptyState>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="Rows" value={formatNumber(data.table.rows.length, 0)} />
-            <Stat label="Columns" value={formatNumber(data.table.headers.length, 0)} />
-            <Stat label="Empty cells" value={`${formatNumber(summary.empty, 0)} (${pct(summary.empty, summary.cells)})`} />
-            <Stat label="Numeric columns" value={formatNumber(summary.numeric, 0)} />
+            <Stat label={t('Rows')} value={formatNumber(data.table.rows.length, 0)} />
+            <Stat label={t('Columns')} value={formatNumber(data.table.headers.length, 0)} />
+            <Stat label={t('Empty cells')} value={`${formatNumber(summary.empty, 0)} (${pct(summary.empty, summary.cells)})`} />
+            <Stat label={t('Numeric columns')} value={formatNumber(summary.numeric, 0)} />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -132,18 +133,18 @@ export default function CsvStatistics() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Find a column…"
-                aria-label="Find a column"
+                placeholder={t('Find a column…')}
+                aria-label={t('Find a column')}
                 className="h-8 pl-8 text-[13px]"
               />
             </div>
             <div className="ml-auto flex flex-wrap gap-2">
-              <CopyButton value={exportCsv} label="Copy as CSV" />
+              <CopyButton value={exportCsv} label={t('Copy as CSV')} />
               <DownloadButton
                 data={exportCsv}
                 filename={withExtension(data.fileName ?? 'data', 'stats.csv')}
                 type="text/csv"
-                label="Download CSV"
+                label={t('Download CSV')}
               />
               <DownloadButton
                 data={() => JSON.stringify(stats, null, 2)}
@@ -155,7 +156,7 @@ export default function CsvStatistics() {
           </div>
 
           {visible && visible.length === 0 ? (
-            <p className="text-[13px] text-fg-muted">No column matches “{query}”.</p>
+            <p className="text-[13px] text-fg-muted">{t('No column matches “{query}”.', { query })}</p>
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {visible?.map((s) => (
@@ -170,25 +171,29 @@ export default function CsvStatistics() {
 }
 
 function ColumnCard({ stats: s }: { stats: ColumnStats }) {
+  const typeLabels: Record<ColumnType, string> = {
+    empty: t('Empty'), integer: t('Integer'), decimal: t('Decimal number'),
+    boolean: t('Boolean'), date: t('Date'), text: t('Text'),
+  };
   const metrics: Array<[string, string]> = [
-    ['Filled', `${formatNumber(s.filled, 0)} (${pct(s.filled, s.count)})`],
-    ['Empty', `${formatNumber(s.empty, 0)} (${pct(s.empty, s.count)})`],
-    ['Unique', formatNumber(s.unique, 0)],
-    ['Length', s.filled ? (s.minLength === s.maxLength ? String(s.minLength) : `${s.minLength}–${s.maxLength}`) : '—'],
+    [t('Filled'), `${formatNumber(s.filled, 0)} (${pct(s.filled, s.count)})`],
+    [t('Empty'), `${formatNumber(s.empty, 0)} (${pct(s.empty, s.count)})`],
+    [t('Unique'), formatNumber(s.unique, 0)],
+    [t('Length'), s.filled ? (s.minLength === s.maxLength ? String(s.minLength) : `${s.minLength}–${s.maxLength}`) : '—'],
   ];
   if (s.numeric) {
     metrics.push(
-      ['Min', num(s.numeric.min)],
-      ['Max', num(s.numeric.max)],
-      ['Mean', num(s.numeric.mean)],
-      ['Median', num(s.numeric.median)],
-      ['Std. dev.', num(s.numeric.stdDev)],
-      ['Sum', num(s.numeric.sum)],
+      [t('Min'), num(s.numeric.min)],
+      [t('Max'), num(s.numeric.max)],
+      [t('Mean'), num(s.numeric.mean)],
+      [t('Median'), num(s.numeric.median)],
+      [t('Std. dev.'), num(s.numeric.stdDev)],
+      [t('Sum'), num(s.numeric.sum)],
     );
   }
-  if (s.dates) metrics.push(['Earliest', s.dates.min], ['Latest', s.dates.max]);
+  if (s.dates) metrics.push([t('Earliest'), s.dates.min], [t('Latest'), s.dates.max]);
   if (s.booleans)
-    metrics.push(['True / yes', formatNumber(s.booleans.trueCount, 0)], ['False / no', formatNumber(s.booleans.falseCount, 0)]);
+    metrics.push([t('True / yes'), formatNumber(s.booleans.trueCount, 0)], [t('False / no'), formatNumber(s.booleans.falseCount, 0)]);
   const maxTop = s.top[0]?.count ?? 1;
 
   return (
@@ -196,11 +201,11 @@ function ColumnCard({ stats: s }: { stats: ColumnStats }) {
       <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line px-4 py-2">
         <h3 className="min-w-0 truncate text-[13px] font-semibold text-fg" title={s.name}>
           <span className="mr-1.5 font-mono text-[11.5px] font-normal text-fg-muted">#{s.index + 1}</span>
-          {s.name || <span className="font-normal text-fg-muted italic">unnamed</span>}
+          {s.name || <span className="font-normal text-fg-muted italic">{t('unnamed')}</span>}
         </h3>
         <div className="flex shrink-0 items-center gap-1.5">
-          {s.type === 'text' && s.typeConfidence < 1 && s.numeric && <Badge tone="warning">mixed</Badge>}
-          <Badge tone={TYPE_TONE[s.type]}>{TYPE_LABELS[s.type]}</Badge>
+          {s.type === 'text' && s.typeConfidence < 1 && s.numeric && <Badge tone="warning">{t('mixed')}</Badge>}
+          <Badge tone={TYPE_TONE[s.type]}>{typeLabels[s.type]}</Badge>
         </div>
       </header>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 px-4 py-3 text-[13px]">
@@ -215,7 +220,7 @@ function ColumnCard({ stats: s }: { stats: ColumnStats }) {
       </dl>
       {s.top.length > 0 && (
         <div className="mt-auto border-t border-line px-4 py-3">
-          <p className="mb-1.5 text-[12px] font-medium text-fg-secondary">Most common</p>
+          <p className="mb-1.5 text-[12px] font-medium text-fg-secondary">{t('Most common')}</p>
           <ul className="space-y-1">
             {s.top.map((t) => (
               <li

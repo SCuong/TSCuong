@@ -1,4 +1,5 @@
 import type { ParseIssue } from '../lib/csv';
+import { t } from '@/lib/i18n';
 import type { CsvParseMessage, CsvParseRequest } from '../workers/csvParse.worker';
 
 export interface ParsedFile {
@@ -33,10 +34,10 @@ export function parseCsvFile(
     worker.onmessage = (event: MessageEvent<CsvParseMessage>) => {
       const msg = event.data;
       if (msg.type === 'progress') {
-        options.onProgress(msg.progress, msg.label);
+        options.onProgress(msg.progress, t(msg.label));
       } else if (msg.type === 'chunk') {
         for (const row of msg.rows) records.push(row);
-        options.onProgress(msg.progress, `Parsing… ${records.length.toLocaleString()} rows`);
+        options.onProgress(msg.progress, t('Parsing… {count} rows', { count: records.length.toLocaleString() }));
       } else if (msg.type === 'done') {
         finish();
         resolve({ records, delimiter: msg.delimiter, linebreak: msg.linebreak, issues: msg.issues, truncated: msg.truncated });
@@ -47,7 +48,7 @@ export function parseCsvFile(
     };
     worker.onerror = (event) => {
       finish();
-      reject(new Error(event.message || 'The CSV parser stopped unexpectedly.'));
+      reject(new Error(event.message || t('The CSV parser stopped unexpectedly.')));
     };
     worker.postMessage({ file, delimiter: options.delimiter, encoding: options.encoding, maxRows: MAX_ROWS } satisfies CsvParseRequest);
   });

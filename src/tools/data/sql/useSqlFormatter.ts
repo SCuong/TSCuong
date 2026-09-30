@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '@/lib/i18n';
 import type { SqlFormatError, SqlFormatSettings } from './lib/sqlFormat';
 import type { SqlFormatRequest, SqlFormatResponse } from './workers/sqlFormat.worker';
 
@@ -46,7 +47,7 @@ export function useSqlFormatter(text: string, settings: SqlFormatSettings, enabl
             event.preventDefault();
             pending.current = false;
             setBusy(false);
-            setResult({ id: latest.current, outcome: { ok: false, error: { message: 'The SQL formatter could not start in this browser.' } } });
+            setResult({ id: latest.current, outcome: { ok: false, error: { message: t('The SQL formatter could not start in this browser.') } } });
           };
           worker.current = w;
         }

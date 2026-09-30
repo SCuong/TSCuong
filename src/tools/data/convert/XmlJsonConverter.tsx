@@ -6,6 +6,7 @@ import { useToolState } from '@/lib/hooks';
 import { looksLikeJson, looksLikeXml, type IndentOption } from './lib/common';
 import { ATTRIBUTE_PREFIXES, jsonToXml, TEXT_KEYS, xmlToJson } from './lib/xml';
 import { DirectionHint, DirectionSwitch, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'xml-json-converter';
 type Direction = 'xml2json' | 'json2xml';
@@ -86,18 +87,18 @@ export default function XmlJsonConverter() {
   }
 
   const prefixSelect = (
-    <Option label="Attribute prefix" htmlFor="xj-prefix" className="w-32">
+    <Option label={t('Attribute prefix')} htmlFor="xj-prefix" className="w-32">
       <Select id="xj-prefix" value={s.attributePrefix} onChange={(e) => set('attributePrefix', e.target.value)} className="h-8 py-1 font-mono text-[13px]">
         {ATTRIBUTE_PREFIXES.map((p) => (
           <option key={p} value={p}>
-            {p}name
+            {t('{p}name', { p })}
           </option>
         ))}
       </Select>
     </Option>
   );
   const textKeySelect = (
-    <Option label="Text key" htmlFor="xj-text" className="w-28">
+    <Option label={t('Text key')} htmlFor="xj-text" className="w-28">
       <Select id="xj-text" value={s.textKey} onChange={(e) => set('textKey', e.target.value)} className="h-8 py-1 font-mono text-[13px]">
         {TEXT_KEYS.map((k) => (
           <option key={k} value={k}>
@@ -121,9 +122,9 @@ export default function XmlJsonConverter() {
           onSwap={swap}
           canSwap={Boolean(output)}
         />
-        <Option label="Indent">
+        <Option label={t('Indent')}>
           <Segmented
-            label="Indent"
+            label={t('Indent')}
             value={s.indent}
             onChange={(v) => set('indent', v)}
             options={[
@@ -137,41 +138,41 @@ export default function XmlJsonConverter() {
           <>
             {s.attributes && prefixSelect}
             {textKeySelect}
-            <Switch label="Attributes" checked={s.attributes} onChange={(v) => set('attributes', v)} className="h-8" />
-            <Switch label="Numbers & booleans" checked={s.parseValues} onChange={(v) => set('parseValues', v)} className="h-8" />
-            <Switch label="Always use arrays" checked={s.alwaysArray} onChange={(v) => set('alwaysArray', v)} className="h-8" />
-            <Switch label="Strip namespace prefixes" checked={s.stripNamespaces} onChange={(v) => set('stripNamespaces', v)} className="h-8" />
+            <Switch label={t('Attributes')} checked={s.attributes} onChange={(v) => set('attributes', v)} className="h-8" />
+            <Switch label={t('Numbers & booleans')} checked={s.parseValues} onChange={(v) => set('parseValues', v)} className="h-8" />
+            <Switch label={t('Always use arrays')} checked={s.alwaysArray} onChange={(v) => set('alwaysArray', v)} className="h-8" />
+            <Switch label={t('Strip namespace prefixes')} checked={s.stripNamespaces} onChange={(v) => set('stripNamespaces', v)} className="h-8" />
           </>
         ) : (
           <>
-            <Option label="Root element" htmlFor="xj-root" className="w-32">
+            <Option label={t('Root element')} htmlFor="xj-root" className="w-32">
               <Input id="xj-root" value={s.rootName} onChange={(e) => set('rootName', e.target.value)} className="h-8 py-1 font-mono text-[13px]" spellCheck={false} />
             </Option>
-            <Option label="Array item element" htmlFor="xj-item" className="w-36">
+            <Option label={t('Array item element')} htmlFor="xj-item" className="w-36">
               <Input id="xj-item" value={s.itemName} onChange={(e) => set('itemName', e.target.value)} className="h-8 py-1 font-mono text-[13px]" spellCheck={false} />
             </Option>
             {prefixSelect}
             {textKeySelect}
-            <Switch label="XML declaration" checked={s.declaration} onChange={(v) => set('declaration', v)} className="h-8" />
+            <Switch label={t('XML declaration')} checked={s.declaration} onChange={(v) => set('declaration', v)} className="h-8" />
           </>
         )}
       </ToolBar>
 
       {wrongWay && (
-        <DirectionHint actionLabel={toJson ? 'Convert JSON → XML' : 'Convert XML → JSON'} onAction={() => setDirection(toJson ? 'json2xml' : 'xml2json')}>
-          {toJson ? 'This input is JSON. Did you mean to convert it to XML?' : 'This input looks like XML. Did you mean to convert it to JSON?'}
+        <DirectionHint actionLabel={toJson ? t('Convert JSON → XML') : t('Convert XML → JSON')} onAction={() => setDirection(toJson ? 'json2xml' : 'xml2json')}>
+          {toJson ? t('This input is JSON. Did you mean to convert it to XML?') : t('This input looks like XML. Did you mean to convert it to JSON?')}
         </DirectionHint>
       )}
-      <ErrorPanel title={toJson ? 'Invalid XML' : 'Cannot convert this JSON'} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
+      <ErrorPanel title={toJson ? t('Invalid XML') : t('Cannot convert this JSON')} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
       <NotesPanel notes={result?.ok ? result.warnings : []} />
 
       <SplitPanes>
         <EditorPanel code
-          title={toJson ? 'XML input' : 'JSON input'}
+          title={toJson ? t('XML input') : t('JSON input')}
           value={input}
           onChange={setInput}
           language={toJson ? 'xml' : 'json'}
-          placeholder={toJson ? 'Paste XML…' : 'Paste JSON…'}
+          placeholder={toJson ? t('Paste XML…') : t('Paste JSON…')}
           sample={toJson ? SAMPLE_XML : SAMPLE_JSON}
           fileAccept={toJson ? '.xml,.svg,.rss,.atom,.plist,.config,text/xml,application/xml,text/plain' : '.json,application/json,text/plain'}
           invalid={Boolean(error)}
@@ -186,7 +187,7 @@ export default function XmlJsonConverter() {
           language={toJson ? 'json' : 'xml'}
           downloadName={toJson ? 'data.json' : 'data.xml'}
           downloadType={toJson ? 'application/json' : 'application/xml'}
-          placeholder={toJson ? 'JSON appears here' : 'XML appears here'}
+          placeholder={toJson ? t('JSON appears here') : t('XML appears here')}
           height="480px"
           lineWrapping={false}
           footer={output ? <TextStats text={output} /> : undefined}

@@ -6,6 +6,7 @@ import { useToolState } from '@/lib/hooks';
 import { looksLikeJson, type IndentOption } from './lib/common';
 import { jsonToYaml, yamlToJson, type MultiDocMode } from './lib/yaml';
 import { DirectionHint, DirectionSwitch, ErrorPanel, NotesPanel, Option, TextStats, useEditorView, useProblemMarkers } from './shared/ConvertUi';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'json-yaml-converter';
 type Direction = 'yaml2json' | 'json2yaml';
@@ -110,9 +111,9 @@ export default function JsonYamlConverter() {
         />
         {toJson ? (
           <>
-            <Option label="Indent">
+            <Option label={t('Indent')}>
               <Segmented
-                label="Indent"
+                label={t('Indent')}
                 value={j.indent}
                 onChange={(v) => setJo('indent', v)}
                 options={[
@@ -122,21 +123,21 @@ export default function JsonYamlConverter() {
                 ]}
               />
             </Option>
-            <Option label="Several documents" htmlFor="jy-multi" className="w-44">
+            <Option label={t('Several documents')} htmlFor="jy-multi" className="w-44">
               <Select id="jy-multi" value={j.multiDoc} onChange={(e) => setJo('multiDoc', e.target.value as MultiDocMode)} className="h-8 py-1 text-[13px]">
-                <option value="array">Combine into an array</option>
-                <option value="first">First document only</option>
-                <option value="lines">JSON Lines (one per line)</option>
+                <option value="array">{t('Combine into an array')}</option>
+                <option value="first">{t('First document only')}</option>
+                <option value="lines">{t('JSON Lines (one per line)')}</option>
               </Select>
             </Option>
-            <Switch label="YAML 1.1 rules (yes/no/on/off are booleans)" checked={j.yaml11} onChange={(v) => setJo('yaml11', v)} className="h-8" />
-            <Switch label="CloudFormation tags (!Ref, !Sub…)" checked={j.cloudFormation} onChange={(v) => setJo('cloudFormation', v)} className="h-8" />
+            <Switch label={t('YAML 1.1 rules (yes/no/on/off are booleans)')} checked={j.yaml11} onChange={(v) => setJo('yaml11', v)} className="h-8" />
+            <Switch label={t('CloudFormation tags (!Ref, !Sub…)')} checked={j.cloudFormation} onChange={(v) => setJo('cloudFormation', v)} className="h-8" />
           </>
         ) : (
           <>
-            <Option label="Indent">
+            <Option label={t('Indent')}>
               <Segmented
-                label="Indent"
+                label={t('Indent')}
                 value={y.indent}
                 onChange={(v) => setYo('indent', v)}
                 options={[
@@ -145,36 +146,36 @@ export default function JsonYamlConverter() {
                 ]}
               />
             </Option>
-            <Switch label="Sort keys" checked={y.sortKeys} onChange={(v) => setYo('sortKeys', v)} className="h-8" />
-            <Switch label="Quote values YAML 1.1 misreads (no, on, 0755…)" checked={y.quoteAmbiguous} onChange={(v) => setYo('quoteAmbiguous', v)} className="h-8" />
-            <Switch label="Quote all strings" checked={y.quoteAll} onChange={(v) => setYo('quoteAll', v)} className="h-8" />
-            <Switch label="Indent lists" checked={y.indentSeq} onChange={(v) => setYo('indentSeq', v)} className="h-8" />
-            <Switch label="Fold long strings" checked={y.foldLines} onChange={(v) => setYo('foldLines', v)} className="h-8" />
-            <Switch label="Array items as documents (---)" checked={y.splitDocuments} onChange={(v) => setYo('splitDocuments', v)} className="h-8" />
+            <Switch label={t('Sort keys')} checked={y.sortKeys} onChange={(v) => setYo('sortKeys', v)} className="h-8" />
+            <Switch label={t('Quote values YAML 1.1 misreads (no, on, 0755…)')} checked={y.quoteAmbiguous} onChange={(v) => setYo('quoteAmbiguous', v)} className="h-8" />
+            <Switch label={t('Quote all strings')} checked={y.quoteAll} onChange={(v) => setYo('quoteAll', v)} className="h-8" />
+            <Switch label={t('Indent lists')} checked={y.indentSeq} onChange={(v) => setYo('indentSeq', v)} className="h-8" />
+            <Switch label={t('Fold long strings')} checked={y.foldLines} onChange={(v) => setYo('foldLines', v)} className="h-8" />
+            <Switch label={t('Array items as documents (---)')} checked={y.splitDocuments} onChange={(v) => setYo('splitDocuments', v)} className="h-8" />
           </>
         )}
       </ToolBar>
 
       {inputIsJson && (
-        <DirectionHint actionLabel="Convert JSON → YAML" onAction={() => setDirection('json2yaml')}>
-          This input is already JSON. Did you mean to convert it to YAML?
+        <DirectionHint actionLabel={t('Convert JSON → YAML')} onAction={() => setDirection('json2yaml')}>
+          {t('This input is already JSON. Did you mean to convert it to YAML?')}
         </DirectionHint>
       )}
       {inputIsYaml && (
-        <DirectionHint actionLabel="Convert YAML → JSON" onAction={() => setDirection('yaml2json')}>
-          This input is not JSON. If it is YAML, switch the direction.
+        <DirectionHint actionLabel={t('Convert YAML → JSON')} onAction={() => setDirection('yaml2json')}>
+          {t('This input is not JSON. If it is YAML, switch the direction.')}
         </DirectionHint>
       )}
-      <ErrorPanel title={toJson ? 'Invalid YAML' : 'Invalid JSON'} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
+      <ErrorPanel title={toJson ? t('Invalid YAML') : t('Invalid JSON')} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
       <NotesPanel notes={result?.ok ? result.warnings : []} />
 
       <SplitPanes>
         <EditorPanel code
-          title={toJson ? 'YAML input' : 'JSON input'}
+          title={toJson ? t('YAML input') : t('JSON input')}
           value={input}
           onChange={setInput}
           language={toJson ? 'yaml' : 'json'}
-          placeholder={toJson ? 'Paste YAML (several documents separated by --- are fine)…' : 'Paste JSON…'}
+          placeholder={toJson ? t('Paste YAML (several documents separated by --- are fine)…') : t('Paste JSON…')}
           sample={toJson ? SAMPLE_YAML : SAMPLE_JSON}
           fileAccept={toJson ? '.yaml,.yml,text/yaml,application/yaml,text/plain' : '.json,application/json,text/plain'}
           invalid={Boolean(error)}
@@ -184,12 +185,12 @@ export default function JsonYamlConverter() {
           footer={input ? <TextStats text={input} /> : undefined}
         />
         <EditorPanel
-          title={toJson ? (j.multiDoc === 'lines' ? 'JSON Lines' : 'JSON') : 'YAML'}
+          title={toJson ? (j.multiDoc === 'lines' ? t('JSON Lines') : 'JSON') : 'YAML'}
           value={output}
           language={toJson ? 'json' : 'yaml'}
           downloadName={toJson ? (j.multiDoc === 'lines' ? 'data.jsonl' : 'data.json') : 'data.yaml'}
           downloadType={toJson ? 'application/json' : 'application/yaml'}
-          placeholder={toJson ? 'JSON appears here' : 'YAML appears here'}
+          placeholder={toJson ? t('JSON appears here') : t('YAML appears here')}
           height="480px"
           lineWrapping={false}
           footer={output ? <TextStats text={output} /> : undefined}

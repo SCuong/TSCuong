@@ -14,6 +14,7 @@ import { CsvSourcePanel, useCsvSource } from './components/CsvSource';
 import { SAMPLE_CSV } from './components/samples';
 import { OutputPanel } from './components/OutputPanel';
 import { TableEditor } from './components/TableEditor';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'html-table-generator';
 const PREVIEW_MAX_CHARS = 2_000_000;
@@ -87,19 +88,19 @@ export default function HtmlTableGenerator() {
   return (
     <ToolStack>
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[13px] font-medium text-fg-secondary">Data source</span>
+        <span className="text-[13px] font-medium text-fg-secondary">{t('Data source')}</span>
         <Segmented
-          label="Data source"
+          label={t('Data source')}
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'grid', label: 'Edit a table' },
-            { value: 'csv', label: 'From CSV' },
+            { value: 'grid', label: t('Edit a table') },
+            { value: 'csv', label: t('From CSV') },
           ]}
         />
       </div>
       {mode === 'grid' ? (
-        <Panel title="Table" bodyClassName="p-3">
+        <Panel title={t('Table')} bodyClassName="p-3">
           <TableEditor table={gridTable} onChange={setTable} align={align} onAlignChange={setAlign} />
         </Panel>
       ) : (
@@ -107,31 +108,31 @@ export default function HtmlTableGenerator() {
       )}
 
       <ToolBar>
-        {(mode === 'grid' || source.header) && <Switch label="Header row in <thead>" checked={thead} onChange={setThead} className="h-8" />}
-        <Switch label="First column as row headers" checked={rowHeaders} onChange={setRowHeaders} className="h-8" />
-        <Switch label="Escape HTML in cells" checked={escape} onChange={setEscape} className="h-8" />
-        <Switch label="Line breaks → <br>" checked={lineBreaks} onChange={setLineBreaks} className="h-8" />
+        {(mode === 'grid' || source.header) && <Switch label={t('Header row in <thead>')} checked={thead} onChange={setThead} className="h-8" />}
+        <Switch label={t('First column as row headers')} checked={rowHeaders} onChange={setRowHeaders} className="h-8" />
+        <Switch label={t('Escape HTML in cells')} checked={escape} onChange={setEscape} className="h-8" />
+        <Switch label={t('Line breaks → <br>')} checked={lineBreaks} onChange={setLineBreaks} className="h-8" />
         <div>
-          <Label>Indent</Label>
+          <Label>{t('Indent')}</Label>
           <Segmented
-            label="Indent"
+            label={t('Indent')}
             value={indent}
             onChange={setIndent}
             options={[
               { value: '2', label: '2' },
               { value: '4', label: '4' },
               { value: 'tab', label: 'Tab' },
-              { value: 'none', label: 'Minify' },
+              { value: 'none', label: t('Minify') },
             ]}
           />
         </div>
         <div className="w-40">
-          <Label htmlFor="ht-class">Class</Label>
+          <Label htmlFor="ht-class">{t('Class')}</Label>
           <Input
             id="ht-class"
             value={className}
             onChange={(e) => setClassName(e.target.value)}
-            placeholder="e.g. table striped"
+            placeholder={t('e.g. table striped')}
             className="h-8 py-1 text-[13px]"
             mono
           />
@@ -142,27 +143,26 @@ export default function HtmlTableGenerator() {
             id="ht-id"
             value={id}
             onChange={(e) => setId(e.target.value)}
-            placeholder="e.g. pricing"
+            placeholder={t('e.g. pricing')}
             className="h-8 py-1 text-[13px]"
             mono
           />
         </div>
         <div className="w-full sm:w-56">
-          <Label htmlFor="ht-caption">Caption</Label>
+          <Label htmlFor="ht-caption">{t('Caption')}</Label>
           <Input
             id="ht-caption"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Optional"
+            placeholder={t('Optional')}
             className="h-8 py-1 text-[13px]"
           />
         </div>
       </ToolBar>
 
       {!escape && (
-        <Alert tone="warning" title="Cells are inserted as raw HTML">
-          Only turn escaping off for content you trust. Markup such as &lt;script&gt; in a cell would run on the page where you paste this
-          table.
+        <Alert tone="warning" title={t('Cells are inserted as raw HTML')}>
+          {t('Only turn escaping off for content you trust. Markup such as <script> in a cell would run on the page where you paste this table.')}
         </Alert>
       )}
 
@@ -174,24 +174,24 @@ export default function HtmlTableGenerator() {
           actions={<ViewToggle view={view} onChange={setView} />}
           downloadName="table.html"
           downloadType="text/html"
-          placeholder={source.busy ? 'Parsing…' : 'HTML appears here'}
+          placeholder={source.busy ? t('Parsing…') : t('HTML appears here')}
           height="360px"
           lineWrapping={false}
           footer={html ? <span>{formatBytes(new Blob([html]).size)}</span> : undefined}
         />
       ) : (
         <Panel
-          title="Preview"
-          description="Rendered in a sandboxed frame"
+          title={t('Preview')}
+          description={t('Rendered in a sandboxed frame')}
           actions={<ViewToggle view={view} onChange={setView} />}
           bodyClassName="p-0"
         >
           {html.length > PREVIEW_MAX_CHARS ? (
-            <p className="p-4 text-[13px] text-fg-muted">This table is too large to preview. Copy or download the HTML instead.</p>
+            <p className="p-4 text-[13px] text-fg-muted">{t('This table is too large to preview. Copy or download the HTML instead.')}</p>
           ) : html ? (
-            <iframe title="Table preview" sandbox="" srcDoc={srcDoc} className="block h-[360px] w-full rounded-b-xl border-0 bg-surface" />
+            <iframe title={t('Table preview')} sandbox="" srcDoc={srcDoc} className="block h-[360px] w-full rounded-b-xl border-0 bg-surface" />
           ) : (
-            <p className="p-4 text-[13px] text-fg-muted">Add data to see a preview.</p>
+            <p className="p-4 text-[13px] text-fg-muted">{t('Add data to see a preview.')}</p>
           )}
         </Panel>
       )}
@@ -202,13 +202,13 @@ export default function HtmlTableGenerator() {
 function ViewToggle({ view, onChange }: { view: 'html' | 'preview'; onChange: (v: 'html' | 'preview') => void }) {
   return (
     <Segmented
-      label="Output view"
+      label={t('Output view')}
       size="sm"
       value={view}
       onChange={onChange}
       options={[
         { value: 'html', label: 'HTML' },
-        { value: 'preview', label: 'Preview' },
+        { value: 'preview', label: t('Preview') },
       ]}
     />
   );

@@ -10,6 +10,7 @@ import { DIALECTS, dialectInfo, type SqlDialect } from './lib/dialects';
 import { DEFAULT_FORMAT_SETTINGS, type CaseOption, type IndentStyle, type SqlFormatSettings } from './lib/sqlFormat';
 import { minifySql } from './lib/sqlMinify';
 import { useSqlFormatter } from './useSqlFormatter';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'sql-formatter';
 
@@ -31,7 +32,7 @@ interface MinifySettings {
 const CASE_OPTIONS: Array<{ value: CaseOption; label: string }> = [
   { value: 'upper', label: 'UPPER' },
   { value: 'lower', label: 'lower' },
-  { value: 'preserve', label: 'As written' },
+  { value: 'preserve', label: t('As written') },
 ];
 
 export default function SqlFormatter() {
@@ -65,18 +66,18 @@ export default function SqlFormatter() {
   return (
     <ToolStack>
       <ToolBar>
-        <Option label="Mode">
+        <Option label={t('Mode')}>
           <Segmented
-            label="Mode"
+            label={t('Mode')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'format', label: 'Format' },
-              { value: 'minify', label: 'Minify' },
+              { value: 'format', label: t('Format') },
+              { value: 'minify', label: t('Minify') },
             ]}
           />
         </Option>
-        <Option label="Dialect" htmlFor="sqlf-dialect" className="w-48">
+        <Option label={t('Dialect')} htmlFor="sqlf-dialect" className="w-48">
           <Select id="sqlf-dialect" value={s.dialect} onChange={(e) => set('dialect', e.target.value as SqlDialect)} className="h-8 py-1 text-[13px]">
             {DIALECTS.map((d) => (
               <option key={d.id} value={d.id}>
@@ -87,12 +88,12 @@ export default function SqlFormatter() {
         </Option>
         {mode === 'format' ? (
           <>
-            <Option label="Keywords">
-              <Segmented label="Keywords" value={s.keywordCase} onChange={(v) => set('keywordCase', v)} options={CASE_OPTIONS} />
+            <Option label={t('Keywords')}>
+              <Segmented label={t('Keywords')} value={s.keywordCase} onChange={(v) => set('keywordCase', v)} options={CASE_OPTIONS} />
             </Option>
-            <Option label="Indent">
+            <Option label={t('Indent')}>
               <Segmented
-                label="Indent"
+                label={t('Indent')}
                 value={s.indent}
                 onChange={(v) => set('indent', v)}
                 options={[
@@ -102,9 +103,9 @@ export default function SqlFormatter() {
                 ]}
               />
             </Option>
-            <Option label="Blank lines between statements" htmlFor="sqlf-lines" className="w-52">
+            <Option label={t('Blank lines between statements')} htmlFor="sqlf-lines" className="w-52">
               <Select id="sqlf-lines" value={String(s.linesBetweenQueries)} onChange={(e) => set('linesBetweenQueries', Number(e.target.value))} className="h-8 py-1 text-[13px]">
-                <option value="0">None</option>
+                <option value="0">{t('None')}</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -113,7 +114,7 @@ export default function SqlFormatter() {
             <MoreOptionsToggle open={more} onToggle={() => setMore((v) => !v)} controls="sqlf-more" />
             {more && (
               <div id="sqlf-more" className="flex w-full min-w-0 flex-wrap items-end gap-x-4 gap-y-3 border-t border-line pt-3">
-                <Option label="Function names" htmlFor="sqlf-fn" className="w-36">
+                <Option label={t('Function names')} htmlFor="sqlf-fn" className="w-36">
                   <Select id="sqlf-fn" value={s.functionCase} onChange={(e) => set('functionCase', e.target.value as CaseOption)} className="h-8 py-1 text-[13px]">
                     {CASE_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -122,7 +123,7 @@ export default function SqlFormatter() {
                     ))}
                   </Select>
                 </Option>
-                <Option label="Data types" htmlFor="sqlf-types" className="w-36">
+                <Option label={t('Data types')} htmlFor="sqlf-types" className="w-36">
                   <Select id="sqlf-types" value={s.dataTypeCase} onChange={(e) => set('dataTypeCase', e.target.value as CaseOption)} className="h-8 py-1 text-[13px]">
                     {CASE_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -131,11 +132,11 @@ export default function SqlFormatter() {
                     ))}
                   </Select>
                 </Option>
-                <Option label="Layout" htmlFor="sqlf-layout" className="w-44">
+                <Option label={t('Layout')} htmlFor="sqlf-layout" className="w-44">
                   <Select id="sqlf-layout" value={s.indentStyle} onChange={(e) => set('indentStyle', e.target.value as IndentStyle)} className="h-8 py-1 text-[13px]">
-                    <option value="standard">Standard</option>
-                    <option value="tabularLeft">Tabular, keywords left</option>
-                    <option value="tabularRight">Tabular, keywords right</option>
+                    <option value="standard">{t('Standard')}</option>
+                    <option value="tabularLeft">{t('Tabular, keywords left')}</option>
+                    <option value="tabularRight">{t('Tabular, keywords right')}</option>
                   </Select>
                 </Option>
                 <Option label="AND / OR" htmlFor="sqlf-logic" className="w-40">
@@ -145,11 +146,11 @@ export default function SqlFormatter() {
                     onChange={(e) => set('logicalOperatorNewline', e.target.value as 'before' | 'after')}
                     className="h-8 py-1 text-[13px]"
                   >
-                    <option value="before">Start of line</option>
-                    <option value="after">End of line</option>
+                    <option value="before">{t('Start of line')}</option>
+                    <option value="after">{t('End of line')}</option>
                   </Select>
                 </Option>
-                <Option label="Inline width" htmlFor="sqlf-width" className="w-28">
+                <Option label={t('Inline width')} htmlFor="sqlf-width" className="w-28">
                   <NumberInput
                     id="sqlf-width"
                     min={10}
@@ -157,26 +158,26 @@ export default function SqlFormatter() {
                     value={s.expressionWidth}
                     onChange={(v) => set('expressionWidth', v === '' ? DEFAULT_FORMAT_SETTINGS.expressionWidth : v)}
                     className="h-8 py-1 text-[13px]"
-                    title="Parenthesized expressions shorter than this stay on one line"
+                    title={t('Parenthesized expressions shorter than this stay on one line')}
                   />
                 </Option>
-                <Switch label="Dense operators (a=b)" checked={s.denseOperators} onChange={(v) => set('denseOperators', v)} className="h-8" />
-                <Switch label="Semicolon on its own line" checked={s.newlineBeforeSemicolon} onChange={(v) => set('newlineBeforeSemicolon', v)} className="h-8" />
-                <Switch label="Jinja / dbt templates ({{ }})" checked={s.templates} onChange={(v) => set('templates', v)} className="h-8" />
+                <Switch label={t('Dense operators (a=b)')} checked={s.denseOperators} onChange={(v) => set('denseOperators', v)} className="h-8" />
+                <Switch label={t('Semicolon on its own line')} checked={s.newlineBeforeSemicolon} onChange={(v) => set('newlineBeforeSemicolon', v)} className="h-8" />
+                <Switch label={t('Jinja / dbt templates ({{ }})')} checked={s.templates} onChange={(v) => set('templates', v)} className="h-8" />
               </div>
             )}
           </>
         ) : (
           <>
-            <Option label="Backslash in strings" htmlFor="sqlf-bs" className="w-56">
+            <Option label={t('Backslash in strings')} htmlFor="sqlf-bs" className="w-56">
               <Select id="sqlf-bs" value={m.backslash} onChange={(e) => setM((o) => ({ ...o, backslash: e.target.value as Backslash }))} className="h-8 py-1 text-[13px]">
-                <option value="auto">{`Dialect default (${dialectBackslash ? 'escape character' : 'plain character'})`}</option>
-                <option value="on">Escape character (\')</option>
-                <option value="off">Plain character</option>
+                <option value="auto">{t('Dialect default ({value})', { value: dialectBackslash ? t('Escape character') : t('Plain character') })}</option>
+                <option value="on">{t('Escape character (\\\')')}</option>
+                <option value="off">{t('Plain character')}</option>
               </Select>
             </Option>
             <Switch
-              label="Keep optimizer hints (/*+ */, /*! */)"
+              label={t('Keep optimizer hints (/*+ */, /*! */)')}
               checked={m.keepHints}
               onChange={(v) => setM((o) => ({ ...o, keepHints: v }))}
               className="h-8"
@@ -185,7 +186,7 @@ export default function SqlFormatter() {
         )}
       </ToolBar>
 
-      <ErrorPanel title={mode === 'format' ? 'Could not format this SQL' : 'Could not minify this SQL'} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
+      <ErrorPanel title={mode === 'format' ? t('Could not format this SQL') : t('Could not minify this SQL')} error={error} onReveal={() => editor.reveal(error?.line, error?.column)} />
 
       <SplitPanes>
         <EditorPanel code
@@ -193,7 +194,7 @@ export default function SqlFormatter() {
           value={input}
           onChange={setInput}
           language="sql"
-          placeholder="Paste SQL to format or minify…"
+          placeholder={t('Paste SQL to format or minify…')}
           sample={SAMPLE}
           fileAccept=".sql,.ddl,.pgsql,.psql,.mysql,.hql,.txt,application/sql,text/plain"
           invalid={Boolean(error)}
@@ -205,16 +206,16 @@ export default function SqlFormatter() {
         <EditorPanel
           title={
             <span className="inline-flex items-center gap-2">
-              {mode === 'format' ? 'Formatted SQL' : 'Minified SQL'}
-              {mode === 'format' && formatted.busy && <Spinner size={13} label="Formatting…" />}
+              {mode === 'format' ? t('Formatted SQL') : t('Minified SQL')}
+              {mode === 'format' && formatted.busy && <Spinner size={13} label={t('Formatting…')} />}
             </span>
           }
-          ariaLabel={mode === 'format' ? 'Formatted SQL' : 'Minified SQL'}
+          ariaLabel={mode === 'format' ? t('Formatted SQL') : t('Minified SQL')}
           value={output}
           language="sql"
           downloadName={mode === 'format' ? 'query.sql' : 'query.min.sql'}
           downloadType="application/sql"
-          placeholder={error ? 'Fix the error to see the result' : 'The result appears here'}
+          placeholder={error ? t('Fix the error to see the result') : t('The result appears here')}
           height="480px"
           lineWrapping={mode === 'minify'}
           footer={
@@ -223,10 +224,10 @@ export default function SqlFormatter() {
                 text={output}
                 extra={
                   <>
-                    {mode === 'minify' && inBytes > 0 && <span>{Math.max(0, Math.round((1 - outBytes / inBytes) * 100))}% smaller</span>}
+                    {mode === 'minify' && inBytes > 0 && <span>{t('{max}% smaller', { max: Math.max(0, Math.round((1 - outBytes / inBytes) * 100)) })}</span>}
                     {mode === 'minify' && minified?.ok && minified.commentsRemoved > 0 && (
                       <span>
-                        {minified.commentsRemoved} comment{minified.commentsRemoved === 1 ? '' : 's'} removed
+                        {(minified.commentsRemoved === 1) ? t('{commentsRemoved} comment removed', { commentsRemoved: minified.commentsRemoved }) : t('{commentsRemoved} comments removed', { commentsRemoved: minified.commentsRemoved })}
                       </span>
                     )}
                   </>

@@ -12,6 +12,7 @@ import { dedupe } from './lib/dedupe';
 import { CsvSourcePanel, dataNotes, useCsvSource } from './components/CsvSource';
 import { OutputPanel } from './components/OutputPanel';
 import { SAMPLE_DUPES } from './components/samples';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'csv-dedupe';
 
@@ -60,45 +61,45 @@ export default function CsvDedupe() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Compare</Label>
+          <Label>{t('Compare')}</Label>
           <Segmented
-            label="Compare"
+            label={t('Compare')}
             value={by}
             onChange={setBy}
             options={[
-              { value: 'row', label: 'Whole row' },
-              { value: 'columns', label: 'Selected columns' },
+              { value: 'row', label: t('Whole row') },
+              { value: 'columns', label: t('Selected columns') },
             ]}
           />
         </div>
         <div>
-          <Label>Keep</Label>
+          <Label>{t('Keep')}</Label>
           <Segmented
-            label="Keep"
+            label={t('Keep')}
             value={keep}
             onChange={setKeep}
             options={[
-              { value: 'first', label: 'First occurrence' },
-              { value: 'last', label: 'Last occurrence' },
+              { value: 'first', label: t('First occurrence') },
+              { value: 'last', label: t('Last occurrence') },
             ]}
           />
         </div>
-        <Switch label="Ignore case" checked={ignoreCase} onChange={setIgnoreCase} className="h-8" />
-        <Switch label="Trim spaces" checked={trim} onChange={setTrim} className="h-8" />
-        <Switch label="Collapse inner spaces" checked={collapse} onChange={setCollapse} className="h-8" />
+        <Switch label={t('Ignore case')} checked={ignoreCase} onChange={setIgnoreCase} className="h-8" />
+        <Switch label={t('Trim spaces')} checked={trim} onChange={setTrim} className="h-8" />
+        <Switch label={t('Collapse inner spaces')} checked={collapse} onChange={setCollapse} className="h-8" />
       </ToolBar>
 
       {by === 'columns' && (
         <section className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[13px] font-semibold text-fg">Key columns</h2>
+            <h2 className="text-[13px] font-semibold text-fg">{t('Key columns')}</h2>
             {headers.length > 0 && (
               <div className="flex gap-1">
                 <Button size="sm" variant="ghost" onClick={() => setKeyNames(headers.slice())}>
-                  All
+                  {t('All')}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setKeyNames([])}>
-                  None
+                  {t('None')}
                 </Button>
               </div>
             )}
@@ -108,21 +109,21 @@ export default function CsvDedupe() {
               {headers.map((h, i) => (
                 <Checkbox
                   key={`${i}:${h}`}
-                  label={h || <span className="text-fg-muted italic">Column {i + 1}</span>}
+                  label={h || <span className="text-fg-muted italic">{t('Column')}{' '}{i + 1}</span>}
                   checked={keyNames.includes(h)}
                   onChange={(on) => toggleKey(h, on)}
                 />
               ))}
             </div>
           ) : (
-            <p className="text-[13px] text-fg-muted">Add CSV input to choose the columns that identify a duplicate.</p>
+            <p className="text-[13px] text-fg-muted">{t('Add CSV input to choose the columns that identify a duplicate.')}</p>
           )}
-          {needsColumns && headers.length > 0 && <p className="mt-2 text-[13px] text-warning">Select at least one column.</p>}
+          {needsColumns && headers.length > 0 && <p className="mt-2 text-[13px] text-warning">{t('Select at least one column.')}</p>}
         </section>
       )}
 
       {notes.length > 0 && (
-        <Alert tone="warning" title="Input notes">
+        <Alert tone="warning" title={t('Input notes')}>
           <ul className="list-disc pl-4">
             {notes.map((n) => (
               <li key={n}>{n}</li>
@@ -133,28 +134,28 @@ export default function CsvDedupe() {
 
       {result && data && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Rows in" value={formatNumber(data.table.rows.length, 0)} />
-          <Stat label="Duplicates removed" value={formatNumber(result.removedCount, 0)} />
-          <Stat label="Rows kept" value={formatNumber(result.table.rows.length, 0)} />
-          <Stat label="Duplicated keys" value={formatNumber(result.duplicateGroups, 0)} />
+          <Stat label={t('Rows in')} value={formatNumber(data.table.rows.length, 0)} />
+          <Stat label={t('Duplicates removed')} value={formatNumber(result.removedCount, 0)} />
+          <Stat label={t('Rows kept')} value={formatNumber(result.table.rows.length, 0)} />
+          <Stat label={t('Duplicated keys')} value={formatNumber(result.duplicateGroups, 0)} />
         </div>
       )}
 
       <SplitPanes>
         <CsvSourcePanel source={source} sample={SAMPLE_DUPES} height="420px" />
         <OutputPanel
-          title={show === 'kept' ? 'Deduplicated' : 'Removed rows'}
+          title={show === 'kept' ? t('Deduplicated') : t('Removed rows')}
           value={output}
           actions={
             result ? (
               <Segmented
-                label="Show"
+                label={t('Show')}
                 size="sm"
                 value={show}
                 onChange={setShow}
                 options={[
-                  { value: 'kept', label: 'Kept' },
-                  { value: 'removed', label: `Removed (${formatNumber(result.removedCount, 0)})` },
+                  { value: 'kept', label: t('Kept') },
+                  { value: 'removed', label: t('Removed ({removedCount})', { removedCount: formatNumber(result.removedCount, 0) }) },
                 ]}
               />
             ) : undefined
@@ -162,7 +163,7 @@ export default function CsvDedupe() {
           downloadName={fileName}
           downloadType="text/csv"
           placeholder={
-            source.busy ? 'Parsing…' : needsColumns && headers.length ? 'Choose key columns above' : 'The deduplicated CSV appears here'
+            source.busy ? t('Parsing…') : needsColumns && headers.length ? t('Choose key columns above') : t('The deduplicated CSV appears here')
           }
           height="420px"
           lineWrapping={false}
@@ -171,9 +172,9 @@ export default function CsvDedupe() {
               <span>
                 {show === 'kept'
                   ? result.removedCount
-                    ? `${pluralize(result.removedCount, 'duplicate row')} removed`
-                    : 'No duplicates found'
-                  : pluralize(result.removed.rows.length, 'removed row')}
+                    ? t('{count} removed', { count: pluralize(result.removedCount, t('duplicate row'), t('duplicate rows')) })
+                    : t('No duplicates found')
+                  : pluralize(result.removed.rows.length, t('removed row'), t('removed rows'))}
               </span>
             ) : undefined
           }

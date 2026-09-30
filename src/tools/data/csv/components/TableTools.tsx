@@ -7,6 +7,7 @@ import { cn, pluralize } from '@/lib/utils';
 import { writeCsv, type Table } from '../lib/csv';
 import { stringify, tableToJsonValue } from '../lib/csvJson';
 import { pickRows, viewIndices, type SortState } from '../lib/table';
+import { t } from '@/lib/i18n';
 
 export interface TableView {
   filter: string;
@@ -64,14 +65,14 @@ export function FilterBar({ view, headers, className }: { view: TableView; heade
         <Input
           value={view.filter}
           onChange={(e) => view.setFilter(e.target.value)}
-          placeholder="Filter rows…"
-          aria-label="Filter rows"
+          placeholder={t('Filter rows…')}
+          aria-label={t('Filter rows')}
           className="h-8 pr-8 pl-8 text-[13px]"
         />
         {view.filter && (
           <IconButton
             icon={X}
-            label="Clear filter"
+            label={t('Clear filter')}
             size="sm"
             className="absolute top-1/2 right-0.5 -translate-y-1/2"
             onClick={() => view.setFilter('')}
@@ -79,21 +80,21 @@ export function FilterBar({ view, headers, className }: { view: TableView; heade
         )}
       </div>
       <Select
-        aria-label="Filter column"
+        aria-label={t('Filter column')}
         value={view.filterColumn}
         onChange={(e) => view.setFilterColumn(Number(e.target.value))}
         className="h-8 w-auto max-w-44 min-w-32 shrink-0 py-1 text-[13px]"
       >
-        <option value={-1}>All columns</option>
+        <option value={-1}>{t('All columns')}</option>
         {headers.map((h, i) => (
           <option key={i} value={i}>
-            {h || `Column ${i + 1}`}
+            {h || t('Column {i}', { i: i + 1 })}
           </option>
         ))}
       </Select>
       <IconButton
         icon={CaseSensitive}
-        label={view.caseSensitive ? 'Case-sensitive filter (on)' : 'Case-sensitive filter (off)'}
+        label={view.caseSensitive ? t('Case-sensitive filter (on)') : t('Case-sensitive filter (off)')}
         variant="secondary"
         size="md"
         className={cn('size-8', view.caseSensitive && 'border-accent-line bg-accent-soft')}
@@ -106,8 +107,8 @@ export function FilterBar({ view, headers, className }: { view: TableView; heade
 }
 
 export function viewSummary(view: TableView, total: number): string {
-  if (view.indices.length === total) return pluralize(total, 'row');
-  return `${view.indices.length.toLocaleString()} of ${pluralize(total, 'row')}`;
+  if (view.indices.length === total) return pluralize(total, t('row'), t('rows'));
+  return t('{count} of {total}', { count: view.indices.length.toLocaleString(), total: pluralize(total, t('row'), t('rows')) });
 }
 
 export type ExportFormat = 'csv' | 'tsv' | 'json';

@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n';
 /** SQL dialects, named like sql-formatter's `language` option. */
 export type SqlDialect =
   | 'sql'
@@ -84,38 +85,38 @@ const MYSQL: LexFeatures = {
 };
 
 export const DIALECTS: DialectInfo[] = [
-  { id: 'sql', label: 'Standard SQL', lex: { ...BASE, nestedComments: true, dollarQuotes: 'tagged' } },
-  { id: 'postgresql', label: 'PostgreSQL', lex: { ...BASE, nestedComments: true, dollarQuotes: 'tagged', eStrings: true, directives: 'psql' } },
-  { id: 'mysql', label: 'MySQL', lex: MYSQL },
-  { id: 'mariadb', label: 'MariaDB', lex: MYSQL },
-  { id: 'sqlite', label: 'SQLite', lex: { ...BASE, bracketIdentifiers: true } },
-  { id: 'transactsql', label: 'SQL Server (T-SQL)', lex: { ...BASE, bracketIdentifiers: true, nestedComments: true, directives: 'go' } },
-  { id: 'plsql', label: 'Oracle PL/SQL', lex: { ...BASE, qQuotes: true, directives: 'slash' } },
+  { id: 'sql', label: t('Standard SQL'), lex: { ...BASE, nestedComments: true, dollarQuotes: 'tagged' } },
+  { id: 'postgresql', label: t('PostgreSQL'), lex: { ...BASE, nestedComments: true, dollarQuotes: 'tagged', eStrings: true, directives: 'psql' } },
+  { id: 'mysql', label: t('MySQL'), lex: MYSQL },
+  { id: 'mariadb', label: t('MariaDB'), lex: MYSQL },
+  { id: 'sqlite', label: t('SQLite'), lex: { ...BASE, bracketIdentifiers: true } },
+  { id: 'transactsql', label: t('SQL Server (T-SQL)'), lex: { ...BASE, bracketIdentifiers: true, nestedComments: true, directives: 'go' } },
+  { id: 'plsql', label: t('Oracle PL/SQL'), lex: { ...BASE, qQuotes: true, directives: 'slash' } },
   {
     id: 'bigquery',
-    label: 'Google BigQuery',
+    label: t('Google BigQuery'),
     lex: { ...BASE, backslashEscapes: true, doubleQuoteStrings: true, doubleQuoteBackslash: true, hashComments: true, tripleQuotes: true },
   },
-  { id: 'snowflake', label: 'Snowflake', lex: { ...BASE, backslashEscapes: true, dollarQuotes: 'plain', slashComments: true } },
-  { id: 'redshift', label: 'Amazon Redshift', lex: { ...BASE, dollarQuotes: 'tagged' } },
-  { id: 'spark', label: 'Spark SQL', lex: { ...BASE, backslashEscapes: true, doubleQuoteStrings: true, doubleQuoteBackslash: true } },
-  { id: 'hive', label: 'Apache Hive', lex: { ...BASE, backslashEscapes: true, doubleQuoteStrings: true, doubleQuoteBackslash: true } },
-  { id: 'trino', label: 'Trino / Presto', lex: BASE },
-  { id: 'duckdb', label: 'DuckDB', lex: { ...BASE, nestedComments: true, dollarQuotes: 'tagged', eStrings: true } },
+  { id: 'snowflake', label: t('Snowflake'), lex: { ...BASE, backslashEscapes: true, dollarQuotes: 'plain', slashComments: true } },
+  { id: 'redshift', label: t('Amazon Redshift'), lex: { ...BASE, dollarQuotes: 'tagged' } },
+  { id: 'spark', label: t('Spark SQL'), lex: { ...BASE, backslashEscapes: true, doubleQuoteStrings: true, doubleQuoteBackslash: true } },
+  { id: 'hive', label: t('Apache Hive'), lex: { ...BASE, backslashEscapes: true, doubleQuoteStrings: true, doubleQuoteBackslash: true } },
+  { id: 'trino', label: t('Trino / Presto'), lex: BASE },
+  { id: 'duckdb', label: t('DuckDB'), lex: { ...BASE, nestedComments: true, dollarQuotes: 'tagged', eStrings: true } },
   {
     id: 'clickhouse',
-    label: 'ClickHouse',
+    label: t('ClickHouse'),
     lex: { ...BASE, backslashEscapes: true, doubleQuoteBackslash: true, hashComments: true, dollarQuotes: 'tagged' },
   },
-  { id: 'db2', label: 'IBM Db2', lex: BASE },
-  { id: 'db2i', label: 'IBM Db2 for i', lex: { ...BASE, nestedComments: true } },
+  { id: 'db2', label: t('IBM Db2'), lex: BASE },
+  { id: 'db2i', label: t('IBM Db2 for i'), lex: { ...BASE, nestedComments: true } },
   {
     id: 'n1ql',
-    label: 'Couchbase N1QL',
+    label: t('Couchbase N1QL'),
     lex: { ...BASE, backslashEscapes: true, doubleQuoteStrings: true, doubleQuoteBackslash: true, hashComments: true },
   },
-  { id: 'singlestoredb', label: 'SingleStoreDB', lex: MYSQL },
-  { id: 'tidb', label: 'TiDB', lex: MYSQL },
+  { id: 'singlestoredb', label: t('SingleStoreDB'), lex: MYSQL },
+  { id: 'tidb', label: t('TiDB'), lex: MYSQL },
 ];
 
 const BY_ID = new Map(DIALECTS.map((d) => [d.id, d]));

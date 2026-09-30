@@ -9,6 +9,7 @@ import { stringify, tableToJsonValue, type CsvJsonShape, type JsonIndent } from 
 import { CsvSourcePanel, dataNotes, useCsvSource } from './components/CsvSource';
 import { OutputPanel } from './components/OutputPanel';
 import { SAMPLE_CSV } from './components/samples';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'csv-to-json';
 const MAX_OUTPUT_CHARS = 60_000_000;
@@ -26,11 +27,11 @@ export default function CsvToJson() {
     try {
       const text = stringify(tableToJsonValue(data.table, { shape, typed, nest }), indent);
       if (text.length > MAX_OUTPUT_CHARS) {
-        return { ok: false as const, error: 'The JSON output is too large to show here. Try minified output or split the file.' };
+        return { ok: false as const, error: t('The JSON output is too large to show here. Try minified output or split the file.') };
       }
       return { ok: true as const, text, bytes: new Blob([text]).size };
     } catch (error) {
-      return { ok: false as const, error: errorMessage(error, 'Could not convert this CSV.') };
+      return { ok: false as const, error: errorMessage(error, t('Could not convert this CSV.')) };
     }
   }, [data, shape, typed, nest, indent]);
 
@@ -42,38 +43,38 @@ export default function CsvToJson() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Output shape</Label>
+          <Label>{t('Output shape')}</Label>
           <Segmented
-            label="Output shape"
+            label={t('Output shape')}
             value={shape}
             onChange={setShape}
             options={[
-              { value: 'objects', label: 'Objects', title: 'An array with one object per row' },
-              { value: 'arrays', label: 'Arrays', title: 'An array of arrays, header first' },
-              { value: 'columns', label: 'Columns', title: 'One array per column' },
+              { value: 'objects', label: t('Objects'), title: t('An array with one object per row') },
+              { value: 'arrays', label: t('Arrays'), title: t('An array of arrays, header first') },
+              { value: 'columns', label: t('Columns'), title: t('One array per column') },
             ]}
           />
         </div>
         <div>
-          <Label>Indent</Label>
+          <Label>{t('Indent')}</Label>
           <Segmented
-            label="Indent"
+            label={t('Indent')}
             value={indent}
             onChange={setIndent}
             options={[
               { value: '2', label: '2' },
               { value: '4', label: '4' },
               { value: 'tab', label: 'Tab' },
-              { value: 'min', label: 'Minify' },
+              { value: 'min', label: t('Minify') },
             ]}
           />
         </div>
-        <Switch label="Detect numbers, booleans & null" checked={typed} onChange={setTyped} className="h-8" />
-        {shape === 'objects' && <Switch label="Nest dotted headers (a.b)" checked={nest} onChange={setNest} className="h-8" />}
+        <Switch label={t('Detect numbers, booleans & null')} checked={typed} onChange={setTyped} className="h-8" />
+        {shape === 'objects' && <Switch label={t('Nest dotted headers (a.b)')} checked={nest} onChange={setNest} className="h-8" />}
       </ToolBar>
-      {result && !result.ok && <ErrorMessage error={result.error} title="Conversion failed" />}
+      {result && !result.ok && <ErrorMessage error={result.error} title={t('Conversion failed')} />}
       {notes.length > 0 && (
-        <Alert tone="warning" title="Input notes">
+        <Alert tone="warning" title={t('Input notes')}>
           <ul className="list-disc pl-4">
             {notes.map((n) => (
               <li key={n}>{n}</li>
@@ -90,13 +91,13 @@ export default function CsvToJson() {
           downloadName={fileName}
           downloadType="application/json"
           bytes={result?.ok ? result.bytes : undefined}
-          placeholder={source.busy ? 'Parsing…' : 'JSON appears here'}
+          placeholder={source.busy ? t('Parsing…') : t('JSON appears here')}
           height="480px"
           footer={
             output ? (
               <>
                 <span>
-                  {data?.table.rows.length.toLocaleString()} {shape === 'columns' ? 'values per column' : 'records'}
+                  {data?.table.rows.length.toLocaleString()} {shape === 'columns' ? t('values per column') : 'records'}
                 </span>
                 <span>{formatBytes(result?.ok ? result.bytes : 0)}</span>
               </>

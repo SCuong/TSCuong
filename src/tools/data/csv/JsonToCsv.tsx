@@ -12,6 +12,7 @@ import { jsonToTable, type ArrayMode } from './lib/csvJson';
 import { CsvGrid, type GridCell } from './components/CsvGrid';
 import { OutputPanel } from './components/OutputPanel';
 import { SAMPLE_JSON } from './components/samples';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'json-to-csv';
 
@@ -30,7 +31,7 @@ export default function JsonToCsv() {
   const result = useMemo(() => {
     if (!debounced.trim()) return null;
     const parsed = parseJson(debounced);
-    if (!parsed.ok) return { ok: false as const, title: 'Invalid JSON', error: formatJsonError(parsed.error) };
+    if (!parsed.ok) return { ok: false as const, title: t('Invalid JSON'), error: formatJsonError(parsed.error) };
     try {
       const value = parsed.value;
       const conv = jsonToTable(value, { flatten, arrays, separator: separator || '.', firstRowHeader });
@@ -38,7 +39,7 @@ export default function JsonToCsv() {
       const csv = conv.table.headers.length ? writeCsv(conv.table, { delimiter }) : '';
       return { ok: true as const, ...conv, csv, rowsAreArrays, bytes: new Blob([csv]).size };
     } catch (error) {
-      return { ok: false as const, title: 'Cannot convert', error: errorMessage(error, 'Could not convert this JSON.') };
+      return { ok: false as const, title: t('Cannot convert'), error: errorMessage(error, t('Could not convert this JSON.')) };
     }
   }, [debounced, flatten, arrays, separator, firstRowHeader, delimiter]);
 
@@ -50,22 +51,22 @@ export default function JsonToCsv() {
   return (
     <ToolStack>
       <ToolBar>
-        <Switch label="Flatten nested objects" checked={flatten} onChange={setFlatten} className="h-8" />
+        <Switch label={t('Flatten nested objects')} checked={flatten} onChange={setFlatten} className="h-8" />
         <div>
-          <Label>Arrays</Label>
+          <Label>{t('Arrays')}</Label>
           <Segmented
-            label="Arrays"
+            label={t('Arrays')}
             value={arrays}
             onChange={setArrays}
             options={[
-              { value: 'json', label: 'As JSON', title: 'Keep arrays as JSON text in one cell' },
-              { value: 'join', label: 'Join', title: 'Join arrays of plain values with “; ”' },
-              { value: 'index', label: 'Columns', title: 'One column per index: tags.0, tags.1…' },
+              { value: 'json', label: t('As JSON'), title: t('Keep arrays as JSON text in one cell') },
+              { value: 'join', label: t('Join'), title: t('Join arrays of plain values with “; ”') },
+              { value: 'index', label: t('Columns'), title: t('One column per index: tags.0, tags.1…') },
             ]}
           />
         </div>
         <div className="w-24">
-          <Label htmlFor="j2c-sep">Key separator</Label>
+          <Label htmlFor="j2c-sep">{t('Key separator')}</Label>
           <Input
             id="j2c-sep"
             value={separator}
@@ -75,17 +76,17 @@ export default function JsonToCsv() {
           />
         </div>
         <div className="w-36">
-          <Label htmlFor="j2c-delim">Output delimiter</Label>
+          <Label htmlFor="j2c-delim">{t('Output delimiter')}</Label>
           <Select id="j2c-delim" value={delimiter} onChange={(e) => setDelimiter(e.target.value)} className="h-8 py-1 text-[13px]">
             {DELIMITERS.map((d) => (
               <option key={d.label} value={d.value}>
-                {d.label}
+                {t(d.label)}
               </option>
             ))}
           </Select>
         </div>
         {ok?.rowsAreArrays && (
-          <Switch label="First inner array is the header" checked={firstRowHeader} onChange={setFirstRowHeader} className="h-8" />
+          <Switch label={t('First inner array is the header')} checked={firstRowHeader} onChange={setFirstRowHeader} className="h-8" />
         )}
       </ToolBar>
       {result && !result.ok && <ErrorMessage error={result.error} title={result.title} />}
@@ -98,11 +99,11 @@ export default function JsonToCsv() {
       )}
       <SplitPanes>
         <EditorPanel
-          title="JSON input"
+          title={t('JSON input')}
           value={input}
           onChange={setInput}
           language="json"
-          placeholder="Paste a JSON array of objects (or an object that contains one)…"
+          placeholder={t('Paste a JSON array of objects (or an object that contains one)…')}
           sample={SAMPLE_JSON}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(result && !result.ok)}
@@ -115,7 +116,7 @@ export default function JsonToCsv() {
             actions={<ViewToggle view={view} onChange={setView} disabled={!ok?.table.headers.length} />}
             downloadName={`data.${ext}`}
             downloadType={ext === 'tsv' ? 'text/tab-separated-values' : 'text/csv'}
-            placeholder="CSV appears here"
+            placeholder={t('CSV appears here')}
             height="480px"
             lineWrapping={false}
             footer={ok && output ? <Summary rows={ok.table.rows.length} cols={ok.table.headers.length} bytes={ok.bytes} /> : undefined}
@@ -130,14 +131,14 @@ export default function JsonToCsv() {
                   data={output}
                   filename={`data.${ext}`}
                   type={ext === 'tsv' ? 'text/tab-separated-values' : 'text/csv'}
-                  label="Save"
+                  label={t('Save')}
                   variant="ghost"
                 />
                 <CopyButton value={output} iconOnly />
               </div>
             </header>
             <div className="h-[480px] p-2">
-              <CsvGrid table={ok.table} view={viewIndex} label="CSV preview" selected={selected} onSelect={setSelected} height={464} />
+              <CsvGrid table={ok.table} view={viewIndex} label={t('CSV preview')} selected={selected} onSelect={setSelected} height={464} />
             </div>
             <footer className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-1.5 text-[12.5px] text-fg-muted">
               <Summary rows={ok.table.rows.length} cols={ok.table.headers.length} bytes={ok.bytes} />
@@ -153,7 +154,7 @@ function Summary({ rows, cols, bytes }: { rows: number; cols: number; bytes: num
   return (
     <>
       <span>
-        {pluralize(rows, 'row')} × {pluralize(cols, 'column')}
+        {pluralize(rows, t('row'), t('rows'))} × {pluralize(cols, t('column'), t('columns'))}
       </span>
       <span>{formatBytes(bytes)}</span>
     </>
@@ -164,13 +165,13 @@ function ViewToggle({ view, onChange, disabled }: { view: 'text' | 'table'; onCh
   if (disabled) return null;
   return (
     <Segmented
-      label="Output view"
+      label={t('Output view')}
       size="sm"
       value={view}
       onChange={onChange}
       options={[
-        { value: 'text', label: 'Text' },
-        { value: 'table', label: 'Table' },
+        { value: 'text', label: t('Text') },
+        { value: 'table', label: t('Table') },
       ]}
     />
   );
