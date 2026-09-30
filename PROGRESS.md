@@ -19,12 +19,14 @@ Committed since 14:11 (all verified: tsc, eslint, vitest, audit crawler with --a
     remote-image blocking in Markdown previews (0fb441a); WCAG AA tokens + check:contrast (e9ec5eb, 5b2d70a);
     palette quick actions (4a4db6d); EditorPanel extensions/onReady, CodePanel removed (a1b9041);
     catalog generator npm run docs:tools (93e8005); docs ARCHITECTURE/TESTING
-Background agents (resumed 19:14 via SendMessage; they own these files, do NOT start duplicates):
-  - audit-web: src/tools/web/**, src/tools/color/**, e2e/audit-web.spec.ts (launched 19:40)
-  - audit-workspaces-a: src/tools/notes/**, diagrams/**, snippets/**, e2e/audit-workspaces-a.spec.ts (launched 20:35)
-Done since resume: security tools (5530ea1), PDF audit 23 fixes (74d0d74), useAsyncJob cancel fix (0f85d60), Bates padding (6dcd370).
-  - audit-image: src/tools/image/**, src/tools/qr/**, e2e/audit-image.spec.ts
-  - audit-text: src/tools/text/**, regex/**, encoding/**, e2e/audit-text.spec.ts
+Background agents (they own these files; do NOT start duplicates; resume with SendMessage):
+  - audit-web: src/tools/web/**, color/**, e2e/audit-web.spec.ts
+  - audit-workspaces-a: src/tools/notes/**, diagrams/**, snippets/**, e2e/audit-workspaces-a.spec.ts
+  - audit-workspaces-b: src/tools/sqlite/**, filesearch/**, api/**, companion/**, e2e/audit-workspaces-b.spec.ts
+  - audit-utilities: src/tools/math/**, network/**, generators/**, files/**, e2e/audit-utilities.spec.ts
+Done in session 4 (Sep 30 morning): text/encoding audit (8b81f11), image/QR audit 27 fixes (f9d3231),
+Trojan-source guard check:invisible (31306d3), shared error/large-output/ToolBar fixes (e3149eb).
+Still to launch: audit data+json (data.ts, json.ts) and security+git+datetime (security.ts, git.ts, datetime.ts).
 Held uncommitted by the lead until security is verified: docs/PRIVACY.md, docs/BROWSER_SUPPORT.md, docs/TOOLS.md.
 Briefs: scratchpad agent-brief.md (builders), audit-brief.md (auditors).
 
