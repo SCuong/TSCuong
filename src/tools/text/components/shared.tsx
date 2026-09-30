@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useDeferredValue, useMemo, useState, type ReactNode } from 'react';
 import { Label } from '@/components/ui/Field';
 import { FlaskConical } from 'lucide-react';
 import { Button, IconButton } from '@/components/ui/Button';
 import { cn, formatNumber, pluralize } from '@/lib/utils';
-import { codePointLabel, countLines, visibleChar, whitespaceName } from '../lib/common';
+import { codePointLabel, countCodePoints, countLines, visibleChar, whitespaceName } from '../lib/common';
 import type { FrequencyRow } from '../lib/frequency';
 
 /** Standard file types for "Open file" on text inputs. */
@@ -19,13 +19,15 @@ export function Opt({ label, children, className }: { label: ReactNode; children
   );
 }
 
-/** "12 lines · 340 characters" footer for editor panels. */
+/** "12 lines · 340 characters" footer for editor panels (counted without blocking typing in huge texts). */
 export function TextFooter({ text, extra }: { text: string; extra?: ReactNode }) {
+  const deferred = useDeferredValue(text);
+  const counts = useMemo(() => ({ lines: countLines(deferred), chars: countCodePoints(deferred) }), [deferred]);
   if (!text) return null;
   return (
     <>
-      <span>{pluralize(countLines(text), 'line')}</span>
-      <span>{pluralize(Array.from(text).length, 'character')}</span>
+      <span>{pluralize(counts.lines, 'line')}</span>
+      <span>{pluralize(counts.chars, 'character')}</span>
       {extra}
     </>
   );
@@ -87,6 +89,7 @@ export function HighlightedText({
   return (
     <div className={cn('rounded-lg border border-line bg-surface-sunken', className)}>
       <pre
+        role="region"
         aria-label={ariaLabel}
         tabIndex={0}
         className="overflow-auto px-3 py-2 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap text-fg"

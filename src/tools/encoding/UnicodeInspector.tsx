@@ -1,17 +1,20 @@
 import { Fragment, useDeferredValue, useMemo } from 'react';
 import { Eraser, ScanSearch } from 'lucide-react';
 import { EditorPanel, ToolStack } from '@/components/tool/EditorPanel';
-import { Alert } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/Feedback';
+import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { Badge, Panel, Stat } from '@/components/ui/Panel';
 import { toast } from '@/components/ui/Toast';
 import { useToolState } from '@/lib/hooks';
 import { cn, formatNumber, pluralize } from '@/lib/utils';
 import { inspectText, stripInvisible, summarize, type CodePointInfo, type Flag } from './lib/inspect';
+import { countCodePoints } from '../text/lib/common';
 import { TEXT_FILE_ACCEPT } from '../text/components/shared';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'unicode-inspector';
+const EMPTY_SUMMARY = summarize('');
 const MAX_ROWS = 2000;
 const hex = (n: number, w = 2) => n.toString(16).toUpperCase().padStart(w, '0');
 
@@ -49,7 +52,8 @@ function glyph(cp: CodePointInfo): string {
 export default function UnicodeInspector() {
   const [input, setInput] = useToolState(ID, 'input', '');
   const deferred = useDeferredValue(input);
-  const summary = useMemo(() => summarize(deferred), [deferred]);
+  const task = useTask('summarize', summarize, [deferred], { size: deferred.length });
+  const summary = task.value ?? EMPTY_SUMMARY;
   const table = useMemo(() => inspectText(deferred, MAX_ROWS), [deferred]);
 
   const warnings: string[] = [];
@@ -61,7 +65,7 @@ export default function UnicodeInspector() {
 
   function strip() {
     const cleaned = stripInvisible(input);
-    const removed = Array.from(input).length - Array.from(cleaned).length;
+    const removed = countCodePoints(input) - countCodePoints(cleaned);
     setInput(cleaned);
     toast(`Removed ${pluralize(removed, 'character')}.`);
   }
@@ -77,9 +81,11 @@ export default function UnicodeInspector() {
         fileAccept={TEXT_FILE_ACCEPT}
         height="140px"
       />
-      {input && (
+      <ErrorMessage error={task.error} title="Could not inspect this text" />
+      {input && !task.value && task.pending && <Spinner label="Inspecting…" />}
+      {input && task.value && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6" aria-busy={task.pending || undefined}>
             <Stat label="Graphemes" value={formatNumber(summary.graphemes, 0)} />
             <Stat label="Code points" value={formatNumber(summary.codePoints, 0)} />
             <Stat label="UTF-16 units" value={formatNumber(summary.utf16, 0)} />
@@ -96,7 +102,7 @@ export default function UnicodeInspector() {
                 {!summary.isNFC && <li>Not in NFC normal form (some characters are decomposed).</li>}
               </ul>
               {summary.invisible + summary.bidi + summary.control > 0 && (
-                <Button size="sm" icon={Eraser} onClick={strip} className="mt-2.5">
+                <Button size="sm" icon={Eraser} onClick={strip} className="mt-2.5" disabled={task.pending}>
                   Strip invisible characters
                 </Button>
               )}
@@ -118,7 +124,7 @@ export default function UnicodeInspector() {
             Every character’s code point, UTF-8 bytes, UTF-16 units and category appear here.
           </EmptyState>
         ) : (
-          <div className="max-h-[560px] overflow-auto">
+          <div className="max-h-[560px] overflow-auto" tabIndex={0} role="region" aria-label="Characters table">
             <table className="w-full min-w-[760px] text-[13px]">
               <thead className="sticky top-0 z-10 bg-surface">
                 <tr className="border-b border-line text-left text-[12px] text-fg-muted">

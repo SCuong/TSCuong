@@ -5,7 +5,7 @@ import type { Change } from 'diff';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Switch } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
-import { ErrorMessage } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
@@ -14,9 +14,11 @@ import { useDebouncedValue, useMediaQuery, useToolState } from '@/lib/hooks';
 import { cn, downloadBlob, formatNumber } from '@/lib/utils';
 import { collapseRows, inlineLineDiff, type DiffMode, type DiffResult, type DiffRow, type DisplayRow, type InlinePart } from './lib/diff';
 import type { DiffWorkerRequest } from './lib/diff.worker';
+import { detectEol } from './lib/common';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
 
 const ID = 'text-diff';
+const EOL_NAMES = { '\n': 'LF', '\r\n': 'CRLF', '\r': 'CR' } as const;
 const SAMPLE_A = `The quick brown fox
 jumps over the lazy dog.
 Lorem ipsum dolor sit amet,
@@ -90,6 +92,8 @@ function useDiffWorker() {
       if (cancelPrevious && pending.current.size > 0) {
         worker.current?.terminate();
         worker.current = null;
+        // Settle the abandoned requests so nothing waits forever.
+        for (const [id, cb] of pending.current) cb({ id, type: 'error', error: 'Cancelled by a newer comparison.' });
         pending.current.clear();
       }
       const id = ++seq.current;
@@ -115,7 +119,10 @@ export default function TextDiff() {
   const [state, setState] = useState<DiffState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [patching, setPatching] = useState(false);
   const request = useDiffWorker();
+  // Patches get their own worker: a new comparison must not cancel a download in progress.
+  const requestPatch = useDiffWorker();
   const wide = useMediaQuery('(min-width: 768px)');
 
   const big = a.length + b.length > 200_000;
@@ -148,9 +155,15 @@ export default function TextDiff() {
   }, [debouncedA, debouncedB, mode, ignoreWhitespace, ignoreCase, request]);
 
   async function downloadPatch() {
-    const msg = await request({ type: 'patch', a, b, oldName: 'original.txt', newName: 'changed.txt' }, false);
-    if (msg.type === 'patch') downloadBlob(msg.patch, 'changes.patch', 'text/x-diff;charset=utf-8');
-    else toast('Could not create the patch.', 'error');
+    if (patching) return;
+    setPatching(true);
+    try {
+      const msg = await requestPatch({ type: 'patch', a, b, oldName: 'original.txt', newName: 'changed.txt' }, true);
+      if (msg.type === 'patch') downloadBlob(msg.patch, 'changes.patch', 'text/x-diff;charset=utf-8');
+      else toast('Could not create the patch.', 'error');
+    } finally {
+      setPatching(false);
+    }
   }
 
   function swap() {
@@ -161,6 +174,12 @@ export default function TextDiff() {
   const stats = state?.result.ok ? state.result.stats : null;
   const identical = stats && stats.added === 0 && stats.removed === 0;
   const effectiveView: View = wide ? view : 'unified';
+  const eolMismatch = useMemo(() => {
+    if (mode !== 'line' || ignoreWhitespace) return null;
+    const left = /[\r\n]/.test(debouncedA) ? detectEol(debouncedA) : null;
+    const right = /[\r\n]/.test(debouncedB) ? detectEol(debouncedB) : null;
+    return left && right && left !== right ? { left: EOL_NAMES[left], right: EOL_NAMES[right] } : null;
+  }, [mode, ignoreWhitespace, debouncedA, debouncedB]);
 
   return (
     <ToolStack>
@@ -197,7 +216,13 @@ export default function TextDiff() {
           <Button icon={ArrowLeftRight} onClick={swap} disabled={!a && !b}>
             Swap
           </Button>
-          <Button icon={Download} onClick={() => void downloadPatch()} disabled={!a && !b} title="Unified diff of the exact line changes">
+          <Button
+            icon={Download}
+            onClick={() => void downloadPatch()}
+            disabled={!a && !b}
+            loading={patching}
+            title="Unified diff of the exact line changes"
+          >
             .patch
           </Button>
         </div>
@@ -229,6 +254,12 @@ export default function TextDiff() {
       </SplitPanes>
 
       <ErrorMessage error={error} title="Could not compare" />
+      {eolMismatch && (
+        <Alert tone="info" title="Different line endings">
+          The original uses {eolMismatch.left} and the changed text uses {eolMismatch.right} line breaks, so lines that look the same
+          are reported as changed. Turn on Ignore whitespace to compare only the content.
+        </Alert>
+      )}
 
       <Panel
         title="Differences"
@@ -306,9 +337,13 @@ function LineNo({ n }: { n?: number }) {
 
 function Marker({ kind }: { kind: 'ctx' | 'del' | 'add' }) {
   return (
-    <span className={cn('w-4 shrink-0 select-none', kind === 'del' ? 'text-danger' : kind === 'add' ? 'text-success' : 'text-fg-muted')} aria-hidden>
-      {kind === 'del' ? '−' : kind === 'add' ? '+' : ' '}
-    </span>
+    <>
+      <span className={cn('w-4 shrink-0 select-none', kind === 'del' ? 'text-danger' : kind === 'add' ? 'text-success' : 'text-fg-muted')} aria-hidden>
+        {kind === 'del' ? '−' : kind === 'add' ? '+' : ' '}
+      </span>
+      {/* Colour and the +/− marker are visual only; screen readers hear what happened to the line. */}
+      {kind !== 'ctx' && <span className="sr-only">{kind === 'del' ? 'Removed: ' : 'Added: '}</span>}
+    </>
   );
 }
 
@@ -428,14 +463,19 @@ function LineDiffView({ rows, view, collapse, ignoreCase }: { rows: DiffRow[]; v
   }
 
   return (
-    <div ref={scrollRef} className="max-h-[640px] overflow-auto rounded-b-xl font-mono text-[12.5px] leading-[1.6] text-fg" role="table" aria-label="Line differences">
+    <div
+      ref={scrollRef}
+      className="max-h-[640px] overflow-auto rounded-b-xl font-mono text-[12.5px] leading-[1.6] text-fg"
+      role="region"
+      aria-label="Line differences"
+      tabIndex={0}
+    >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualizer.getVirtualItems().map((item) => (
           <div
             key={item.key}
             data-index={item.index}
             ref={virtualizer.measureElement}
-            role="row"
             className="absolute inset-x-0 top-0"
             style={{ transform: `translateY(${item.start}px)` }}
           >
@@ -496,15 +536,15 @@ function InlineDiffView({ changes, view }: { changes: Change[]; view: View }) {
     <div>
       {view === 'split' ? (
         <div className="grid grid-cols-2 divide-x divide-line">
-          <div className={box} aria-label="Original with removals highlighted">
+          <div className={box} role="region" tabIndex={0} aria-label="Original with removals highlighted">
             {left}
           </div>
-          <div className={box} aria-label="Changed with additions highlighted">
+          <div className={box} role="region" tabIndex={0} aria-label="Changed with additions highlighted">
             {right}
           </div>
         </div>
       ) : (
-        <div className={box} aria-label="Differences inline">
+        <div className={box} role="region" tabIndex={0} aria-label="Differences inline">
           {unified}
         </div>
       )}

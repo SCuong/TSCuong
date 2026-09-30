@@ -1,12 +1,15 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Segmented } from '@/components/ui/Segmented';
-import { Alert } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
+import { DownloadButton } from '@/components/ui/Actions';
 import { useToolState } from '@/lib/hooks';
 import { pluralize } from '@/lib/utils';
-import { binaryToText, textToBinary, type BinaryEncodeOptions } from './lib/hexBinary';
+import { binaryConvert, type BinaryEncodeOptions } from './lib/hexBinary';
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'binary-text';
 const SAMPLE_TEXT = 'Hi! é';
@@ -18,12 +21,8 @@ export default function BinaryText() {
   const [separator, setSeparator] = useToolState<BinaryEncodeOptions['separator']>(ID, 'separator', 'space');
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => {
-    if (!deferred) return null;
-    if (direction === 'encode') return { ok: true as const, text: textToBinary(deferred, { separator }), bytes: new TextEncoder().encode(deferred).length };
-    const r = binaryToText(deferred);
-    return r.ok ? { ok: true as const, text: r.text, bytes: r.bytes.length } : r;
-  }, [deferred, direction, separator]);
+  const task = useTask('binaryConvert', binaryConvert, deferred ? [deferred, direction, { separator }] : null, { size: deferred.length });
+  const result = task.value;
   const output = result?.ok ? result.text : '';
 
   function swap() {
@@ -34,7 +33,7 @@ export default function BinaryText() {
   return (
     <ToolStack>
       <ToolBar>
-        <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output)} labels={{ encode: 'Text → Binary', decode: 'Binary → Text' }} />
+        <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !task.pending} labels={{ encode: 'Text → Binary', decode: 'Binary → Text' }} />
         {direction === 'encode' ? (
           <Opt label="Separate bytes with">
             <Segmented
@@ -52,9 +51,15 @@ export default function BinaryText() {
           <p className="pb-2 text-[12.5px] text-fg-muted">Reads 8-bit groups (spaces optional) and decodes the bytes as UTF-8, so accented letters and emoji work.</p>
         )}
       </ToolBar>
+      <ErrorMessage error={task.error} title="Could not convert this text" />
       {result && !result.ok && (
-        <Alert tone="danger" title="Cannot decode">
+        <Alert
+          tone="danger"
+          title={result.bytes ? 'Not valid UTF-8 text' : 'Cannot decode'}
+          action={result.bytes ? <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="bytes.bin" label="Download bytes" /> : undefined}
+        >
           {result.error}
+          {result.lossy !== undefined && <span className="mt-1 block text-fg-secondary">With replacement characters: {result.lossy.slice(0, 200)}</span>}
         </Alert>
       )}
       <SplitPanes>
@@ -69,12 +74,13 @@ export default function BinaryText() {
           height="320px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title={direction === 'encode' ? 'Binary (UTF-8 bytes)' : 'Text'}
           value={output}
           placeholder="Result appears here"
           downloadName={direction === 'encode' ? 'binary.txt' : 'decoded.txt'}
           height="320px"
+          busy={task.pending}
           footer={result?.ok ? <span>{pluralize(result.bytes, 'byte')}</span> : undefined}
         />
       </SplitPanes>

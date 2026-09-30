@@ -1,28 +1,37 @@
 /* URL and e-mail extraction. */
 
-const URL_RE = /\b(?:(?:https?|ftp):\/\/|www\.)[^\s<>"'`{}|\\^\u00a0\u3000]+/giu;
+// A link ends at whitespace, quotes and angle brackets, and at CJK / full-width punctuation
+// (、。〈〉《》「」『』【】！（），：；？), which is never part of a URL written in running text.
+const URL_RE =
+  /\b(?:(?:https?|ftp):\/\/|www\.)[^\s<>"'`{}|\\^\u00a0\u3000\u3001\u3002\u3008-\u3011\uff01\uff08\uff09\uff0c\uff1a\uff1b\uff1f]+/giu;
+
+/** Sentence punctuation that is almost never the last character of a real URL. */
+const TRAILING_PUNCTUATION = new Set([...'.,;:!?*\'"’”»…']);
+const CLOSERS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
 
 /** Trim trailing punctuation that is almost always sentence punctuation, keeping balanced brackets. */
 export function trimUrl(url: string): string {
-  let u = url;
-  for (;;) {
-    const last = u.slice(-1);
-    if (/[.,;:!?*'"’”»]/.test(last)) {
-      u = u.slice(0, -1);
+  const counts: Record<string, number> = { '(': 0, ')': 0, '[': 0, ']': 0, '{': 0, '}': 0 };
+  for (let i = 0; i < url.length; i++) {
+    const ch = url[i];
+    if (ch in counts) counts[ch]++;
+  }
+  let end = url.length;
+  while (end > 0) {
+    const last = url[end - 1];
+    if (TRAILING_PUNCTUATION.has(last)) {
+      end--;
       continue;
     }
-    const pairs: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
-    if (pairs[last]) {
-      const open = pairs[last];
-      const opens = u.split(open).length - 1;
-      const closes = u.split(last).length - 1;
-      if (closes > opens) {
-        u = u.slice(0, -1);
-        continue;
-      }
+    const open = CLOSERS[last];
+    if (open && counts[last] > counts[open]) {
+      counts[last]--;
+      end--;
+      continue;
     }
-    return u;
+    break;
   }
+  return url.slice(0, end);
 }
 
 export interface UrlExtractOptions {
@@ -76,7 +85,10 @@ export function extractUrls(text: string, opts: Partial<UrlExtractOptions> = {})
       return true;
     });
   }
-  if (o.sort) urls = urls.slice().sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
+  if (o.sort) {
+    const compare = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }).compare;
+    urls = urls.slice().sort(compare);
+  }
   return urls;
 }
 
@@ -91,8 +103,15 @@ export function urlHost(url: string): string {
 /* ------------------------------------------------------------------------ */
 
 // Practical address syntax: the rarely used local-part symbols (!#$/=?...) are excluded so that
-// "?email=john@example.com" in a URL yields "john@example.com".
-const EMAIL_RE = /(?<![\p{L}\p{N}._%+-])[\p{L}\p{N}_%+-]+(?:\.[\p{L}\p{N}_%+-]+)*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}]{2,63}(?![\p{L}\p{N}-])/gu;
+// "?email=john@example.com" in a URL yields "john@example.com". Letters may carry combining
+// accents (a decomposed "é"), a quoted local part ("john doe"@example.com) is accepted, and the
+// top-level domain is letters or an internationalized one in Punycode (xn--p1ai).
+const EMAIL_RE = new RegExp(
+  String.raw`(?:"(?:[^"\\\r\n]|\\.){1,64}"|(?<![\p{L}\p{N}\p{M}._%+-])[\p{L}\p{N}\p{M}_%+-]+(?:\.[\p{L}\p{N}\p{M}_%+-]+)*)` +
+    String.raw`@(?:[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?\.)+` +
+    String.raw`(?:\p{L}[\p{L}\p{M}]{1,62}|[xX][nN]--[a-zA-Z0-9-]{1,59})(?![\p{L}\p{N}\p{M}-])`,
+  'gu',
+);
 
 export interface EmailExtractOptions {
   dedupe: boolean;
@@ -103,12 +122,16 @@ export interface EmailExtractOptions {
 export const DEFAULT_EMAIL_OPTIONS: EmailExtractOptions = { dedupe: true, lowercase: true, sort: false };
 
 export function findEmails(text: string): string[] {
-  return Array.from(text.matchAll(EMAIL_RE), (m) => m[0]);
+  return Array.from(text.matchAll(EMAIL_RE), (m) => m[0].normalize('NFC'));
 }
 
 export function extractEmails(text: string, opts: Partial<EmailExtractOptions> = {}): string[] {
+  return processEmails(findEmails(text), opts);
+}
+
+function processEmails(found: string[], opts: Partial<EmailExtractOptions>): string[] {
   const o = { ...DEFAULT_EMAIL_OPTIONS, ...opts };
-  let emails = findEmails(text).map((e) => {
+  let emails = found.map((e) => {
     if (o.lowercase) return e.toLowerCase();
     // Domains are case-insensitive: normalize them even when keeping the local part.
     const at = e.lastIndexOf('@');
@@ -123,7 +146,7 @@ export function extractEmails(text: string, opts: Partial<EmailExtractOptions> =
       return true;
     });
   }
-  if (o.sort) emails = emails.slice().sort((a, b) => a.localeCompare(b));
+  if (o.sort) emails = emails.slice().sort(new Intl.Collator().compare);
   return emails;
 }
 
@@ -135,7 +158,24 @@ export function groupByDomain(emails: string[]): Array<{ domain: string; emails:
     if (list) list.push(e);
     else groups.set(domain, [e]);
   }
+  const compare = new Intl.Collator().compare;
   return Array.from(groups, ([domain, list]) => ({ domain, emails: list })).sort(
-    (a, b) => b.emails.length - a.emails.length || a.domain.localeCompare(b.domain),
+    (a, b) => b.emails.length - a.emails.length || compare(a.domain, b.domain),
   );
+}
+
+export interface EmailReport {
+  emails: string[];
+  groups: Array<{ domain: string; emails: string[] }>;
+  /** Addresses found before de-duplication and the domain filter. */
+  found: number;
+}
+
+/** Everything the E-mail Extractor shows, in one pass (runs in a worker for large texts). */
+export function emailReport(text: string, opts: Partial<EmailExtractOptions>, domainFilter: string): EmailReport {
+  const found = findEmails(text);
+  const all = processEmails(found, opts);
+  const filter = domainFilter.trim().toLowerCase().replace(/^@/, '');
+  const emails = filter ? all.filter((e) => e.slice(e.lastIndexOf('@') + 1).toLowerCase().includes(filter)) : all;
+  return { emails, groups: groupByDomain(emails), found: found.length };
 }

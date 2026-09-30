@@ -39,10 +39,10 @@ export default function RemoveDuplicateLines() {
           />
         </Opt>
         <Opt label="Whitespace">
-          <Select value={whitespace} onChange={(e) => setWhitespace(e.target.value as DedupeOptions['whitespace'])} aria-label="Whitespace comparison" className="w-60">
+          <Select value={whitespace} onChange={(e) => setWhitespace(e.target.value as DedupeOptions['whitespace'])} aria-label="Whitespace comparison" className="w-72">
             <option value="none">Compare exactly</option>
             <option value="trim">Ignore leading/trailing spaces</option>
-            <option value="all">Ignore all spacing differences</option>
+            <option value="all">Ignore extra spaces (trim and collapse)</option>
           </Select>
         </Opt>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">

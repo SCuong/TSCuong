@@ -63,7 +63,7 @@ describe('compileRegex', () => {
   it('compiles valid patterns and reports invalid ones', () => {
     const ok = compileRegex('a+', 'gi');
     expect(ok.ok && ok.regex.flags).toBe('gi');
-    expect(compileRegex('(', '')).toEqual({ ok: false, error: expect.any(String) });
+    expect(compileRegex('(', '')).toEqual({ ok: false, error: expect.any(String), engine: expect.any(String) });
   });
 });
 
@@ -71,6 +71,7 @@ describe('flags', () => {
   it('normalizes order and duplicates', () => {
     expect(normalizeFlags('yigxg')).toBe('giy');
     expect(normalizeFlags('')).toBe('');
+    expect(normalizeFlags('gd')).toBe('dg');
   });
 
   it('toggles flags and keeps u and v exclusive', () => {
@@ -164,5 +165,28 @@ describe('RegexRunner', () => {
     void runner.run(job, 10_000);
     expect(await first).toEqual({ status: 'superseded' });
     runner.dispose();
+  });
+});
+
+describe('FLAGS', () => {
+  it('offers every flag JavaScript has, in the order RegExp#flags prints them', async () => {
+    const { FLAGS } = await import('./flags');
+    expect(FLAGS.map((f) => f.flag).join('')).toBe('dgimsuvy'.split('').filter((f) => FLAGS.some((x) => x.flag === f)).join(''));
+    expect(FLAGS.map((f) => f.flag)).toEqual(['d', 'g', 'i', 'm', 's', 'u', 'v', 'y']);
+    expect(String(new RegExp('a', FLAGS.map((f) => f.flag).filter((f) => f !== 'v').join('')))).toBe('/a/dgimsuy');
+  });
+});
+
+describe('compileRegex engine message', () => {
+  it('keeps the browser wording next to the explanation', () => {
+    const r = compileRegex('(a', '');
+    expect(r).toMatchObject({ ok: false, engine: 'Unterminated group' });
+  });
+
+  it('explains a control escape without a letter in u mode', () => {
+    const r = compileRegex(String.raw`a\c`, 'u');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/must be followed by a letter/);
+    expect(compileRegex(String.raw`\u{110000}`, 'u')).toMatchObject({ ok: false, error: expect.stringMatching(/Unicode escape is not valid/) });
   });
 });

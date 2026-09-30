@@ -15,7 +15,7 @@ const SAMPLE = 'banana\nApple\ncherry\nitem 10\nitem 2\nitem 1\napple\nDate\n\ne
 const MODES: Array<{ value: SortMode; label: string; title: string }> = [
   { value: 'natural', label: 'Natural', title: 'Alphabetical, with numbers compared by value (item 2 before item 10)' },
   { value: 'alpha', label: 'Alphabetical', title: 'Dictionary order for your language' },
-  { value: 'codepoint', label: 'Code point', title: 'Raw Unicode order (ASCII order), like most programming languages' },
+  { value: 'codepoint', label: 'Code point', title: 'Raw Unicode code point order (ASCII order for plain English), independent of language' },
   { value: 'length', label: 'Length', title: 'By number of characters' },
   { value: 'reverse', label: 'Reverse', title: 'Reverse the current line order' },
   { value: 'shuffle', label: 'Shuffle', title: 'Random order using the Web Crypto API' },

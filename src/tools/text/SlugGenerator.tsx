@@ -6,10 +6,15 @@ import { Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { pluralize } from '@/lib/utils';
-import { slugify, slugifyLines } from './lib/slug';
+import { makeSlugs } from './lib/slug';
+import { countCodePoints } from './lib/common';
 import { Opt, TEXT_FILE_ACCEPT } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { useTask } from './components/useTask';
 
 const ID = 'slug-generator';
+/** A slug is short; a huge pasted text only shows its beginning (Copy has all of it). */
+const MAX_SHOWN = 5_000;
 const SAMPLE_SINGLE = 'Crème Brûlée: 10 Easy Recipes & Tips for Beginners!';
 const SAMPLE_BULK = 'Hello World!\nCrème Brûlée à la carte\nStraße & Øresund Bridge\nПривет, мир\n10 Tips for Writing Clean Code (2025 Edition)';
 
@@ -37,8 +42,9 @@ export default function SlugGenerator() {
     }),
     [separator, lowercase, maxLength, translit, keepUnicode, umlauts, symbols],
   );
-  const output = useMemo(() => (bulk ? slugifyLines(deferred, opts) : slugify(deferred, opts)), [bulk, deferred, opts]);
-  const count = bulk ? output.split('\n').filter(Boolean).length : 0;
+  const task = useTask('makeSlugs', makeSlugs, [deferred, bulk, opts], { size: deferred.length });
+  const output = task.value ?? '';
+  const count = useMemo(() => (bulk ? output.split('\n').filter(Boolean).length : 0), [bulk, output]);
 
   return (
     <ToolStack>
@@ -80,12 +86,13 @@ export default function SlugGenerator() {
             fileAccept={TEXT_FILE_ACCEPT}
             height="360px"
           />
-          <EditorPanel
+          <OutputPanel
             title="Slugs"
             value={output}
             placeholder="Slugs appear here"
             downloadName="slugs.txt"
             height="360px"
+            busy={task.pending}
             footer={output ? <span>{pluralize(count, 'slug')}</span> : undefined}
           />
         </SplitPanes>
@@ -102,13 +109,21 @@ export default function SlugGenerator() {
           <Panel
             title="Slug"
             actions={<CopyButton value={output} />}
-            description={output ? `${pluralize(Array.from(output).length, 'character')}` : undefined}
+            description={output ? `${pluralize(countCodePoints(output), 'character')}` : undefined}
           >
             {output ? (
-              <p className="font-mono text-[15px] break-all text-fg">{output}</p>
+              <p className="font-mono text-[15px] break-all text-fg">
+                {output.length > MAX_SHOWN ? `${output.slice(0, MAX_SHOWN)}…` : output}
+              </p>
             ) : (
               <p className="text-[13px] text-fg-muted">
-                {input.trim() ? 'The text has no letters or digits that can be used in a slug.' : 'Your slug appears here as you type.'}
+                {!deferred.trim()
+                  ? 'Your slug appears here as you type.'
+                  : task.pending
+                    ? 'Generating…'
+                    : !keepUnicode && /\p{L}/u.test(deferred)
+                    ? 'None of these letters has a Latin spelling. Turn on “Keep non-Latin letters” to keep them in the slug.'
+                    : 'The text has no letters or digits that can be used in a slug.'}
               </p>
             )}
           </Panel>

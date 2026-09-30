@@ -1,10 +1,12 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { reverseText, type ReverseMode } from './lib/reverse';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { useTask } from './components/useTask';
 
 const ID = 'reverse-text';
 const SAMPLE = 'Hello, world! 👋🏽\nFamily: 👨‍👩‍👧 Flag: 🇻🇳 Café\nThe quick brown fox';
@@ -15,7 +17,8 @@ export default function ReverseText() {
   const [perLine, setPerLine] = useToolState(ID, 'perLine', true);
 
   const deferred = useDeferredValue(input);
-  const output = useMemo(() => reverseText(deferred, { mode, perLine }), [deferred, mode, perLine]);
+  const task = useTask('reverseText', reverseText, [deferred, { mode, perLine }], { size: deferred.length });
+  const output = task.value ?? '';
 
   return (
     <ToolStack>
@@ -48,12 +51,13 @@ export default function ReverseText() {
           height="360px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title="Reversed"
           value={output}
           placeholder="Reversed text appears here"
           downloadName="reversed.txt"
           height="360px"
+          busy={task.pending}
           footer={input ? <span>Emoji, flags and accented letters stay intact.</span> : undefined}
         />
       </SplitPanes>

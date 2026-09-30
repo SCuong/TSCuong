@@ -279,7 +279,14 @@ export default function RegexTester() {
 
       {compiled && !compiled.ok && (
         <div id="regex-error">
-          <ErrorMessage error={compiled.error} title="Invalid pattern" />
+          <Alert tone="danger" title="Invalid pattern">
+            {compiled.error}
+            {compiled.engine && !compiled.error.startsWith(compiled.engine.charAt(0).toUpperCase() + compiled.engine.slice(1)) && (
+              <span className="mt-1 block text-[12.5px]">
+                Your browser says: <span className="font-mono">{compiled.engine}</span>
+              </span>
+            )}
+          </Alert>
         </div>
       )}
       <ErrorMessage error={runError} title="Matching failed" />

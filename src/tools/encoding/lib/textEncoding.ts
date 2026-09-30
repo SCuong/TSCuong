@@ -1,4 +1,5 @@
 /** Decoding text files in legacy encodings with the WHATWG Encoding API. */
+import { detectFileType } from './magic';
 
 export interface EncodingInfo {
   label: string;
@@ -12,6 +13,8 @@ export const ENCODINGS: EncodingInfo[] = [
   { label: 'utf-8', name: 'UTF-8', group: 'Unicode', singleByte: false },
   { label: 'utf-16le', name: 'UTF-16 LE', group: 'Unicode', singleByte: false },
   { label: 'utf-16be', name: 'UTF-16 BE', group: 'Unicode', singleByte: false },
+  { label: 'utf-32le', name: 'UTF-32 LE', group: 'Unicode', singleByte: false },
+  { label: 'utf-32be', name: 'UTF-32 BE', group: 'Unicode', singleByte: false },
   { label: 'windows-1252', name: 'Windows-1252 / ISO-8859-1 (Western)', group: 'Western', singleByte: true },
   { label: 'iso-8859-15', name: 'ISO-8859-15 (Latin-9)', group: 'Western', singleByte: true },
   { label: 'macintosh', name: 'Mac OS Roman', group: 'Western', singleByte: true },
@@ -59,13 +62,41 @@ export function detectBom(bytes: Uint8Array): { bom: Bom; length: number } | nul
   return null;
 }
 
+/** UTF-32 is not part of the WHATWG Encoding standard, so browsers cannot decode it; we can. */
+const UTF32 = new Set(['utf-32le', 'utf-32be']);
+
 export function isSupported(label: string): boolean {
+  if (UTF32.has(label)) return true;
   try {
     new TextDecoder(label);
     return true;
   } catch {
     return false;
   }
+}
+
+/** Decode UTF-32; invalid code points and a trailing partial unit become U+FFFD and make the result invalid. */
+export function decodeUtf32(bytes: Uint8Array, littleEndian: boolean, stripBom = true): { text: string; valid: boolean } {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const units = Math.floor(bytes.length / 4);
+  let valid = bytes.length % 4 === 0;
+  const parts: string[] = [];
+  let chunk: number[] = [];
+  for (let i = 0; i < units; i++) {
+    const cp = view.getUint32(i * 4, littleEndian);
+    if (i === 0 && stripBom && cp === 0xfeff) continue;
+    if (cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
+      valid = false;
+      chunk.push(0xfffd);
+    } else chunk.push(cp);
+    if (chunk.length >= 8192) {
+      parts.push(String.fromCodePoint(...chunk));
+      chunk = [];
+    }
+  }
+  if (bytes.length % 4) chunk.push(0xfffd);
+  parts.push(String.fromCodePoint(...chunk));
+  return { text: parts.join(''), valid };
 }
 
 export interface DecodeAttempt {
@@ -193,11 +224,15 @@ export function rankAttempts(attempts: DecodeAttempt[]): DecodeAttempt[] {
 export function decodeAs(bytes: Uint8Array, encoding: EncodingInfo, stripBom = true): DecodeAttempt {
   let valid = true;
   let text: string;
-  try {
-    text = new TextDecoder(encoding.label, { fatal: true, ignoreBOM: !stripBom }).decode(bytes);
-  } catch {
-    valid = false;
-    text = new TextDecoder(encoding.label, { ignoreBOM: !stripBom }).decode(bytes);
+  if (UTF32.has(encoding.label)) {
+    ({ text, valid } = decodeUtf32(bytes, encoding.label === 'utf-32le', stripBom));
+  } else {
+    try {
+      text = new TextDecoder(encoding.label, { fatal: true, ignoreBOM: !stripBom }).decode(bytes);
+    } catch {
+      valid = false;
+      text = new TextDecoder(encoding.label, { ignoreBOM: !stripBom }).decode(bytes);
+    }
   }
   let replacements = 0;
   for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0xfffd) replacements++;
@@ -221,22 +256,24 @@ export function tryAllEncodings(bytes: Uint8Array, sampleSize = 64 * 1024): Deco
 /** Best guess: BOM first, then valid UTF-8, then the most plausible valid decoding. */
 export function guessEncoding(bytes: Uint8Array, attempts: DecodeAttempt[]): string {
   const bom = detectBom(bytes);
-  if (bom && (bom.bom === 'utf-8' || bom.bom === 'utf-16le' || bom.bom === 'utf-16be')) return bom.bom;
-  // UTF-16 without BOM: many zero bytes in alternating positions (checked first: NUL bytes are valid UTF-8).
-  let evenZeros = 0;
-  let oddZeros = 0;
+  if (bom) return bom.bom;
+  // UTF-16/UTF-32 without BOM: zero bytes at regular positions (checked first: NUL bytes are valid UTF-8).
   const n = Math.min(bytes.length, 4096);
-  for (let i = 0; i < n; i++) {
-    if (bytes[i] === 0) {
-      if (i % 2 === 0) evenZeros++;
-      else oddZeros++;
-    }
+  const zerosAt = [0, 0, 0, 0];
+  for (let i = 0; i < n; i++) if (bytes[i] === 0) zerosAt[i % 4]++;
+  const quarter = n / 4;
+  if (n >= 16 && bytes.length % 4 === 0) {
+    // Mostly-ASCII UTF-32: three zero bytes in every four.
+    if (zerosAt[1] > quarter * 0.9 && zerosAt[2] > quarter * 0.9 && zerosAt[3] > quarter * 0.9 && zerosAt[0] < quarter * 0.1) return 'utf-32le';
+    if (zerosAt[0] > quarter * 0.9 && zerosAt[1] > quarter * 0.9 && zerosAt[2] > quarter * 0.9 && zerosAt[3] < quarter * 0.1) return 'utf-32be';
   }
+  const evenZeros = zerosAt[0] + zerosAt[2];
+  const oddZeros = zerosAt[1] + zerosAt[3];
   if (n > 8 && oddZeros > n / 4 && evenZeros < n / 50) return 'utf-16le';
   if (n > 8 && evenZeros > n / 4 && oddZeros < n / 50) return 'utf-16be';
   const utf8 = attempts.find((a) => a.encoding.label === 'utf-8');
   if (utf8?.valid) return 'utf-8';
-  const ranked = rankAttempts(attempts.filter((a) => a.encoding.label !== 'utf-16le' && a.encoding.label !== 'utf-16be'));
+  const ranked = rankAttempts(attempts.filter((a) => a.encoding.group !== 'Unicode'));
   return ranked[0]?.encoding.label ?? 'windows-1252';
 }
 
@@ -315,4 +352,20 @@ export function repairMojibake(text: string, wrongLabel: string, rightLabel: str
   } catch {
     return { ok: false, error: `The recovered bytes are not valid ${rightLabel}. Try another pair of encodings.` };
   }
+}
+
+/**
+ * A warning when the bytes look like binary data rather than text in any encoding: text files
+ * (single-byte or East Asian) almost never contain C0 control bytes other than tab, line breaks,
+ * form feed and ESC. UTF-16/32 files are expected to contain NUL bytes and are not flagged.
+ */
+export function binaryFileWarning(bytes: Uint8Array, guess: string): string | null {
+  if (bytes.length === 0 || detectBom(bytes) || guess.startsWith('utf-16') || guess.startsWith('utf-32')) return null;
+  const sample = bytes.subarray(0, 8192);
+  let controls = 0;
+  for (const b of sample) if (b < 0x09 || (b > 0x0d && b < 0x20 && b !== 0x1b)) controls++;
+  if (controls === 0 || controls / sample.length < 0.01) return null;
+  const type = detectFileType(bytes.subarray(0, 4100));
+  const what = type && !type.weak ? `binary data (${type.label})` : 'binary data';
+  return `This file looks like ${what}, not text. Converting it to UTF-8 would damage it.`;
 }

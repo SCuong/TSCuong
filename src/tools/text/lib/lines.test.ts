@@ -197,7 +197,10 @@ describe('filterLines', () => {
   it('reports invalid regex', () => {
     const r = filterLines(text, { action: 'keep', condition: 'regex', term: '(', caseSensitive: true, wholeWord: false });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/Invalid regular expression/);
+    if (!r.ok) {
+      expect(r.error).toMatch(/group is never closed/);
+      expect(r.error).not.toMatch(/\/\(\//);
+    }
   });
 
   it('filters empty lines', () => {

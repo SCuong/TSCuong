@@ -49,7 +49,7 @@ function escapeCodePoint(cp: number, next: string | undefined, o: UnicodeEscapeO
     case 'css': {
       // A space terminates the escape when the next character could be read as part of it.
       const needsSpace = next !== undefined && /[0-9a-fA-F\s]/.test(next);
-      return `\\${hex(cp, 0, up)}${needsSpace ? ' ' : ''}`;
+      return `\\${hex(cp, 2, up)}${needsSpace ? ' ' : ''}`;
     }
   }
 }
@@ -96,7 +96,9 @@ const UNESCAPE_RE = new RegExp(
     String.raw`&#[xX]([0-9a-fA-F]{1,6});`, // 5: &#xX;
     String.raw`&#([0-9]{1,7});`, // 6: &#N;
     String.raw`[Uu]\+([0-9a-fA-F]{4,6})(?![0-9a-fA-F])`, // 7: U+XXXX
-    String.raw`\\([0-9a-fA-F]{1,6}) ?`, // 8: CSS \XXXXXX (optional terminating space)
+    // 8: CSS \XX…XXXXXX with at least two hex digits (or the newline \A), optional terminating space. A single
+    // digit is left alone so that JavaScript escapes such as \b, \f and \0 are not misread as CSS.
+    String.raw`\\([0-9a-fA-F]{2,6}|[aA](?![0-9a-fA-F])) ?`,
   ].join('|'),
   'g',
 );
@@ -168,4 +170,15 @@ export function unescapeUnicode(text: string, opts: Partial<UnescapeOptions> = {
   );
   for (const w of surrogateWarning(out)) warnings.add(w);
   return { text: out, count, warnings: Array.from(warnings) };
+}
+
+export interface UnicodeEscapeSettings extends UnicodeEscapeOptions {
+  /** Unescape only: decode CSS escapes. */
+  css: boolean;
+}
+
+/** Escape (encode) or unescape (decode) in one call, so large texts can be processed in a worker. */
+export function convertUnicodeEscapes(text: string, direction: 'encode' | 'decode', settings: UnicodeEscapeSettings): UnescapeResult {
+  if (direction === 'encode') return { text: escapeUnicode(text, settings), count: 0, warnings: [] };
+  return unescapeUnicode(text, { css: settings.css });
 }

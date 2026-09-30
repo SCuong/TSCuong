@@ -35,10 +35,13 @@ describe('findAndReplace', () => {
     expect(interpretEscapes('\\t\\\\')).toBe('\t\\');
   });
 
-  it('reports invalid regex', () => {
+  it('reports invalid regex as a human sentence (no engine prefix)', () => {
     const r = findAndReplace('abc', '[a-', 'x', { regex: true });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/^Invalid regular expression/);
+    if (!r.ok) {
+      expect(r.error).toMatch(/character class is never closed/);
+      expect(r.error).not.toMatch(/\/\[a-\//);
+    }
   });
 
   it('falls back to non-unicode regex for legacy patterns', () => {
@@ -125,12 +128,25 @@ describe('textStats', () => {
     expect(s.charactersNoSpaces).toBe(43);
   });
 
-  it('distinguishes code points, graphemes, UTF-16 units and bytes', () => {
+  it('counts characters as graphemes and still reports code points, UTF-16 units and bytes', () => {
     const s = textStats('👩‍👩‍👧é');
-    expect(s.graphemes).toBe(2);
-    expect(s.characters).toBe(6);
+    expect(s.characters).toBe(2);
+    expect(s.codePoints).toBe(6);
     expect(s.utf16Units).toBe(9);
     expect(s.bytes).toBe(new TextEncoder().encode('👩‍👩‍👧é').length);
+  });
+
+  it('counts a decomposed accent and an emoji ZWJ sequence as one character each', () => {
+    const s = textStats('é 👨‍👩‍👧 x');
+    expect(s.characters).toBe(5);
+    expect(s.charactersNoSpaces).toBe(3);
+    expect(s.codePoints).toBe(10);
+  });
+
+  it('treats CRLF as one character and NBSP / ideographic space as spaces', () => {
+    const s = textStats('a\r\nb c　d');
+    expect(s.characters).toBe(7);
+    expect(s.charactersNoSpaces).toBe(4);
   });
 
   it('is all zero for empty text', () => {

@@ -10,6 +10,7 @@ import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { baseName, cn, downloadBlob, errorMessage, formatBytes, formatNumber } from '@/lib/utils';
 import {
+  binaryFileWarning,
   decodeAs,
   detectBom,
   encodeOutput,
@@ -88,6 +89,7 @@ function FileMode() {
   }
 
   const bom = useMemo(() => (file ? detectBom(file.bytes) : null), [file]);
+  const binaryWarning = useMemo(() => (file ? binaryFileWarning(file.bytes, file.guess) : null), [file]);
   const attempts = useMemo(() => file?.attempts ?? [], [file]);
   const decoded = useMemo(() => {
     if (!file) return null;
@@ -132,8 +134,29 @@ function FileMode() {
     );
   }
 
+  if (file.bytes.length === 0) {
+    return (
+      <Alert
+        tone="info"
+        title={`${file.name} is empty`}
+        action={
+          <Button size="sm" onClick={() => setFile(null)}>
+            Open another file
+          </Button>
+        }
+      >
+        There is no text to detect or convert.
+      </Alert>
+    );
+  }
+
   return (
     <>
+      {binaryWarning && (
+        <Alert tone="warning" title="This is probably not a text file">
+          {binaryWarning}
+        </Alert>
+      )}
       <Panel
         title={<span className="break-all">{file.name}</span>}
         description={`${formatBytes(file.bytes.length)} · ${bom ? `${bom.bom.toUpperCase()} byte order mark (BOM) found` : 'No byte order mark'} · ${validCount} of ${attempts.length} encodings decode without errors`}

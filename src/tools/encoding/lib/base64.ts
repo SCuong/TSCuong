@@ -40,22 +40,50 @@ const DATA_URL = /^data:([^,]*?)(;base64)?,/i;
  * Decode Base64 or Base64url. Whitespace is ignored, missing padding is accepted,
  * and a leading `data:...;base64,` prefix is stripped. Returns a clear error for bad input.
  */
+/** 1-based line and column of a UTF-16 offset, for error messages. */
+function lineAndColumn(text: string, offset: number): { line: number; column: number } {
+  let line = 1;
+  let lineStart = 0;
+  for (let i = 0; i < offset; i++) {
+    if (text.charCodeAt(i) === 10) {
+      line++;
+      lineStart = i + 1;
+    }
+  }
+  return { line, column: offset - lineStart + 1 };
+}
+
+/** "unexpected character "%" at position 12 (line 2, column 3)" for the first invalid Base64 character. */
+export function describeBadBase64Char(input: string, offset: number): string {
+  const ch = String.fromCodePoint(input.codePointAt(offset)!);
+  // Invisible characters (zero-width space, controls…) are named by code point.
+  const shown =
+    ch === '%'
+      ? '"%" (the text looks URL-encoded)'
+      : /[\p{C}\p{Z}]/u.test(ch)
+        ? `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')} (an invisible character)`
+        : `"${ch}"`;
+  const { line, column } = lineAndColumn(input, offset);
+  const where = line > 1 ? `line ${line}, column ${column}` : `position ${column}`;
+  return `Invalid Base64: unexpected character ${shown} at ${where}.`;
+}
+
 export function decodeBase64(input: string): Base64DecodeResult {
+  const leading = input.length - input.trimStart().length;
   let text = input.trim();
+  let prefix = leading;
   const data = DATA_URL.exec(text);
   if (data) {
     if (!data[2]) return { ok: false, error: 'This data URL is not Base64-encoded (it has no ";base64" marker).' };
     text = text.slice(data[0].length);
+    prefix += data[0].length;
   }
   const clean = text.replace(/[\s]+/g, '');
   if (!clean) return { ok: true, bytes: new Uint8Array(0), urlSafe: false };
 
-  const bad = /[^A-Za-z0-9+/\-_=]/.exec(clean);
-  if (bad) {
-    const ch = bad[0];
-    const shown = ch === '%' ? '"%" (the text looks URL-encoded)' : `"${ch}"`;
-    return { ok: false, error: `Invalid Base64: unexpected character ${shown} at position ${bad.index + 1}.` };
-  }
+  // Search the text as typed (whitespace is allowed) so the position matches what the user sees.
+  const bad = /[^A-Za-z0-9+/\-_=\s]/.exec(text);
+  if (bad) return { ok: false, error: describeBadBase64Char(input, prefix + bad.index) };
   const hasStd = /[+/]/.test(clean);
   const hasUrl = /[-_]/.test(clean);
   if (hasStd && hasUrl) return { ok: false, error: 'Invalid Base64: mixes the standard (+ /) and URL-safe (- _) alphabets.' };
@@ -108,4 +136,15 @@ export function decodeBase64Text(input: string): Base64TextResult {
 export function decodedSize(input: string): number {
   const clean = input.replace(DATA_URL, '').replace(/[\s=]+/g, '');
   return Math.floor((clean.length * 3) / 4);
+}
+
+export type Base64Conversion =
+  | { ok: true; text: string; urlSafe: boolean }
+  | { ok: false; error: string; bytes?: Uint8Array; lossy?: string };
+
+/** Encode or decode in one call, so large texts can be processed in a worker. */
+export function convertBase64(input: string, direction: 'encode' | 'decode', o: Partial<Base64EncodeOptions>): Base64Conversion {
+  if (direction === 'encode') return { ok: true, text: encodeBase64Text(input, o), urlSafe: Boolean(o.urlSafe) };
+  const r = decodeBase64Text(input);
+  return r.ok ? { ok: true, text: r.text, urlSafe: r.urlSafe } : r;
 }

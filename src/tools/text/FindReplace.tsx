@@ -2,16 +2,22 @@ import { useDeferredValue, useMemo } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Input, Switch } from '@/components/ui/Field';
 import { ErrorMessage } from '@/components/ui/Alert';
+import { Spinner } from '@/components/ui/Feedback';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { useToolState } from '@/lib/hooks';
 import { formatNumber, pluralize } from '@/lib/utils';
-import { DEFAULT_FIND_OPTIONS, findAndReplace, type FindOptions } from './lib/findReplace';
+import { compileSearch, DEFAULT_FIND_OPTIONS, findAndReplace, type FindOptions } from './lib/findReplace';
 import { HighlightedText, Opt, SampleButton, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { regexTimeoutMs, RegexTimeoutAlert } from './components/RegexTimeout';
+import { useTask } from './components/useTask';
 
 const ID = 'find-replace';
 const SAMPLE = `Order #1042 shipped on 2024-03-15 to alice@example.com.
 Order #1043 shipped on 2024-03-16 to bob@example.org.
 Order #1044 is pending since 2024-03-17.`;
+/** One more than the highlighter shows, so it can say that only the first 5,000 are highlighted. */
+const MAX_RANGES = 5_001;
 
 export default function FindReplace() {
   const [input, setInput] = useToolState(ID, 'input', '');
@@ -21,10 +27,18 @@ export default function FindReplace() {
   const set = <K extends keyof FindOptions>(key: K, value: FindOptions[K]) => setOpts((o) => ({ ...o, [key]: value }));
 
   const deferredInput = useDeferredValue(input);
-  const result = useMemo(() => findAndReplace(deferredInput, find, replacement, opts), [deferredInput, find, replacement, opts]);
-  const output = result.ok ? result.text : '';
-  const ranges = result.ok ? result.ranges : [];
-  const count = result.ok ? result.count : 0;
+  // Compiling is instant and safe; only matching can run away, so it happens in a worker.
+  const compiled = useMemo(() => (find ? compileSearch(find, opts) : null), [find, opts]);
+  const patternError = compiled && !compiled.ok ? compiled.error : null;
+  const task = useTask(
+    'findAndReplace',
+    findAndReplace,
+    find && compiled?.ok ? [deferredInput, find, replacement, opts, MAX_RANGES] : null,
+    { size: deferredInput.length, timeoutMs: opts.regex ? regexTimeoutMs(deferredInput.length) : undefined },
+  );
+  const result = task.value?.ok ? task.value : null;
+  const searchedText = task.args?.[0] ?? '';
+  const failure = patternError ?? (task.value && !task.value.ok ? task.value.error : task.error);
 
   function loadSample() {
     setInput(SAMPLE);
@@ -34,6 +48,8 @@ export default function FindReplace() {
       setOpts((o) => ({ ...o, regex: true }));
     }
   }
+
+  const showResult = Boolean(find && !failure && !task.timedOut);
 
   return (
     <ToolStack>
@@ -45,7 +61,7 @@ export default function FindReplace() {
             mono
             placeholder={opts.regex ? 'Regular expression, e.g. (\\w+)@(\\w+)' : 'Text to find'}
             aria-label="Find"
-            aria-invalid={!result.ok || undefined}
+            aria-invalid={Boolean(patternError) || undefined}
           />
         </Opt>
         <Opt label="Replace with" className="min-w-52 flex-1">
@@ -68,14 +84,16 @@ export default function FindReplace() {
             </>
           )}
           <Switch label="\n \t in replacement" checked={opts.escapes} onChange={(v) => set('escapes', v)} />
-          {find && result.ok && (
-            <Badge tone={count ? 'accent' : 'neutral'} className="ml-auto">
-              {count ? pluralize(count, 'match', 'matches') : 'No matches'}
-            </Badge>
-          )}
+          <span className="ml-auto flex items-center gap-2">
+            {task.pending && <Spinner size={14} label="Searching…" />}
+            {showResult && result && !task.pending && (
+              <Badge tone={result.count ? 'accent' : 'neutral'}>{result.count ? pluralize(result.count, 'match', 'matches') : 'No matches'}</Badge>
+            )}
+          </span>
         </div>
       </ToolBar>
-      <ErrorMessage error={result.ok ? null : result.error} />
+      <ErrorMessage error={failure} title={patternError ? 'Invalid pattern' : undefined} />
+      {task.timedOut && <RegexTimeoutAlert size={deferredInput.length} />}
       <SplitPanes>
         <EditorPanel
           title="Input"
@@ -84,24 +102,23 @@ export default function FindReplace() {
           placeholder="Paste the text to search…"
           fileAccept={TEXT_FILE_ACCEPT}
           height="360px"
-          actions={
-            <SampleButton onClick={loadSample} />
-          }
+          actions={<SampleButton onClick={loadSample} />}
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title="Result"
-          value={find ? output : input}
-          placeholder="The replaced text appears here"
+          value={!find ? deferredInput : showResult && result ? result.text : ''}
+          placeholder={find && (failure || task.timedOut) ? 'Fix the search to see the result' : 'The replaced text appears here'}
           downloadName="replaced.txt"
           height="360px"
-          invalid={!result.ok}
-          footer={input && find && result.ok ? <span>{`${formatNumber(count, 0)} replaced`}</span> : undefined}
+          invalid={Boolean(failure) || task.timedOut}
+          busy={task.pending}
+          footer={input && showResult && result ? <span>{`${formatNumber(result.count, 0)} replaced`}</span> : undefined}
         />
       </SplitPanes>
-      {input && find && result.ok && (
+      {input && showResult && result && (
         <Panel title="Matches" description="Highlighted in the input text." bodyClassName="p-3">
-          <HighlightedText text={deferredInput} ranges={ranges} ariaLabel="Input with matches highlighted" />
+          <HighlightedText text={searchedText} ranges={result.ranges} ariaLabel="Input with matches highlighted" />
         </Panel>
       )}
     </ToolStack>

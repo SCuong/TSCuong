@@ -44,19 +44,47 @@ function countChars(value: string): number {
   return n;
 }
 
+/**
+ * Line comparison that ignores every whitespace difference, like `git diff -w` ("a  b" = "a b",
+ * CRLF = LF, indentation and trailing spaces ignored). The diff library's own option only trims
+ * the ends of lines.
+ */
+function whitespaceInsensitiveComparator(ignoreCase: boolean): (left: string, right: string) => boolean {
+  const cache = new Map<string, string>();
+  const key = (s: string) => {
+    let k = cache.get(s);
+    if (k === undefined) {
+      k = s.replace(/\s+/g, '');
+      if (ignoreCase) k = k.toLowerCase();
+      if (cache.size < 100_000) cache.set(s, k);
+    }
+    return k;
+  };
+  return (left, right) => left === right || key(left) === key(right);
+}
+
+/** Collapse whitespace for a whitespace-insensitive character diff, keeping line breaks visible. */
+export function collapseWhitespace(text: string): string {
+  return text.replace(/\s+/g, (run) => (/[\r\n]/.test(run) ? '\n' : ' '));
+}
+
 export function computeDiff(a: string, b: string, o: DiffOptions): DiffResult {
   const timeout = o.timeout ?? TIMEOUT_MS;
   let changes: Change[] | undefined;
   if (o.mode === 'line') {
-    const opts = { ignoreWhitespace: o.ignoreWhitespace, ignoreCase: o.ignoreCase, timeout } as DiffLinesOptionsAbortable;
+    // jsdiff's Diff#equals honours `comparator` and `ignoreCase` for every diff type (the typings
+    // only list them for arrays and characters); tests in diff.test.ts pin this behaviour.
+    const opts = (
+      o.ignoreWhitespace ? { comparator: whitespaceInsensitiveComparator(o.ignoreCase), timeout } : { ignoreCase: o.ignoreCase, timeout }
+    ) as unknown as DiffLinesOptionsAbortable;
     changes = diffLines(a, b, opts);
   } else if (o.mode === 'word') {
     changes = o.ignoreWhitespace
       ? diffWords(a, b, { ignoreCase: o.ignoreCase, timeout })
       : diffWordsWithSpace(a, b, { ignoreCase: o.ignoreCase, timeout });
   } else {
-    const left = o.ignoreWhitespace ? a.replace(/\s+/g, ' ') : a;
-    const right = o.ignoreWhitespace ? b.replace(/\s+/g, ' ') : b;
+    const left = o.ignoreWhitespace ? collapseWhitespace(a) : a;
+    const right = o.ignoreWhitespace ? collapseWhitespace(b) : b;
     changes = diffChars(left, right, { ignoreCase: o.ignoreCase, timeout });
   }
   if (!changes) {

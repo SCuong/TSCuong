@@ -2,15 +2,25 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { Eraser } from 'lucide-react';
 import { EditorPanel, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { NumberInput, Switch } from '@/components/ui/Field';
+import { ErrorMessage } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Feedback';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { toast } from '@/components/ui/Toast';
 import { useToolState } from '@/lib/hooks';
 import { cn, formatNumber, pluralize } from '@/lib/utils';
-import { DEFAULT_DUPLICATE_OPTIONS, findDuplicateWords, removeConsecutiveDuplicates, type DuplicateWordOptions } from './lib/duplicates';
+import {
+  DEFAULT_DUPLICATE_OPTIONS,
+  findDuplicateWords,
+  removeConsecutiveDuplicates,
+  type DuplicateWordOptions,
+  type DuplicateWordResult,
+} from './lib/duplicates';
 import { HighlightedText, Opt, TEXT_FILE_ACCEPT, TextFooter, type HighlightRange } from './components/shared';
+import { useTask } from './components/useTask';
 
 const ID = 'duplicate-word-finder';
+const EMPTY: DuplicateWordResult = { consecutive: [], repeated: [], totalWords: 0 };
 const SAMPLE = `Paris in the
 the spring is is lovely. Many readers never notice the the repeated word.
 Writing clear sentences takes practice, and practice makes writing easier. Good writing is rewriting.`;
@@ -22,7 +32,11 @@ export default function DuplicateWords() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => findDuplicateWords(deferred, o), [deferred, o]);
+  const task = useTask('findDuplicateWords', findDuplicateWords, [deferred, o], { size: deferred.length });
+  const result = task.value ?? EMPTY;
+  // Positions refer to the text the result was computed from.
+  const analyzed = task.args?.[0] ?? '';
+  const current = !task.pending && analyzed === input;
   const selectedWord = result.repeated.find((r) => r.word === selected) ?? null;
 
   const ranges: HighlightRange[] = useMemo(() => {
@@ -34,7 +48,8 @@ export default function DuplicateWords() {
   }, [result, selectedWord]);
 
   function fix() {
-    setInput(removeConsecutiveDuplicates(deferred, result.consecutive));
+    if (!current) return;
+    setInput(removeConsecutiveDuplicates(analyzed, result.consecutive));
     toast(`Removed ${pluralize(result.consecutive.length, 'repeated word')}.`);
   }
 
@@ -81,25 +96,29 @@ export default function DuplicateWords() {
                 : undefined
           }
           actions={
-            selectedWord ? (
-              <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>
-                Show doubled words
-              </Button>
-            ) : (
-              <Button size="sm" icon={Eraser} onClick={fix} disabled={result.consecutive.length === 0}>
-                Remove doubles
-              </Button>
-            )
+            <>
+              {task.pending && <Spinner size={14} label="Checking…" />}
+              {selectedWord ? (
+                <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>
+                  Show doubled words
+                </Button>
+              ) : (
+                <Button size="sm" icon={Eraser} onClick={fix} disabled={!current || result.consecutive.length === 0}>
+                  Remove doubles
+                </Button>
+              )}
+            </>
           }
           bodyClassName="p-3"
         >
-          <HighlightedText text={deferred} ranges={ranges} maxHeight="300px" emptyLabel="Highlighted text appears here." ariaLabel="Text with duplicates highlighted" />
+          <ErrorMessage error={task.error} title="Could not check this text" />
+          <HighlightedText text={analyzed} ranges={ranges} maxHeight="300px" emptyLabel="Highlighted text appears here." ariaLabel="Text with duplicates highlighted" />
           {!selectedWord && result.consecutive.length > 0 && (
-            <ul className="mt-3 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+            <ul className="mt-3 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto" tabIndex={0} aria-label="Doubled words">
               {result.consecutive.slice(0, 200).map((d) => (
                 <li key={d.position.start}>
                   <Badge tone="warning">
-                    “{d.word} {d.word}” · line {d.position.line}:{d.position.column}
+                    “{analyzed.slice(d.first.start, d.first.end)} {d.word}” · line {d.position.line}:{d.position.column}
                   </Badge>
                 </li>
               ))}

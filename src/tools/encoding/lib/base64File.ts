@@ -1,4 +1,4 @@
-import { bytesToBase64 } from './base64';
+import { bytesToBase64, describeBadBase64Char } from './base64';
 
 /** Multiple of 3 so chunk outputs concatenate into one valid Base64 string. */
 export const ENCODE_CHUNK = 3 * 256 * 1024;
@@ -41,20 +41,22 @@ export type ParsePayloadResult = ({ ok: true } & ParsedBase64Payload) | { ok: fa
 /** Accepts raw Base64, Base64url or a data URL; validates and normalizes it. */
 export function parseBase64Payload(input: string): ParsePayloadResult {
   let text = input.trim();
+  let prefix = input.length - input.trimStart().length;
   let declaredMime: string | null = null;
   const data = /^data:([^,]*?),/i.exec(text);
   if (data) {
     const meta = data[1].split(';');
-    if (!meta.some((m) => m.toLowerCase() === 'base64')) {
+    if (!meta.some((m) => m.trim().toLowerCase() === 'base64')) {
       return { ok: false, error: 'This data URL is not Base64-encoded (it has no ";base64" marker).' };
     }
-    declaredMime = meta[0] || null;
+    declaredMime = meta[0].trim().toLowerCase() || null;
     text = text.slice(data[0].length);
+    prefix += data[0].length;
   }
   let clean = text.replace(/\s+/g, '');
   if (!clean) return { ok: false, error: 'There is no Base64 data to decode.' };
-  const bad = /[^A-Za-z0-9+/\-_=]/.exec(clean);
-  if (bad) return { ok: false, error: `Invalid Base64: unexpected character "${bad[0]}" at position ${bad.index + 1}.` };
+  const bad = /[^A-Za-z0-9+/\-_=\s]/.exec(text);
+  if (bad) return { ok: false, error: describeBadBase64Char(input, prefix + bad.index) };
   if (/[-_]/.test(clean)) {
     if (/[+/]/.test(clean)) return { ok: false, error: 'Invalid Base64: mixes the standard (+ /) and URL-safe (- _) alphabets.' };
     clean = clean.replace(/-/g, '+').replace(/_/g, '/');

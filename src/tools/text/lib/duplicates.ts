@@ -1,4 +1,4 @@
-import { words } from './common';
+import { countGraphemes, words } from './common';
 import { ENGLISH_STOP_WORDS } from './frequency';
 
 export interface Position {
@@ -22,11 +22,18 @@ export interface RepeatedWord {
   positions: Position[];
 }
 
+/** Offsets where lines start (LF, CRLF and old Mac CR line endings). */
 function lineIndex(text: string): number[] {
   const starts = [0];
-  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) starts.push(i + 1);
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c === 10 || (c === 13 && text.charCodeAt(i + 1) !== 10)) starts.push(i + 1);
+  }
   return starts;
 }
+
+/** Positions kept per repeated word (enough to highlight; the count stays exact). */
+export const MAX_POSITIONS = 5_001;
 
 function locate(starts: number[], offset: number): { line: number; column: number } {
   let lo = 0;
@@ -85,7 +92,7 @@ export function findDuplicateWords(text: string, opts: Partial<DuplicateWordOpti
     if (!/\p{L}/u.test(t.word)) continue;
     const lower = t.word.toLowerCase();
     if (o.excludeStopWords && ENGLISH_STOP_WORDS.has(lower.replace(/’/g, "'"))) continue;
-    if (Array.from(t.word).length < o.minLength) continue;
+    if (countGraphemes(t.word) < o.minLength) continue;
     const k = key(t.word);
     let entry = map.get(k);
     if (!entry) {
@@ -93,11 +100,12 @@ export function findDuplicateWords(text: string, opts: Partial<DuplicateWordOpti
       map.set(k, entry);
     }
     entry.count++;
-    entry.positions.push(pos(t.index, t.word));
+    if (entry.positions.length < MAX_POSITIONS) entry.positions.push(pos(t.index, t.word));
   }
+  const compare = new Intl.Collator().compare;
   const repeated = Array.from(map.values())
     .filter((e) => e.count > 1)
-    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
+    .sort((a, b) => b.count - a.count || compare(a.word, b.word));
 
   return { consecutive, repeated, totalWords: tokens.length };
 }

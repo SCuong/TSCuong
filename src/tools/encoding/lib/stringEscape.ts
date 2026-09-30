@@ -28,6 +28,8 @@ const u4 = (code: number) => `\\u${code.toString(16).padStart(4, '0')}`;
 function escapeUtf16(ch: string, asciiOnly: boolean): string | null {
   const code = ch.charCodeAt(0);
   if (code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f) || code === 0x2028 || code === 0x2029) return u4(code);
+  // A lone surrogate (half of a broken emoji) cannot be written as UTF-8; JSON.stringify escapes it too.
+  if (ch.length === 1 && code >= 0xd800 && code <= 0xdfff) return u4(code);
   if (asciiOnly && code > 0x7e) {
     return Array.from({ length: ch.length }, (_, i) => u4(ch.charCodeAt(i))).join('');
   }
@@ -402,4 +404,10 @@ export function unescapeString(text: string, lang: EscapeLanguage): UnescapeResu
     if (error instanceof UnescapeError) return { ok: false, error: error.message };
     throw error;
   }
+}
+
+/** Escape (encode) or unescape (decode) in one call, so large texts can be processed in a worker. */
+export function convertString(text: string, direction: 'encode' | 'decode', lang: EscapeLanguage, opts: Partial<EscapeOptions>): UnescapeResult {
+  if (direction === 'encode') return { ok: true, text: escapeString(text, lang, opts) };
+  return unescapeString(text, lang);
 }

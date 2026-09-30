@@ -1,11 +1,13 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Select, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { pluralize } from '@/lib/utils';
-import { countTypographic, DEFAULT_SMART_OPTIONS, toSmart, toStraight, type SmartOptions } from './lib/quotes';
+import { convertQuotes, DEFAULT_SMART_OPTIONS, type SmartOptions } from './lib/quotes';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { useTask } from './components/useTask';
 
 const ID = 'smart-quotes';
 const SAMPLE_STRAIGHT = `"Don't worry," she said -- "it's only the '90s... isn't it?"
@@ -22,8 +24,9 @@ export default function SmartQuotes() {
   const set = <K extends keyof SmartOptions>(key: K, value: SmartOptions[K]) => setO((prev) => ({ ...prev, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const output = useMemo(() => (direction === 'smart' ? toSmart(deferred, o) : toStraight(deferred, o)), [deferred, direction, o]);
-  const typographic = countTypographic(direction === 'smart' ? output : deferred);
+  const task = useTask('convertQuotes', convertQuotes, [deferred, direction, o], { size: deferred.length });
+  const output = task.value?.text ?? '';
+  const marks = task.value?.marks ?? 0;
 
   return (
     <ToolStack>
@@ -62,13 +65,18 @@ export default function SmartQuotes() {
           height="360px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title="Result"
           value={output}
           placeholder="Converted text appears here"
           downloadName="text.txt"
           height="360px"
-          footer={input ? <span>{direction === 'smart' ? `${pluralize(typographic, 'typographic mark')} in the result` : `${pluralize(typographic, 'typographic mark')} replaced`}</span> : undefined}
+          busy={task.pending}
+          footer={
+            input && task.value ? (
+              <span>{direction === 'smart' ? `${pluralize(marks, 'typographic mark')} in the result` : `${pluralize(marks, 'typographic mark')} replaced`}</span>
+            ) : undefined
+          }
         />
       </SplitPanes>
     </ToolStack>

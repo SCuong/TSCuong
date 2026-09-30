@@ -1,16 +1,18 @@
 import { useDeferredValue, useMemo } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Select, Switch } from '@/components/ui/Field';
-import { Alert } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { DownloadButton } from '@/components/ui/Actions';
 import { Badge } from '@/components/ui/Panel';
 import { useToolState } from '@/lib/hooks';
 import { formatBytes } from '@/lib/utils';
-import { decodeBase64Text, encodeBase64Text } from './lib/base64';
+import { convertBase64 } from './lib/base64';
 import { hexPreview } from './lib/bytes';
 import { utf8Length } from '../text/lib/common';
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'base64-text';
 const SAMPLE_TEXT = 'Hello, World! Ünïcødé and emoji work too 😀';
@@ -29,15 +31,12 @@ export default function Base64Text() {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((o) => ({ ...o, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => {
-    if (!deferred) return null;
-    if (direction === 'encode') return { ok: true as const, text: encodeBase64Text(deferred, s), note: null };
-    const r = decodeBase64Text(deferred);
-    if (r.ok) return { ok: true as const, text: r.text, note: r.urlSafe ? 'URL-safe alphabet detected' : null, bytes: r.bytes };
-    return r;
-  }, [deferred, direction, s]);
-
+  const task = useTask('convertBase64', convertBase64, deferred ? [deferred, direction, s] : null, { size: deferred.length });
+  const result = task.value;
+  const note = result?.ok && direction === 'decode' && result.urlSafe ? 'URL-safe alphabet detected' : null;
   const output = result?.ok ? result.text : '';
+  const inputBytes = useMemo(() => utf8Length(deferred), [deferred]);
+  const outputBytes = useMemo(() => utf8Length(output), [output]);
 
   function swap() {
     setInput(output);
@@ -47,7 +46,7 @@ export default function Base64Text() {
   return (
     <ToolStack>
       <ToolBar>
-        <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output)} />
+        <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !task.pending} />
         {direction === 'encode' ? (
           <>
             <Opt label="Line wrapping">
@@ -68,7 +67,7 @@ export default function Base64Text() {
           </p>
         )}
       </ToolBar>
-
+      <ErrorMessage error={task.error} title="Could not convert this text" />
       {result && !result.ok && (
         <Alert
           tone="danger"
@@ -81,7 +80,7 @@ export default function Base64Text() {
         >
           {result.error}
           {result.bytes && (
-            <span className="mt-1 block font-mono text-[12px] break-all text-fg-muted">
+            <span className="mt-1 block font-mono text-[12px] break-all text-fg-secondary">
               {formatBytes(result.bytes.length)}: {hexPreview(result.bytes, 24)}
             </span>
           )}
@@ -98,22 +97,21 @@ export default function Base64Text() {
           fileAccept={TEXT_FILE_ACCEPT}
           invalid={Boolean(result && !result.ok)}
           height="360px"
-          footer={input ? <span>{formatBytes(utf8Length(input))}</span> : undefined}
+          footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
-        <EditorPanel
+        <OutputPanel
           title={direction === 'encode' ? 'Base64' : 'Decoded text'}
           value={output}
           placeholder={direction === 'encode' ? 'Base64 appears here' : 'Decoded text appears here'}
           downloadName={direction === 'encode' ? 'encoded.b64.txt' : 'decoded.txt'}
           height="360px"
+          busy={task.pending}
           footer={
             output ? (
               <>
-                <span>{formatBytes(utf8Length(output))}</span>
-                {direction === 'encode' && input && (
-                  <span>{`${Math.round((utf8Length(output) / Math.max(1, utf8Length(input))) * 100)}% of input size`}</span>
-                )}
-                {result?.ok && result.note && <Badge tone="accent">{result.note}</Badge>}
+                <span>{formatBytes(outputBytes)}</span>
+                {direction === 'encode' && inputBytes > 0 && <span>{`${Math.round((outputBytes / inputBytes) * 100)}% of input size`}</span>}
+                {note && <Badge tone="accent">{note}</Badge>}
               </>
             ) : undefined
           }

@@ -161,8 +161,11 @@ const isDigit = (c: string | undefined) => c !== undefined && c >= '0' && c <= '
 const isHex = (c: string | undefined) => c !== undefined && /^[0-9a-fA-F]$/.test(c);
 const isLetter = (c: string | undefined) => c !== undefined && /^[A-Za-z]$/.test(c);
 
-/** Count capture groups the way the engine does (needed to resolve Annex B `\N` escapes). */
-export function countCaptureGroups(pattern: string): { count: number; hasNamed: boolean } {
+/**
+ * Count capture groups the way the engine does (needed to resolve Annex B `\N` escapes).
+ * Classes only nest with the `v` flag; otherwise "[" inside a class is an ordinary character.
+ */
+export function countCaptureGroups(pattern: string, unicodeSets = false): { count: number; hasNamed: boolean } {
   let count = 0;
   let hasNamed = false;
   let inClass = 0;
@@ -173,7 +176,7 @@ export function countCaptureGroups(pattern: string): { count: number; hasNamed: 
       continue;
     }
     if (inClass) {
-      if (c === '[') inClass++;
+      if (c === '[' && unicodeSets) inClass++;
       else if (c === ']') inClass--;
       continue;
     }
@@ -204,7 +207,7 @@ class Parser {
   ) {
     this.sets = Boolean(options.unicodeSets);
     this.unicode = Boolean(options.unicode) || this.sets;
-    const { count, hasNamed } = countCaptureGroups(src);
+    const { count, hasNamed } = countCaptureGroups(src, this.sets);
     this.totalGroups = count;
     this.namedGroups = this.unicode || hasNamed;
   }

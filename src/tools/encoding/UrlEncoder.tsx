@@ -6,6 +6,7 @@ import { useToolState } from '@/lib/hooks';
 import { urlDecode, urlDecodeLenient, urlEncode, type UrlEncodeMode } from './lib/url';
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
 
 const ID = 'url-encoder';
 const SAMPLE_ENCODE = 'name=Jürgen Müller&city=São Paulo&q=café & crème 100%';
@@ -32,14 +33,16 @@ export default function UrlEncoder() {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((o) => ({ ...o, [key]: value }));
 
   const deferred = useDeferredValue(input);
+  // Form data always encodes spaces as "+", so decoding it must turn "+" back into spaces.
+  const plusAsSpace = s.mode === 'form' || s.plusAsSpace;
   const result = useMemo(() => {
     if (!deferred) return null;
     if (direction === 'encode') return urlEncode(deferred, s);
     const decodeMode = s.mode === 'uri' ? 'uri' : 'component';
-    const strict = urlDecode(deferred, { plusAsSpace: s.plusAsSpace, mode: decodeMode });
-    if (!strict.ok && s.lenient) return { ok: true as const, text: urlDecodeLenient(deferred, s.plusAsSpace) };
+    const strict = urlDecode(deferred, { plusAsSpace, mode: decodeMode });
+    if (!strict.ok && s.lenient) return { ok: true as const, text: urlDecodeLenient(deferred, plusAsSpace, decodeMode) };
     return strict;
-  }, [deferred, direction, s]);
+  }, [deferred, direction, s, plusAsSpace]);
   const output = result?.ok ? result.text : '';
 
   function swap() {
@@ -66,7 +69,12 @@ export default function UrlEncoder() {
             </>
           ) : (
             <>
-              <Switch label="Treat + as space" checked={s.plusAsSpace} onChange={(v) => set('plusAsSpace', v)} />
+              <Switch
+                label="Treat + as space"
+                checked={plusAsSpace}
+                onChange={(v) => set('plusAsSpace', v)}
+                disabled={s.mode === 'form'}
+              />
               <Switch label="Skip malformed sequences" checked={s.lenient} onChange={(v) => set('lenient', v)} />
             </>
           )}
@@ -76,7 +84,9 @@ export default function UrlEncoder() {
             ? MODE_HELP[s.mode]
             : s.mode === 'uri'
               ? 'decodeURI leaves reserved characters such as %2F and %3F encoded, so the URL structure is preserved.'
-              : 'Decodes every %XX sequence as UTF-8.'}
+              : s.mode === 'form'
+                ? 'Decodes every %XX sequence as UTF-8 and every + as a space (form submissions).'
+                : 'Decodes every %XX sequence as UTF-8.'}
         </p>
       </ToolBar>
       <ErrorMessage error={result && !result.ok ? result.error : null} title={direction === 'encode' ? 'Cannot encode' : 'Cannot decode'} />
@@ -92,7 +102,7 @@ export default function UrlEncoder() {
           height="320px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title={direction === 'encode' ? 'Encoded' : 'Decoded'}
           value={output}
           placeholder="Result appears here"

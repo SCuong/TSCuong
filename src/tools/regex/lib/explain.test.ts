@@ -131,3 +131,11 @@ describe('helpers', () => {
     expect(describeCodePoint(0xd83d)).toBe('lone surrogate U+D83D');
   });
 });
+
+describe('explanation wording', () => {
+  it('uses natural articles for Unicode properties', () => {
+    expect(texts(explainPattern('\\p{Any}', 'u').nodes)).toEqual(['A code point of any kind']);
+    expect(texts(explainPattern('\\p{Lo}', 'u').nodes)).toEqual(['A Unicode uncased letter (such as CJK, Arabic or Hebrew)']);
+    expect(texts(explainPattern('\\P{Lu}', 'u').nodes)).toEqual(['Any character that is not a Unicode uppercase letter']);
+  });
+});

@@ -37,3 +37,11 @@ export function rot47(text: string): string {
 export function allShifts(text: string): Array<{ shift: number; text: string }> {
   return Array.from({ length: 25 }, (_, i) => ({ shift: i + 1, text: caesar(text, i + 1) }));
 }
+
+export type RotAlgorithm = 'caesar' | 'rot47';
+
+/** The tool's whole conversion in one call, so large texts can be processed in a worker. */
+export function rotate(text: string, algo: RotAlgorithm, shift: number, decode: boolean, rotateDigits: boolean): string {
+  if (algo === 'rot47') return rot47(text);
+  return caesar(text, decode ? -shift : shift, rotateDigits);
+}

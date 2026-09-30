@@ -1,13 +1,15 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { ChartColumn } from 'lucide-react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { NumberInput, Switch } from '@/components/ui/Field';
 import { DownloadButton } from '@/components/ui/Actions';
-import { EmptyState } from '@/components/ui/Feedback';
+import { ErrorMessage } from '@/components/ui/Alert';
+import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { Panel } from '@/components/ui/Panel';
 import { useToolState } from '@/lib/hooks';
 import { DEFAULT_WORD_FREQ_OPTIONS, frequencyToCsv, wordFrequency, type WordFrequencyOptions } from './lib/frequency';
 import { Counts, FrequencyTable, Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { useTask } from './components/useTask';
 
 const ID = 'word-frequency';
 const SAMPLE = `It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity, it was the season of Light, it was the season of Darkness, it was the spring of hope, it was the winter of despair.`;
@@ -18,7 +20,8 @@ export default function WordFrequency() {
   const set = <K extends keyof WordFrequencyOptions>(key: K, value: WordFrequencyOptions[K]) => setO((prev) => ({ ...prev, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => wordFrequency(deferred, o), [deferred, o]);
+  const task = useTask('wordFrequency', wordFrequency, [deferred, o], { size: deferred.length });
+  const result = task.value;
 
   return (
     <ToolStack>
@@ -37,6 +40,7 @@ export default function WordFrequency() {
           <Switch label="Include numbers" checked={o.includeNumbers} onChange={(v) => set('includeNumbers', v)} />
         </div>
       </ToolBar>
+      <ErrorMessage error={task.error} title="Could not count the words" />
       <SplitPanes>
         <EditorPanel
           title="Text"
@@ -51,16 +55,27 @@ export default function WordFrequency() {
         <Panel
           title="Word frequency"
           actions={
-            <DownloadButton
-              data={() => frequencyToCsv(result.rows, 'word')}
-              filename="word-frequency.csv"
-              type="text/csv;charset=utf-8"
-              label="CSV"
-              disabled={result.rows.length === 0}
-            />
+            <>
+              {task.pending && <Spinner size={14} label="Counting…" />}
+              <DownloadButton
+                data={() => frequencyToCsv(result?.rows ?? [], 'word')}
+                filename="word-frequency.csv"
+                type="text/csv;charset=utf-8"
+                label="CSV"
+                disabled={!result || result.rows.length === 0}
+              />
+            </>
           }
         >
-          {result.rows.length === 0 ? (
+          {!result ? (
+            task.pending ? (
+              <Spinner label="Counting words…" className="p-2" />
+            ) : (
+              <EmptyState icon={ChartColumn} title="No text yet">
+                Word counts and percentages appear here as you type.
+              </EmptyState>
+            )
+          ) : result.rows.length === 0 ? (
             <EmptyState icon={ChartColumn} title={input.trim() ? 'No words match the filters' : 'No text yet'}>
               {input.trim() ? 'Try lowering the minimum length or including common words.' : 'Word counts and percentages appear here as you type.'}
             </EmptyState>
@@ -72,7 +87,7 @@ export default function WordFrequency() {
                   { label: 'unique', value: result.unique, tone: 'accent' },
                 ]}
               />
-              <div className="min-h-0 overflow-y-auto">
+              <div className="min-h-0 overflow-y-auto" tabIndex={0} role="region" aria-label="Word frequency table">
                 <FrequencyTable rows={result.rows} itemHeader="Word" />
               </div>
             </div>

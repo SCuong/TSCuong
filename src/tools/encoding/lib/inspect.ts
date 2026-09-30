@@ -1,4 +1,5 @@
 /** Unicode inspection: per code point properties without shipping the Unicode database. */
+import { countGraphemes } from '../../text/lib/common';
 
 export const GENERAL_CATEGORIES: Array<{ code: string; name: string }> = [
   { code: 'Lu', name: 'Uppercase letter' },
@@ -88,6 +89,8 @@ export interface CodePointInfo {
   script: string;
   name: string | null;
   flags: Flag[];
+  /** A letter of a right-to-left script (Hebrew, Arabic, Syriac, Thaana, N'Ko). */
+  rtl: boolean;
 }
 
 export interface GraphemeInfo {
@@ -136,7 +139,48 @@ function computeInfo(ch: string): CodePointInfo {
     script: scriptOf(ch),
     name: SPECIAL_NAMES[cp] ?? (cp >= 0xe0000 && cp <= 0xe007f ? 'TAG CHARACTER' : null),
     flags: [...new Set(flags)],
+    rtl: /\p{Script=Hebrew}|\p{Script=Arabic}|\p{Script=Syriac}|\p{Script=Thaana}|\p{Script=Nko}/u.test(ch),
   };
+}
+
+/** Scripts that need ZWJ / ZWNJ between letters to control joining and conjuncts (Persian, Hindi, Malayalam…). */
+const JOINER_SCRIPTS =
+  /[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Nko}\p{Script=Thaana}\p{Script=Hebrew}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}]/u;
+const EMOJI_BEFORE_ZWJ = /\p{Extended_Pictographic}|\p{Emoji_Modifier}|\ufe0f/u;
+
+function isJoinerContext(ch: string | undefined): boolean {
+  return ch !== undefined && /[\p{L}\p{M}]/u.test(ch) && JOINER_SCRIPTS.test(ch);
+}
+
+/**
+ * Visit every code point with `hidden` = invisible and not doing a legitimate job here. A zero-width
+ * joiner inside an emoji sequence (👨‍👩‍👧), ZWJ/ZWNJ between letters of Arabic or Indic scripts,
+ * and tag characters of a flag emoji (🏴 + tags) are legitimate; the same characters elsewhere,
+ * like in "pay\u200bpal", are hidden. Summary counts and stripping both use this rule.
+ */
+function scanText(text: string, visit: (ch: string, info: CodePointInfo, hidden: boolean) => void) {
+  let prev: string | undefined;
+  let flagTags = false;
+  for (let i = 0; i < text.length; ) {
+    const cp = text.codePointAt(i)!;
+    const ch = String.fromCodePoint(cp);
+    const info = describeCodePoint(ch);
+    let hidden = false;
+    if (info.flags.includes('invisible')) {
+      if (cp >= 0xe0020 && cp <= 0xe007f) hidden = !flagTags;
+      else if (cp === 0x200d || cp === 0x200c) {
+        const nextCp = text.codePointAt(i + ch.length);
+        const next = nextCp === undefined ? undefined : String.fromCodePoint(nextCp);
+        const inEmoji = cp === 0x200d && prev !== undefined && EMOJI_BEFORE_ZWJ.test(prev);
+        hidden = !inEmoji && !(isJoinerContext(prev) && isJoinerContext(next));
+      } else hidden = true;
+    }
+    if (cp === 0x1f3f4) flagTags = true;
+    else if (!(cp >= 0xe0020 && cp <= 0xe007f)) flagTags = false;
+    visit(ch, info, hidden);
+    prev = ch;
+    i += ch.length;
+  }
 }
 
 /** Split into code points, keeping lone surrogates as their own entries. */
@@ -192,26 +236,19 @@ export function summarize(text: string): InspectSummary {
   let nonstandardSpaces = 0;
   let rtl = 0;
   const scripts = new Set<string>();
-  let prev = '';
-  for (const ch of text) {
+  scanText(text, (ch, info, hidden) => {
     codePoints++;
-    const info = describeCodePoint(ch);
     utf8Bytes += info.utf8.length;
-    // A zero-width joiner after an emoji is part of an emoji sequence (👨‍👩‍👧), not a hidden character.
-    const emojiJoiner = info.codePoint === 0x200d && /\p{Extended_Pictographic}|\p{Emoji_Modifier}|\ufe0f/u.test(prev);
-    if (info.flags.includes('invisible') && !emojiJoiner) invisible++;
-    prev = ch;
+    if (hidden) invisible++;
     if (info.flags.includes('bidi')) bidi++;
-    if (info.flags.includes('control') && !/[\n\r\t]/.test(ch)) control++;
+    if (info.flags.includes('control') && ch !== '\n' && ch !== '\r' && ch !== '\t') control++;
     if (info.flags.includes('combining')) combining++;
     if (info.flags.includes('nonstandard-space')) nonstandardSpaces++;
-    if (/\p{Script=Hebrew}|\p{Script=Arabic}|\p{Script=Syriac}|\p{Script=Thaana}|\p{Script=Nko}/u.test(ch)) rtl++;
+    if (info.rtl) rtl++;
     if (info.script !== 'Common' && info.script !== 'Inherited') scripts.add(info.script);
-  }
-  const graphemes =
-    typeof Intl.Segmenter === 'function' ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)).length : codePoints;
+  });
   return {
-    graphemes,
+    graphemes: countGraphemes(text),
     codePoints,
     utf16: text.length,
     utf8Bytes,
@@ -226,14 +263,17 @@ export function summarize(text: string): InspectSummary {
   };
 }
 
-/** Remove invisible, bidi-control and non-printing control characters (keeps \n, \r, \t). */
+/**
+ * Remove exactly what the summary reports: hidden invisible characters, bidi controls and
+ * non-printing control characters (keeps \n, \r, \t, emoji joiners and joiners that Arabic or
+ * Indic words need).
+ */
 export function stripInvisible(text: string): string {
   let out = '';
-  for (const ch of text) {
-    const info = describeCodePoint(ch);
-    if (info.flags.includes('bidi') || (info.flags.includes('invisible') && info.codePoint !== 0x200d)) continue;
-    if (info.flags.includes('control') && !/[\n\r\t]/.test(ch)) continue;
+  scanText(text, (ch, info, hidden) => {
+    if (hidden || info.flags.includes('bidi')) return;
+    if (info.flags.includes('control') && ch !== '\n' && ch !== '\r' && ch !== '\t') return;
     out += ch;
-  }
+  });
   return out;
 }

@@ -4,10 +4,14 @@ import { Input, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { pluralize } from '@/lib/utils';
-import { DEFAULT_EMAIL_OPTIONS, extractEmails, findEmails, groupByDomain, type EmailExtractOptions } from './lib/extract';
+import { DEFAULT_EMAIL_OPTIONS, emailReport, type EmailExtractOptions } from './lib/extract';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { useTask } from './components/useTask';
 
 const ID = 'email-extractor';
+const NONE: string[] = [];
+const NO_GROUPS: Array<{ domain: string; emails: string[] }> = [];
 const SAMPLE = `From: Alice Smith <Alice.Smith@Example.com>
 To: bob@example.com, carol+newsletter@mail.example.org
 Cc: support@company.io; bob@EXAMPLE.com
@@ -28,19 +32,20 @@ export default function EmailExtractor() {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((prev) => ({ ...prev, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const emails = useMemo(() => {
-    const all = extractEmails(deferred, s);
-    const filter = domainFilter.trim().toLowerCase().replace(/^@/, '');
-    return filter ? all.filter((e) => e.slice(e.lastIndexOf('@') + 1).toLowerCase().includes(filter)) : all;
-  }, [deferred, s, domainFilter]);
-  const groups = useMemo(() => groupByDomain(emails), [emails]);
-  const found = useMemo(() => findEmails(deferred).length, [deferred]);
+  const options = useMemo(() => ({ dedupe: s.dedupe, lowercase: s.lowercase, sort: s.sort }), [s.dedupe, s.lowercase, s.sort]);
+  const task = useTask('emailReport', emailReport, [deferred, options, domainFilter], { size: deferred.length });
+  const emails = task.value?.emails ?? NONE;
+  const groups = task.value?.groups ?? NO_GROUPS;
+  const found = task.value?.found ?? 0;
 
   const sep = s.separator === 'comma' ? ', ' : s.separator === 'semicolon' ? '; ' : '\n';
-  const output =
-    s.layout === 'grouped'
-      ? groups.map((g) => `# ${g.domain} (${g.emails.length})\n${g.emails.join('\n')}`).join('\n\n')
-      : emails.join(sep);
+  const output = useMemo(
+    () =>
+      s.layout === 'grouped'
+        ? groups.map((g) => `# ${g.domain} (${g.emails.length})\n${g.emails.join('\n')}`).join('\n\n')
+        : emails.join(sep),
+    [s.layout, groups, emails, sep],
+  );
 
   return (
     <ToolStack>
@@ -90,15 +95,16 @@ export default function EmailExtractor() {
           height="420px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title="E-mail addresses"
           value={output}
-          placeholder={input ? 'No e-mail addresses found' : 'Addresses appear here'}
+          placeholder={!input ? 'Addresses appear here' : task.pending ? 'Searching…' : 'No e-mail addresses found'}
           downloadName="emails.txt"
           height="420px"
           lineWrapping={s.layout === 'list' && s.separator !== 'newline'}
+          busy={task.pending}
           footer={
-            input ? (
+            input && task.value ? (
               <>
                 <span>{pluralize(emails.length, 'address', 'addresses')}</span>
                 <span>{pluralize(groups.length, 'domain')}</span>

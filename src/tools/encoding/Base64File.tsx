@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, FileDown, FileUp, X } from 'lucide-react';
 import { EditorPanel, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Input, Textarea } from '@/components/ui/Field';
@@ -13,7 +13,7 @@ import { toast } from '@/components/ui/Toast';
 import { nextFrame, useAsyncJob, useObjectUrl, useToolState } from '@/lib/hooks';
 import { baseName, downloadBlob, errorMessage, formatBytes, formatNumber } from '@/lib/utils';
 import { base64ToBytes, blobToBase64, parseBase64Payload, toDataUrl } from './lib/base64File';
-import { detectFileType, extensionForMime, type DetectedType } from './lib/magic';
+import { canonicalMime, detectFileType, extensionForMime, type DetectedType } from './lib/magic';
 import { Opt } from '../text/components/shared';
 
 const ID = 'base64-file';
@@ -60,22 +60,41 @@ function EncodeFile() {
   const [format, setFormat] = useToolState<OutputFormat>(ID, 'format', 'dataUrl');
   const job = useAsyncJob();
   const previewUrl = useObjectUrl(file && (file.type.startsWith('image/') || detected?.mime.startsWith('image/')) ? file : null);
+  // The file being encoded; results of an abandoned file are ignored.
+  const currentFile = useRef<File | null>(null);
 
   async function onFile(next: File) {
+    currentFile.current = next;
     setFile(next);
     setBase64('');
     setError(null);
     setDetected(null);
     try {
-      setDetected(detectFileType(new Uint8Array(await next.slice(0, 4100).arrayBuffer())));
+      const head = detectFileType(new Uint8Array(await next.slice(0, 4100).arrayBuffer()));
+      if (currentFile.current !== next) return;
+      setDetected(head);
       const encoded = await job.run(({ signal, progress }) =>
         blobToBase64(next, { signal, progress: (f) => progress(f, 'Encoding…'), yieldFn: nextFrame }),
       );
-      setBase64(encoded);
+      if (currentFile.current === next) setBase64(encoded);
     } catch (e) {
+      if (currentFile.current !== next) return;
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        // Cancelled by the user: back to the drop zone, no error.
+        currentFile.current = null;
+        setFile(null);
+        return;
+      }
       setError(errorMessage(e, 'Could not read the file.'));
-      if (e instanceof DOMException && e.name === 'AbortError') setFile(null);
     }
+  }
+
+  function reset() {
+    currentFile.current = null;
+    job.cancel();
+    setFile(null);
+    setBase64('');
+    setError(null);
   }
 
   const mime = file?.type || detected?.mime || 'application/octet-stream';
@@ -96,7 +115,7 @@ function EncodeFile() {
         <Panel
           title={<span className="break-all">{file.name}</span>}
           description={`${formatBytes(file.size)} · ${detected?.label ?? (file.type || 'Unknown type')}`}
-          actions={<IconButton icon={X} label="Choose another file" size="sm" onClick={() => { job.cancel(); setFile(null); setBase64(''); setError(null); }} />}
+          actions={<IconButton icon={X} label="Choose another file" size="sm" onClick={reset} />}
         >
           <div className="flex flex-col gap-4 sm:flex-row">
             {previewUrl && (
@@ -173,10 +192,14 @@ function DecodeToFile() {
   }, [parsed]);
 
   const size = parsed?.ok ? Math.floor((parsed.base64.replace(/=+$/, '').length * 3) / 4) : 0;
-  const mime = head?.mime ?? (parsed?.ok ? parsed.declaredMime : null) ?? 'application/octet-stream';
-  const ext = head?.ext ?? (parsed?.ok && parsed.declaredMime ? extensionForMime(parsed.declaredMime) : 'bin');
+  const declared = parsed?.ok ? parsed.declaredMime : null;
+  // A declared type beats a guess made from text content alone (data:text/csv is CSV, not "plain text").
+  const useDeclared = Boolean(declared && (!head || head.weak));
+  const mime = (useDeclared ? declared : head?.mime) ?? declared ?? 'application/octet-stream';
+  const declaredExt = declared ? extensionForMime(declared) : 'bin';
+  const ext = useDeclared ? (declaredExt !== 'bin' ? declaredExt : (head?.ext ?? 'bin')) : (head?.ext ?? declaredExt);
   const filename = name.trim() || `decoded.${ext}`;
-  const mismatch = parsed?.ok && parsed.declaredMime && head && parsed.declaredMime.toLowerCase() !== head.mime;
+  const mismatch = Boolean(declared && head && !head.weak && canonicalMime(declared) !== canonicalMime(head.mime));
 
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const previewUrl = useObjectUrl(previewBlob);
@@ -202,6 +225,7 @@ function DecodeToFile() {
       downloadBlob(new Blob([bytes.slice()], { type: mime }), filename);
       toast(`Saved ${filename}`);
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
       setError(errorMessage(e, 'Could not decode the data.'));
     }
   }
@@ -231,13 +255,17 @@ function DecodeToFile() {
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               <KeyValueList
                 items={[
-                  { label: 'Detected type', value: head ? `${head.label} (${head.mime})` : 'Not recognized, saved as binary' },
-                  ...(parsed.declaredMime ? [{ label: 'Declared in data URL', value: parsed.declaredMime }] : []),
+                  {
+                    label: 'Detected type',
+                    value: head ? `${head.label} (${head.mime})` : declared ? 'Not recognized from the content' : 'Not recognized, saved as binary',
+                  },
+                  ...(declared ? [{ label: 'Declared in data URL', value: declared }] : []),
+                  { label: 'Saved as', value: mime },
                 ]}
               />
               {mismatch && (
                 <Badge tone="warning" className="self-start">
-                  The data URL says {parsed.declaredMime}, but the content looks like {head?.mime}
+                  The data URL says {declared}, but the content looks like {head?.mime}
                 </Badge>
               )}
               <div className="flex flex-wrap items-end gap-3">

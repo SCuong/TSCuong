@@ -68,5 +68,22 @@ export function toStraight(text: string, opts: Partial<SmartOptions> = {}): stri
 }
 
 export function countTypographic(text: string): number {
-  return (text.match(/[‘’‚‛“”„‟–—…′″«»‹›]/g) ?? []).length;
+  let n = 0;
+  for (const _ of text.matchAll(/[‘’‚‛“”„‟–—…′″«»‹›‐‑‒−]/g)) n++;
+  return n;
+}
+
+export type QuoteDirection = 'smart' | 'straight';
+
+/**
+ * Convert in either direction. `marks` is the number of typographic marks in the result
+ * (straight → curly) or the number that were replaced by plain ASCII (curly → straight).
+ */
+export function convertQuotes(text: string, direction: QuoteDirection, opts: Partial<SmartOptions> = {}): { text: string; marks: number } {
+  if (direction === 'smart') {
+    const out = toSmart(text, opts);
+    return { text: out, marks: countTypographic(out) };
+  }
+  const out = toStraight(text, opts);
+  return { text: out, marks: countTypographic(text) - countTypographic(out) };
 }

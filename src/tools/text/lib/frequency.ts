@@ -1,4 +1,4 @@
-import { countGraphemes, graphemes, words } from './common';
+import { countGraphemes, forEachGrapheme, words } from './common';
 
 export const ENGLISH_STOP_WORDS = new Set(
   (
@@ -40,25 +40,33 @@ export interface FrequencyResult {
   unique: number;
 }
 
+let collator: Intl.Collator | null = null;
+
 function toRows(counts: Map<string, number>, total: number): FrequencyRow[] {
+  // One shared collator: String#localeCompare creates one per call, which is slow for big tables.
+  collator ??= new Intl.Collator();
+  const compare = collator.compare;
   return Array.from(counts, ([item, count]) => ({ item, count, percent: total ? (count / total) * 100 : 0 })).sort(
-    (a, b) => b.count - a.count || a.item.localeCompare(b.item),
+    (a, b) => b.count - a.count || compare(a.item, b.item),
   );
 }
 
 export function wordFrequency(text: string, opts: Partial<WordFrequencyOptions> = {}): FrequencyResult {
   const o = { ...DEFAULT_WORD_FREQ_OPTIONS, ...opts };
+  // Count each distinct spelling once, then filter the (much smaller) set of distinct words.
+  const raw = new Map<string, number>();
+  for (const { word } of words(text)) raw.set(word, (raw.get(word) ?? 0) + 1);
   const counts = new Map<string, number>();
   let total = 0;
-  for (const { word: raw } of words(text)) {
-    const word = raw.replace(/’/g, "'");
+  for (const [rawWord, n] of raw) {
+    const word = rawWord.includes('’') ? rawWord.replace(/’/g, "'") : rawWord;
     if (!o.includeNumbers && !/\p{L}/u.test(word)) continue;
     if (countGraphemes(word) < o.minLength) continue;
     const lower = word.toLowerCase();
     if (o.excludeStopWords && ENGLISH_STOP_WORDS.has(lower)) continue;
     const key = o.caseFold ? lower : word;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-    total++;
+    counts.set(key, (counts.get(key) ?? 0) + n);
+    total += n;
   }
   return { rows: toRows(counts, total), total, unique: counts.size };
 }
@@ -78,14 +86,17 @@ export const DEFAULT_CHAR_FREQ_OPTIONS: CharFrequencyOptions = {
 
 export function charFrequency(text: string, opts: Partial<CharFrequencyOptions> = {}): FrequencyResult {
   const o = { ...DEFAULT_CHAR_FREQ_OPTIONS, ...opts };
+  // Count each distinct grapheme once, then filter the distinct set (texts reuse few characters).
+  const raw = new Map<string, number>();
+  forEachGrapheme(text, (g) => raw.set(g, (raw.get(g) ?? 0) + 1));
   const counts = new Map<string, number>();
   let total = 0;
-  for (const g of graphemes(text)) {
+  for (const [g, n] of raw) {
     if (!o.includeWhitespace && /^\s+$/u.test(g)) continue;
     if (o.lettersOnly && !/[\p{L}\p{N}]/u.test(g)) continue;
     const key = o.caseFold ? g.toLowerCase() : g;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-    total++;
+    counts.set(key, (counts.get(key) ?? 0) + n);
+    total += n;
   }
   return { rows: toRows(counts, total), total, unique: counts.size };
 }

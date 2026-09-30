@@ -127,7 +127,7 @@ export const encodingTools: ToolDefinition[] = [
     icon: FileType,
     route: 'encoding/text-encoding',
     keywords: [
-      'encoding', 'charset', 'utf-8', 'utf-16', 'bom', 'windows-1252', 'latin-1', 'iso-8859', 'shift_jis', 'euc-jp', 'gbk', 'big5', 'koi8-r',
+      'encoding', 'charset', 'utf-8', 'utf-16', 'utf-32', 'bom', 'windows-1252', 'latin-1', 'iso-8859', 'shift_jis', 'euc-jp', 'gbk', 'big5', 'koi8-r',
       'mojibake', 'garbled', 'convert', 'detect',
     ],
     aliases: ['convert to utf-8', 'fix garbled text', 'detect file encoding', 'mojibake fixer', 'change file encoding'],

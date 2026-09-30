@@ -4,6 +4,8 @@ export interface DetectedType {
   mime: string;
   ext: string;
   label: string;
+  /** Guessed from text content only (plain text, JSON): a declared type is more specific. */
+  weak?: boolean;
 }
 
 function startsWith(bytes: Uint8Array, sig: Array<number | null>, offset = 0): boolean {
@@ -86,9 +88,33 @@ export function detectFileType(bytes: Uint8Array): DetectedType | null {
   if (lower.startsWith('<svg') || (lower.startsWith('<?xml') && lower.includes('<svg'))) return T('image/svg+xml', 'svg', 'SVG image');
   if (lower.startsWith('<!doctype html') || lower.startsWith('<html')) return T('text/html', 'html', 'HTML document');
   if (lower.startsWith('<?xml')) return T('application/xml', 'xml', 'XML document');
-  if (/^[{[]/.test(head) && looksLikeText(b)) return T('application/json', 'json', 'JSON (probably)');
-  if (looksLikeText(b)) return T('text/plain', 'txt', 'Plain text');
+  if (/^[{[]/.test(head) && looksLikeText(b)) return { ...T('application/json', 'json', 'JSON (probably)'), weak: true };
+  if (looksLikeText(b)) return { ...T('text/plain', 'txt', 'Plain text'), weak: true };
   return null;
+}
+
+const MIME_ALIASES: Record<string, string> = {
+  'image/jpg': 'image/jpeg',
+  'image/pjpeg': 'image/jpeg',
+  'image/x-png': 'image/png',
+  'image/x-ms-bmp': 'image/bmp',
+  'image/vnd.microsoft.icon': 'image/x-icon',
+  'audio/mp3': 'audio/mpeg',
+  'audio/x-wav': 'audio/wav',
+  'audio/wave': 'audio/wav',
+  'text/xml': 'application/xml',
+  'application/x-zip-compressed': 'application/zip',
+  'application/x-gzip': 'application/gzip',
+  'application/font-woff': 'font/woff',
+  'application/x-font-ttf': 'font/ttf',
+  'application/x-javascript': 'text/javascript',
+  'application/javascript': 'text/javascript',
+};
+
+/** Lower-cased MIME type without parameters, with common aliases mapped (image/jpg → image/jpeg). */
+export function canonicalMime(mime: string): string {
+  const base = mime.toLowerCase().split(';')[0].trim();
+  return MIME_ALIASES[base] ?? base;
 }
 
 /** Heuristic: valid UTF-8 without NUL bytes or many control characters in the first 4 KB. */
@@ -112,14 +138,17 @@ export function looksLikeText(bytes: Uint8Array): boolean {
 
 /** Extension for a MIME type given in a data URL, when magic bytes are inconclusive. */
 export function extensionForMime(mime: string): string {
-  const m = mime.toLowerCase().split(';')[0].trim();
+  const m = canonicalMime(mime);
   const map: Record<string, string> = {
     'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
     'image/avif': 'avif', 'image/bmp': 'bmp', 'image/x-icon': 'ico', 'application/pdf': 'pdf', 'application/zip': 'zip',
     'application/json': 'json', 'text/plain': 'txt', 'text/html': 'html', 'text/css': 'css', 'text/csv': 'csv',
     'text/javascript': 'js', 'application/javascript': 'js', 'application/xml': 'xml', 'text/xml': 'xml',
     'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg', 'video/mp4': 'mp4', 'video/webm': 'webm',
-    'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'application/wasm': 'wasm',
+    'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'font/otf': 'otf', 'application/wasm': 'wasm',
+    'text/markdown': 'md', 'text/tab-separated-values': 'tsv', 'text/yaml': 'yaml', 'application/yaml': 'yaml',
+    'text/calendar': 'ics', 'text/vcard': 'vcf', 'application/rtf': 'rtf', 'image/tiff': 'tif', 'image/heic': 'heic',
+    'audio/flac': 'flac', 'audio/mp4': 'm4a', 'video/quicktime': 'mov', 'application/gzip': 'gz', 'application/x-tar': 'tar',
   };
   return map[m] ?? 'bin';
 }

@@ -1,13 +1,15 @@
 import { useDeferredValue, useMemo } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { NumberInput, Select, Switch } from '@/components/ui/Field';
-import { Alert } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { DownloadButton } from '@/components/ui/Actions';
 import { useToolState } from '@/lib/hooks';
 import { formatBytes, pluralize } from '@/lib/utils';
-import { HEX_SEPARATORS, hexToText, textToHex, type HexSeparator } from './lib/hexBinary';
+import { HEX_SEPARATORS, hexConvert, type HexSeparator } from './lib/hexBinary';
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'hex-encoder';
 const SAMPLE_TEXT = 'Hello, Wörld! 😀';
@@ -26,15 +28,12 @@ export default function HexEncoder() {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((o) => ({ ...o, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => {
-    if (!deferred) return null;
-    if (direction === 'encode') {
-      const bytes = new TextEncoder().encode(deferred).length;
-      return { ok: true as const, text: textToHex(deferred, { ...s, bytesPerLine: typeof s.bytesPerLine === 'number' ? s.bytesPerLine : 0 }), bytes };
-    }
-    const r = hexToText(deferred);
-    return r.ok ? { ok: true as const, text: r.text, bytes: r.bytes.length } : r;
-  }, [deferred, direction, s]);
+  const options = useMemo(
+    () => ({ separator: s.separator, uppercase: s.uppercase, bytesPerLine: typeof s.bytesPerLine === 'number' ? s.bytesPerLine : 0 }),
+    [s.separator, s.uppercase, s.bytesPerLine],
+  );
+  const task = useTask('hexConvert', hexConvert, deferred ? [deferred, direction, options] : null, { size: deferred.length });
+  const result = task.value;
   const output = result?.ok ? result.text : '';
 
   function swap() {
@@ -45,7 +44,7 @@ export default function HexEncoder() {
   return (
     <ToolStack>
       <ToolBar>
-        <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output)} labels={{ encode: 'Text → Hex', decode: 'Hex → Text' }} />
+        <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !task.pending} labels={{ encode: 'Text → Hex', decode: 'Hex → Text' }} />
         {direction === 'encode' ? (
           <>
             <Opt label="Format">
@@ -72,6 +71,7 @@ export default function HexEncoder() {
           <p className="pb-2 text-[12.5px] text-fg-muted">Accepts 48 65, 4865, 48:65, 0x48 0x65, \x48\x65 and %48%65. Bytes are decoded as UTF-8.</p>
         )}
       </ToolBar>
+      <ErrorMessage error={task.error} title="Could not convert this text" />
       {result && !result.ok && (
         <Alert
           tone="danger"
@@ -79,7 +79,7 @@ export default function HexEncoder() {
           action={result.bytes ? <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="bytes.bin" label="Download bytes" /> : undefined}
         >
           {result.error}
-          {result.lossy !== undefined && <span className="mt-1 block text-fg-muted">With replacement characters: {result.lossy.slice(0, 200)}</span>}
+          {result.lossy !== undefined && <span className="mt-1 block text-fg-secondary">With replacement characters: {result.lossy.slice(0, 200)}</span>}
         </Alert>
       )}
       <SplitPanes>
@@ -94,12 +94,13 @@ export default function HexEncoder() {
           height="320px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title={direction === 'encode' ? 'Hex (UTF-8 bytes)' : 'Text'}
           value={output}
           placeholder="Result appears here"
           downloadName={direction === 'encode' ? 'hex.txt' : 'decoded.txt'}
           height="320px"
+          busy={task.pending}
           footer={result?.ok ? <span>{pluralize(result.bytes, 'byte')}{result.bytes >= 1024 ? ` (${formatBytes(result.bytes)})` : ''}</span> : undefined}
         />
       </SplitPanes>

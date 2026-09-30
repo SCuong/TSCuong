@@ -1,25 +1,31 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { EditorPanel, ToolStack } from '@/components/tool/EditorPanel';
+import { ErrorMessage } from '@/components/ui/Alert';
+import { Spinner } from '@/components/ui/Feedback';
 import { Panel, Stat } from '@/components/ui/Panel';
 import { useToolState } from '@/lib/hooks';
 import { formatBytes, formatNumber } from '@/lib/utils';
 import { formatMinutes, READING_WPM, SPEAKING_WPM, textStats } from './lib/stats';
 import { TEXT_FILE_ACCEPT } from './components/shared';
+import { useTask } from './components/useTask';
 
 const ID = 'text-statistics';
 const SAMPLE = `The first draft of anything is rarely perfect. Writers revise, cut and rearrange until every sentence earns its place.
 
 Counting words helps you hit a target length for essays, articles or social posts. Reading time estimates how long your audience needs — useful for newsletters and blog posts! 📚`;
 
+const EMPTY = textStats('');
+
 export default function TextStatistics() {
   const [input, setInput] = useToolState(ID, 'input', '');
   const deferred = useDeferredValue(input);
-  const s = useMemo(() => textStats(deferred), [deferred]);
+  const task = useTask('textStats', textStats, [deferred], { size: deferred.length });
+  const s = task.value ?? EMPTY;
   const n = (v: number) => formatNumber(v, 0);
 
   return (
     <ToolStack>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" aria-busy={task.pending || undefined}>
         <Stat label="Words" value={n(s.words)} />
         <Stat label="Characters" value={n(s.characters)} />
         <Stat label="Without spaces" value={n(s.charactersNoSpaces)} />
@@ -27,6 +33,7 @@ export default function TextStatistics() {
         <Stat label="Paragraphs" value={n(s.paragraphs)} />
         <Stat label="Reading time" value={s.words ? formatMinutes(s.readingMinutes) : '—'} />
       </div>
+      <ErrorMessage error={task.error} title="Could not count this text" />
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <EditorPanel
           title="Text"
@@ -38,11 +45,15 @@ export default function TextStatistics() {
           height="460px"
           ariaLabel="Text to count"
         />
-        <Panel title="Details" bodyClassName="px-4 py-1">
+        <Panel
+          title="Details"
+          description="Characters count what you see: an emoji or an accented letter is one character."
+          actions={task.pending ? <Spinner size={14} label="Counting…" /> : undefined}
+          bodyClassName="px-4 py-1"
+        >
           <dl className="divide-y divide-line text-[13px]">
             {[
-              { label: 'Graphemes', value: n(s.graphemes) },
-              { label: 'Code points', value: n(s.characters) },
+              { label: 'Code points', value: n(s.codePoints) },
               { label: 'UTF-16 units', value: n(s.utf16Units) },
               { label: 'Bytes (UTF-8)', value: `${n(s.bytes)}${s.bytes >= 1024 ? ` (${formatBytes(s.bytes)})` : ''}` },
               { label: 'Lines', value: n(s.lines) },

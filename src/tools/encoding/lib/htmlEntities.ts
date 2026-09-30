@@ -64,16 +64,25 @@ function reference(cp: number, format: EntityFormat): string {
 }
 
 export function encodeEntities(text: string, o: EntityEncodeOptions): string {
+  return encodeEntitiesCounted(text, o).text;
+}
+
+/** Encode and count the characters that became references. */
+export function encodeEntitiesCounted(text: string, o: EntityEncodeOptions): { text: string; count: number } {
   let out = '';
+  let count = 0;
   for (const ch of text) {
     const cp = ch.codePointAt(0)!;
     const special = ch === '&' || ch === '<' || ch === '>' || ch === '"' || ch === "'";
     let encode = special;
     if (!encode && o.scope !== 'special') encode = cp > 0x7e;
     if (!encode && o.scope === 'all') encode = !/[A-Za-z0-9\s]/.test(ch);
-    out += encode ? reference(cp, o.format) : ch;
+    if (encode) {
+      out += reference(cp, o.format);
+      count++;
+    } else out += ch;
   }
-  return out;
+  return { text: out, count };
 }
 
 const REFERENCE = /&(?:#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[A-Za-z][A-Za-z0-9]*;?)/g;
@@ -85,14 +94,25 @@ const REFERENCE = /&(?:#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[A-Za-z][A-Za-z0-9]*;?)/g;
  * from the input is ever parsed, and line endings and everything else stay byte-for-byte.
  */
 export function decodeEntities(text: string): string {
-  if (!text.includes('&')) return text;
+  return decodeEntitiesCounted(text).text;
+}
+
+/** Like `decodeEntities`, also counting the references that were actually decoded (unknown names such as "&foo;" stay). */
+export function decodeEntitiesCounted(text: string): { text: string; count: number } {
+  if (!text.includes('&')) return { text, count: 0 };
   const refs = Array.from(new Set(text.match(REFERENCE) ?? []));
-  if (refs.length === 0) return text;
+  if (refs.length === 0) return { text, count: 0 };
   const doc = new DOMParser().parseFromString(`<!doctype html><body>${refs.map((r) => `<p>${r}</p>`).join('')}`, 'text/html');
   const decoded = new Map<string, string>();
   const paragraphs = doc.body.children;
   refs.forEach((ref, i) => decoded.set(ref, paragraphs[i]?.textContent ?? ref));
-  return text.replace(REFERENCE, (m) => decoded.get(m) ?? m);
+  let count = 0;
+  const out = text.replace(REFERENCE, (m) => {
+    const value = decoded.get(m) ?? m;
+    if (value !== m) count++;
+    return value;
+  });
+  return { text: out, count };
 }
 
 /** Count of character references in the text (for status display). */

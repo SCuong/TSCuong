@@ -8,6 +8,11 @@ export interface FlagInfo {
 
 /** Flags the tester exposes, in the order JavaScript prints them (`RegExp.prototype.flags`). */
 export const FLAGS: FlagInfo[] = [
+  {
+    flag: 'd',
+    name: 'indices',
+    description: 'Record where each capture group starts and ends (match.indices); the tester always shows these positions',
+  },
   { flag: 'g', name: 'global', description: 'Find all matches instead of stopping after the first' },
   { flag: 'i', name: 'ignore case', description: 'Letters match regardless of case' },
   { flag: 'm', name: 'multiline', description: '^ and $ match at the start and end of every line' },

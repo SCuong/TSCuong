@@ -1,12 +1,14 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Select, Switch } from '@/components/ui/Field';
-import { Alert } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { useToolState } from '@/lib/hooks';
 import { pluralize } from '@/lib/utils';
-import { ESCAPE_FORMATS, escapeUnicode, unescapeUnicode, type EscapeFormat, type EscapeScope } from './lib/unicodeEscape';
+import { convertUnicodeEscapes, ESCAPE_FORMATS, type EscapeFormat, type EscapeScope } from './lib/unicodeEscape';
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'unicode-escape';
 const SAMPLE_TEXT = 'Café “quotes” — 日本語 😀';
@@ -26,11 +28,8 @@ export default function UnicodeEscape() {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((o) => ({ ...o, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => {
-    if (!deferred) return null;
-    if (direction === 'encode') return { text: escapeUnicode(deferred, s), count: 0, warnings: [] as string[] };
-    return unescapeUnicode(deferred, { css: s.css });
-  }, [deferred, direction, s]);
+  const task = useTask('convertUnicodeEscapes', convertUnicodeEscapes, deferred ? [deferred, direction, s] : null, { size: deferred.length });
+  const result = task.value;
   const output = result?.text ?? '';
   const example = ESCAPE_FORMATS.find((f) => f.value === s.format)?.example;
 
@@ -46,7 +45,7 @@ export default function UnicodeEscape() {
           direction={direction}
           onDirection={setDirection}
           onSwap={swap}
-          canSwap={Boolean(output)}
+          canSwap={Boolean(output) && !task.pending}
           labels={{ encode: 'Escape', decode: 'Unescape' }}
         />
         {direction === 'encode' ? (
@@ -74,11 +73,13 @@ export default function UnicodeEscape() {
           <>
             <Switch label="Decode CSS escapes (\e9)" checked={s.css} onChange={(v) => set('css', v)} className="pb-1.5" />
             <p className="w-full text-[12.5px] text-fg-muted">
-              Detects every style at once: \uXXXX (with surrogate pairs), \u{'{'}X{'}'}, \UXXXXXXXX, \xXX UTF-8 bytes, &amp;#xX;, &amp;#N;, U+XXXX and CSS escapes.
+              Detects every style at once: \uXXXX (with surrogate pairs), \u{'{'}X{'}'}, \UXXXXXXXX, \xXX UTF-8 bytes, &amp;#xX;, &amp;#N;, U+XXXX and
+              CSS escapes with two or more hex digits (\e9).
             </p>
           </>
         )}
       </ToolBar>
+      <ErrorMessage error={task.error} title="Could not convert this text" />
       {result && result.warnings.length > 0 && (
         <Alert tone="warning" title="Check the result">
           <ul className="list-disc pl-4">
@@ -99,14 +100,17 @@ export default function UnicodeEscape() {
           height="320px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title={direction === 'encode' ? 'Escaped' : 'Unescaped'}
           value={output}
           placeholder="Result appears here"
           downloadName={direction === 'encode' ? 'escaped.txt' : 'unescaped.txt'}
           height="320px"
+          busy={task.pending}
           footer={
-            input ? (direction === 'decode' ? <span>{pluralize(result?.count ?? 0, 'escape')} decoded</span> : <TextFooter text={output} />) : undefined
+            input && result ? (
+              direction === 'decode' ? <span>{pluralize(result.count, 'escape')} decoded</span> : <TextFooter text={output} />
+            ) : undefined
           }
         />
       </SplitPanes>

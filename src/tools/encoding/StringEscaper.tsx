@@ -4,9 +4,11 @@ import { Select, Switch } from '@/components/ui/Field';
 import { ErrorMessage } from '@/components/ui/Alert';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
-import { escapeString, ESCAPE_LANGUAGES, unescapeString, type EscapeLanguage, type EscapeOptions } from './lib/stringEscape';
+import { convertString, escapeString, ESCAPE_LANGUAGES, type EscapeLanguage, type EscapeOptions } from './lib/stringEscape';
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, SampleButton, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'string-escaper';
 const SAMPLE = `He said "it's done"\n\tPath: C:\\Users\\me — ok? 😀`;
@@ -25,11 +27,9 @@ export default function StringEscaper() {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setS((o) => ({ ...o, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => {
-    if (!deferred) return null;
-    if (direction === 'encode') return { ok: true as const, text: escapeString(deferred, s.lang, s) };
-    return unescapeString(deferred, s.lang);
-  }, [deferred, direction, s]);
+  const options = useMemo(() => ({ wrap: s.wrap, asciiOnly: s.asciiOnly, quote: s.quote }), [s.wrap, s.asciiOnly, s.quote]);
+  const task = useTask('convertString', convertString, deferred ? [deferred, direction, s.lang, options] : null, { size: deferred.length });
+  const result = task.value;
   const output = result?.ok ? result.text : '';
   const info = ESCAPE_LANGUAGES.find((l) => l.value === s.lang);
 
@@ -49,7 +49,7 @@ export default function StringEscaper() {
           direction={direction}
           onDirection={setDirection}
           onSwap={swap}
-          canSwap={Boolean(output)}
+          canSwap={Boolean(output) && !task.pending}
           labels={{ encode: 'Escape', decode: 'Unescape' }}
         />
         <Opt label="Language / format">
@@ -83,7 +83,7 @@ export default function StringEscaper() {
         )}
         {info && <p className="w-full text-[12.5px] text-fg-muted">{info.hint}</p>}
       </ToolBar>
-      <ErrorMessage error={result && !result.ok ? result.error : null} title="Cannot unescape" />
+      <ErrorMessage error={result && !result.ok ? result.error : task.error} title={direction === 'encode' ? 'Cannot escape' : 'Cannot unescape'} />
       <SplitPanes>
         <EditorPanel
           title={direction === 'encode' ? 'Raw text' : 'Escaped string'}
@@ -96,12 +96,13 @@ export default function StringEscaper() {
           height="320px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title={direction === 'encode' ? 'Escaped' : 'Unescaped'}
           value={output}
           placeholder="Result appears here"
           downloadName={direction === 'encode' ? 'escaped.txt' : 'unescaped.txt'}
           height="320px"
+          busy={task.pending}
           footer={<TextFooter text={output} />}
         />
       </SplitPanes>

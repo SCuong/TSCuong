@@ -14,10 +14,27 @@ export function splitWords(input: string): string[] {
   return spaced.split(/[^\p{L}\p{N}\p{M}]+/u).filter(Boolean);
 }
 
+/** Characters whose titlecase differs from their uppercase (Unicode "Lt" digraphs). */
+const TITLECASE: Record<string, string> = {
+  Ǆ: 'ǅ', ǅ: 'ǅ', ǆ: 'ǅ', Ǉ: 'ǈ', ǈ: 'ǈ', ǉ: 'ǈ', Ǌ: 'ǋ', ǋ: 'ǋ', ǌ: 'ǋ', Ǳ: 'ǲ', ǲ: 'ǲ', ǳ: 'ǲ', ŉ: 'ʼN',
+};
+
+/**
+ * Titlecase of one character: "ǆ" → "ǅ", and characters that uppercase to several letters
+ * keep only the first one capital ("ß" → "Ss", "ﬁ" → "Fi"), as Unicode's titlecase mapping does.
+ */
+export function toTitleChar(ch: string): string {
+  const mapped = TITLECASE[ch];
+  if (mapped) return mapped;
+  const upper = ch.toUpperCase();
+  const first = String.fromCodePoint(upper.codePointAt(0)!);
+  return upper.length > first.length ? first + upper.slice(first.length).toLowerCase() : upper;
+}
+
 function upperFirst(word: string): string {
   if (!word) return word;
   const first = String.fromCodePoint(word.codePointAt(0)!);
-  return first.toUpperCase() + word.slice(first.length);
+  return toTitleChar(first) + word.slice(first.length);
 }
 
 function capitalize(word: string): string {
@@ -115,13 +132,21 @@ export const capitalizedCase = perLine((line) => {
   return line.replace(WORD_RE, (w) => titleWord(w, upper));
 });
 
+/** Abbreviations whose period does not end a sentence ("i.e. this", "Dr. Smith"). */
+const ABBREVIATION_BEFORE = /(?:^|[^\p{L}])(?:i\.e|e\.g|vs|cf|approx|fig|mr|mrs|ms|dr|prof|jr|sr)$/u;
+
 /** Sentence case: lowercase everything, then uppercase the first letter of each sentence and the pronoun "I". */
 export function sentenceCase(text: string): string {
   let result = text.toLowerCase();
-  result = result.replace(/(^|[.!?…]\s+|\n\s*)(\P{L}*?)(\p{L})/gu, (_m, lead: string, mid: string, letter: string) => {
-    return lead + mid + letter.toUpperCase();
-  });
-  result = result.replace(/(^|[^\p{L}\p{N}])i(?=$|[^\p{L}\p{N}])/gu, '$1I');
+  result = result.replace(
+    /(^|[.!?…]\s+|\n\s*)(\P{L}*?)(\p{L})/gu,
+    (match: string, lead: string, mid: string, letter: string, offset: number, whole: string) => {
+      if (lead.startsWith('.') && ABBREVIATION_BEFORE.test(whole.slice(Math.max(0, offset - 12), offset))) return match;
+      return lead + mid + toTitleChar(letter);
+    },
+  );
+  // The pronoun "i" (also in "i'm"), but not the abbreviation "i.e.".
+  result = result.replace(/(^|[^\p{L}\p{N}])i(?=$|[^\p{L}\p{N}])(?!\.\p{L})/gu, '$1I');
   return result;
 }
 

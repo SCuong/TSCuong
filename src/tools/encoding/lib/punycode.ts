@@ -110,7 +110,7 @@ export function punycodeDecode(input: string): string {
   return String.fromCodePoint(...output);
 }
 
-export type DomainResult = { ok: true; value: string } | { ok: false; error: string };
+export type DomainResult = { ok: true; value: string; warnings?: string[] } | { ok: false; error: string };
 
 const SEPARATORS = /[.。．｡]/;
 
@@ -131,27 +131,101 @@ export function domainToAscii(input: string): DomainResult {
     const url = new URL(`http://${host}/`);
     return { ok: true, value: prefix + url.hostname + rest };
   } catch {
-    return { ok: false, error: `"${host}" is not a valid domain name (check for spaces, symbols or labels that are too long).` };
+    return {
+      ok: false,
+      error: `"${host}" is not a valid domain name: it contains a space, a symbol that is not allowed in host names, or a malformed xn-- label.`,
+    };
   }
+}
+
+/** Code points that can never appear in a host name (WHATWG URL "forbidden host code points", plus controls and spaces). */
+const FORBIDDEN_IN_HOST = /[\0-\x20#%/:<>?@[\\\]^|\x7f-\x9f]/;
+
+/**
+ * Check a decoded label the way a browser would: it must be allowed in a host name and
+ * encode back to the same xn-- label. Returns a problem description, or null when valid.
+ */
+function checkDecodedLabel(asciiLabel: string, decoded: string): { error: string } | { warning: string } | null {
+  if (FORBIDDEN_IN_HOST.test(decoded)) return { error: `"${asciiLabel}" decodes to characters that are not allowed in domain names.` };
+  let reencoded: string;
+  try {
+    reencoded = new URL(`http://${decoded}/`).hostname;
+  } catch {
+    return { error: `"${asciiLabel}" decodes to text that is not a valid internationalized domain label.` };
+  }
+  return reencoded === asciiLabel.toLowerCase()
+    ? null
+    : { warning: `"${asciiLabel}" is not in canonical IDNA form; browsers turn “${decoded}” into ${reencoded}.` };
 }
 
 /** ASCII (xn--) domain → Unicode, decoding each Punycode label. */
 export function domainToUnicode(input: string): DomainResult {
   const { prefix, host, rest } = splitHost(input);
   if (!host) return { ok: false, error: 'Enter a domain name such as xn--bcher-kva.example.' };
+  const warnings: string[] = [];
   try {
     const labels = host.split(SEPARATORS).map((label) => {
       if (/^xn--/i.test(label)) {
         const decoded = punycodeDecode(label.slice(4).toLowerCase());
         if (!decoded) throw new PunycodeError(`"${label}" is an empty Punycode label.`);
+        const problem = checkDecodedLabel(label, decoded);
+        if (problem && 'error' in problem) throw new PunycodeError(problem.error);
+        if (problem) warnings.push(problem.warning);
         return decoded;
       }
       return label.toLowerCase();
     });
-    return { ok: true, value: prefix + labels.join('.') + rest };
+    return { ok: true, value: prefix + labels.join('.') + rest, warnings };
   } catch (error) {
     return { ok: false, error: error instanceof PunycodeError ? error.message : 'Invalid Punycode.' };
   }
+}
+
+/** DNS limits that the browser's URL parser does not enforce, checked on the ASCII (xn--) form. */
+export function dnsProblems(asciiHost: string): string[] {
+  const host = asciiHost.replace(/\.$/, '');
+  if (!host || /^\d+(\.\d+){3}$/.test(host) || host.startsWith('[')) return [];
+  const problems: string[] = [];
+  if (host.length > 253) problems.push(`the name is ${host.length} characters long (DNS allows 253)`);
+  for (const label of host.split('.')) {
+    if (label === '') problems.push('it contains an empty label (two dots in a row)');
+    else if (label.length > 63) problems.push(`the label "${label.slice(0, 20)}…" is ${label.length} characters long (DNS allows 63)`);
+    else if (label.startsWith('-') || label.endsWith('-')) problems.push(`the label "${label}" starts or ends with a hyphen`);
+  }
+  return [...new Set(problems)];
+}
+
+export interface DomainRow {
+  line: number;
+  input: string;
+  output: string;
+  error: string | null;
+  warnings: string[];
+}
+
+/** Convert one domain or URL per line, with errors and warnings per line. */
+export function convertDomains(text: string, direction: 'encode' | 'decode'): DomainRow[] {
+  return text.split(/\r\n|\r|\n/).map((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return { line: i + 1, input: line, output: '', error: null, warnings: [] };
+    const r = direction === 'encode' ? domainToAscii(trimmed) : domainToUnicode(trimmed);
+    if (!r.ok) return { line: i + 1, input: trimmed, output: '', error: r.error, warnings: [] };
+    const warnings = [...(r.warnings ?? [])];
+    const unicodeForm = direction === 'encode' ? trimmed : r.value;
+    const asciiForm = direction === 'encode' ? r.value : trimmed;
+    const suspicious = mixedScriptLabels(hostOf(unicodeForm));
+    if (suspicious.length) {
+      warnings.push(`“${suspicious.join('”, “')}” mixes Latin with Cyrillic or Greek letters, a common look-alike (homograph) trick.`);
+    }
+    const dns = dnsProblems(hostOf(asciiForm));
+    if (dns.length) warnings.push(`Not a valid DNS name: ${dns.join('; ')}.`);
+    return { line: i + 1, input: trimmed, output: r.value, error: null, warnings };
+  });
+}
+
+/** The host part of a domain or URL. */
+function hostOf(value: string): string {
+  return splitHost(value).host;
 }
 
 /** Whether a Unicode label mixes scripts in a way that is typical for look-alike (homograph) domains. */

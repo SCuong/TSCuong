@@ -1,15 +1,19 @@
 import { useDeferredValue, useMemo } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Switch } from '@/components/ui/Field';
+import { ErrorMessage } from '@/components/ui/Alert';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { formatNumber, pluralize } from '@/lib/utils';
 import { codePointLabel } from './lib/common';
-import { measure, normalizeSegments, normalizeText, type NormalForm } from './lib/normalize';
-import { HighlightedText, Opt, TEXT_FILE_ACCEPT, type HighlightRange } from './components/shared';
+import { analyzeNormalization, type NormalForm, type NormalizationReport } from './lib/normalize';
+import { HighlightedText, Opt, TEXT_FILE_ACCEPT } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { useTask } from './components/useTask';
 
 const ID = 'unicode-normalizer';
+const EMPTY_REPORT: NormalizationReport = analyzeNormalization('', { form: 'none', removeDiacritics: false });
 // Decomposed "é" (e + U+0301), a ligature, full-width letters, a circled digit and superscript.
 const SAMPLE = 'Café ﬁnance: Ｆｕｌｌ-width ①②, x² and Å (U+212B). Tiếng Việt, Ελληνικά.';
 
@@ -28,33 +32,16 @@ export default function UnicodeNormalizer() {
 
   const deferred = useDeferredValue(input);
   const opts = useMemo(() => ({ form, removeDiacritics: strip }), [form, strip]);
-  const output = useMemo(() => normalizeText(deferred, opts), [deferred, opts]);
-  const before = useMemo(() => measure(deferred), [deferred]);
-  const after = useMemo(() => measure(output), [output]);
-
-  const analysis = useMemo(() => {
-    const limited = deferred.slice(0, 100_000);
-    const segs = normalizeSegments(limited, opts);
-    const ranges: HighlightRange[] = [];
-    const changes = new Map<string, { before: string; after: string; count: number }>();
-    let offset = 0;
-    for (const s of segs) {
-      if (s.changed) {
-        ranges.push({ start: offset, end: offset + s.before.length, title: `${codePointLabel(s.before)} → ${codePointLabel(s.after) || 'removed'}` });
-        const entry = changes.get(s.before);
-        if (entry) entry.count++;
-        else changes.set(s.before, { before: s.before, after: s.after, count: 1 });
-      }
-      offset += s.before.length;
-    }
-    return { ranges, changes: Array.from(changes.values()).sort((a, b) => b.count - a.count), changed: ranges.length };
-  }, [deferred, opts]);
+  const task = useTask('analyzeNormalization', analyzeNormalization, [deferred, opts], { size: deferred.length });
+  const report = task.value ?? EMPTY_REPORT;
+  const analyzedText = task.args?.[0] ?? '';
+  const partial = analyzedText.length > report.analyzedChars;
 
   const rows: Array<[string, number, number]> = [
-    ['Code points', before.codePoints, after.codePoints],
-    ['UTF-16 units', before.utf16, after.utf16],
-    ['UTF-8 bytes', before.bytes, after.bytes],
-    ['Graphemes', before.graphemes, after.graphemes],
+    ['Code points', report.before.codePoints, report.after.codePoints],
+    ['UTF-16 units', report.before.utf16, report.after.utf16],
+    ['UTF-8 bytes', report.before.bytes, report.after.bytes],
+    ['Graphemes', report.before.graphemes, report.after.graphemes],
   ];
 
   return (
@@ -77,11 +64,19 @@ export default function UnicodeNormalizer() {
         <Switch label="Remove diacritics (é → e)" checked={strip} onChange={setStrip} className="pb-1.5" />
         <p className="w-full text-[12.5px] text-fg-muted">{FORM_HELP[form]}</p>
       </ToolBar>
+      <ErrorMessage error={task.error} title="Could not normalize this text" />
       <SplitPanes>
         <EditorPanel title="Input" value={input} onChange={setInput} placeholder="Paste text to normalize…" sample={SAMPLE} fileAccept={TEXT_FILE_ACCEPT} height="260px" />
-        <EditorPanel title="Normalized" value={output} placeholder="Normalized text appears here" downloadName="normalized.txt" height="260px" />
+        <OutputPanel
+          title="Normalized"
+          value={report.output}
+          placeholder="Normalized text appears here"
+          downloadName="normalized.txt"
+          height="260px"
+          busy={task.pending}
+        />
       </SplitPanes>
-      {input && (
+      {input && task.value && (
         <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
           <Panel title="Before → after" bodyClassName="px-4 py-2">
             <table className="w-full text-[13px]">
@@ -103,15 +98,36 @@ export default function UnicodeNormalizer() {
               </tbody>
             </table>
             <p className="mt-2 text-[12.5px] text-fg-muted">
-              {output === deferred ? 'The text is already in this form.' : `${pluralize(analysis.changed, 'character')} changed.`}
+              {report.output === analyzedText
+                ? form === 'none' && !strip
+                  ? 'Nothing to do: choose a form or remove diacritics.'
+                  : 'The text is already in this form.'
+                : partial
+                  ? `${pluralize(report.changed, 'character')} changed in the first ${formatNumber(report.analyzedChars, 0)} characters.`
+                  : `${pluralize(report.changed, 'character')} changed.`}
             </p>
           </Panel>
-          <Panel title="Changed characters" description={analysis.changed ? 'Highlighted in the input. Hover for code points.' : undefined} bodyClassName="p-3">
-            {analysis.changed ? (
+          <Panel
+            title="Changed characters"
+            description={
+              report.changed
+                ? partial
+                  ? `Highlighted in the first ${formatNumber(report.analyzedChars, 0)} characters of the input. Hover for code points.`
+                  : 'Highlighted in the input. Hover for code points.'
+                : undefined
+            }
+            bodyClassName="p-3"
+          >
+            {report.changed ? (
               <>
-                <HighlightedText text={deferred.slice(0, 100_000)} ranges={analysis.ranges} maxHeight="180px" ariaLabel="Input with changed characters highlighted" />
-                <ul className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-                  {analysis.changes.slice(0, 120).map((c) => (
+                <HighlightedText
+                  text={analyzedText.slice(0, report.analyzedChars)}
+                  ranges={report.ranges}
+                  maxHeight="180px"
+                  ariaLabel="Input with changed characters highlighted"
+                />
+                <ul className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" tabIndex={0} aria-label="Changed characters">
+                  {report.changes.slice(0, 120).map((c) => (
                     <li key={c.before}>
                       <Badge className="font-mono">
                         <span className="text-fg">{c.before}</span>
@@ -125,7 +141,11 @@ export default function UnicodeNormalizer() {
                 </ul>
               </>
             ) : (
-              <p className="px-1 text-[13px] text-fg-muted">No characters change with these settings.</p>
+              <p className="px-1 text-[13px] text-fg-muted">
+                {partial
+                  ? `No characters change in the first ${formatNumber(report.analyzedChars, 0)} characters.`
+                  : 'No characters change with these settings.'}
+              </p>
             )}
           </Panel>
         </div>

@@ -19,14 +19,16 @@ export interface HexEncodeOptions {
   bytesPerLine: number;
 }
 
+const HEX_LOWER = Array.from({ length: 256 }, (_, b) => b.toString(16).padStart(2, '0'));
+const HEX_UPPER = HEX_LOWER.map((h) => h.toUpperCase());
+const BITS = Array.from({ length: 256 }, (_, b) => b.toString(2).padStart(8, '0'));
+
 export function bytesToHex(bytes: Uint8Array, o: HexEncodeOptions): string {
-  const hex = Array.from(bytes, (b) => {
-    const h = b.toString(16).padStart(2, '0');
-    return o.uppercase ? h.toUpperCase() : h;
-  });
   const fmt = (h: string) => (o.separator === 'comma0x' ? `0x${h}` : o.separator === 'backslashX' ? `\\x${h}` : o.separator === 'percent' ? `%${h}` : h);
+  // One formatted string per byte value, looked up instead of formatted a million times.
+  const table = (o.uppercase ? HEX_UPPER : HEX_LOWER).map(fmt);
   const sep = { none: '', space: ' ', colon: ':', dash: '-', comma0x: ', ', backslashX: '', percent: '' }[o.separator];
-  const items = hex.map(fmt);
+  const items = Array.from(bytes, (b) => table[b]);
   if (o.bytesPerLine > 0) {
     const lines: string[] = [];
     for (let i = 0; i < items.length; i += o.bytesPerLine) lines.push(items.slice(i, i + o.bytesPerLine).join(sep));
@@ -83,7 +85,7 @@ export interface BinaryEncodeOptions {
 }
 
 export function textToBinary(text: string, o: BinaryEncodeOptions): string {
-  const bits = Array.from(utf8Encode(text), (b) => b.toString(2).padStart(8, '0'));
+  const bits = Array.from(utf8Encode(text), (b) => BITS[b]);
   return bits.join(o.separator === 'space' ? ' ' : o.separator === 'newline' ? '\n' : '');
 }
 
@@ -113,4 +115,25 @@ export function binaryToText(input: string): TextFromBytes {
   const t = utf8DecodeStrict(r.bytes);
   if (!t.ok) return { ok: false, error: t.error, lossy: t.lossy, bytes: r.bytes };
   return { ok: true, text: t.text, bytes: r.bytes };
+}
+
+/* ------------------------------------------------------------------------ */
+/* One-call conversions (so large texts can be processed in a worker)       */
+/* ------------------------------------------------------------------------ */
+
+export type ConversionResult = { ok: true; text: string; bytes: number } | { ok: false; error: string; lossy?: string; bytes?: Uint8Array };
+
+export function hexConvert(text: string, direction: 'encode' | 'decode', o: HexEncodeOptions): ConversionResult {
+  if (direction === 'encode') {
+    const bytes = utf8Encode(text);
+    return { ok: true, text: bytesToHex(bytes, o), bytes: bytes.length };
+  }
+  const r = hexToText(text);
+  return r.ok ? { ok: true, text: r.text, bytes: r.bytes.length } : r;
+}
+
+export function binaryConvert(text: string, direction: 'encode' | 'decode', o: BinaryEncodeOptions): ConversionResult {
+  if (direction === 'encode') return { ok: true, text: textToBinary(text, o), bytes: utf8Encode(text).length };
+  const r = binaryToText(text);
+  return r.ok ? { ok: true, text: r.text, bytes: r.bytes.length } : r;
 }

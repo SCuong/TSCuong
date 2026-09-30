@@ -4,8 +4,11 @@ import { Input, Select, Switch } from '@/components/ui/Field';
 import { ErrorMessage } from '@/components/ui/Alert';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
-import { filterLines, type FilterCondition, type FilterOptions } from './lib/lines';
+import { buildLineMatcher, filterLines, type FilterCondition, type FilterOptions } from './lib/lines';
 import { Counts, Opt, SampleButton, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { OutputPanel } from './components/OutputPanel';
+import { regexTimeoutMs, RegexTimeoutAlert } from './components/RegexTimeout';
+import { useTask } from './components/useTask';
 
 const ID = 'line-filter';
 const SAMPLE = `2024-05-01 10:00:01 INFO  Server started on port 8080
@@ -34,7 +37,17 @@ export default function LineFilter() {
 
   const deferred = useDeferredValue(input);
   const active = o.condition === 'empty' || o.term !== '';
-  const result = useMemo(() => (active ? filterLines(deferred, o) : null), [deferred, o, active]);
+  // Validate synchronously (compiling a pattern is instant); matching a user regex runs in a
+  // worker with a time limit so catastrophic backtracking cannot freeze the page.
+  const matcher = useMemo(() => (active ? buildLineMatcher(o) : null), [active, o]);
+  const patternError = typeof matcher === 'string' ? matcher : null;
+  const task = useTask('filterLines', filterLines, active && !patternError ? [deferred, o] : null, {
+    size: deferred.length,
+    timeoutMs: o.condition === 'regex' ? regexTimeoutMs(deferred.length) : undefined,
+  });
+  const result = task.value?.ok ? task.value : null;
+  const failure = patternError ?? (task.value && !task.value.ok ? task.value.error : task.error);
+  const output = !active ? deferred : result && !failure && !task.timedOut ? result.text : '';
 
   function loadSample() {
     setInput(SAMPLE);
@@ -72,7 +85,7 @@ export default function LineFilter() {
               mono
               placeholder={o.condition === 'regex' ? 'e.g. ^\\d{4}-' : 'e.g. ERROR'}
               aria-label={o.condition === 'regex' ? 'Regular expression' : 'Filter text'}
-              aria-invalid={(result && !result.ok) || undefined}
+              aria-invalid={Boolean(patternError) || undefined}
             />
           </Opt>
         )}
@@ -83,7 +96,8 @@ export default function LineFilter() {
           </div>
         )}
       </ToolBar>
-      <ErrorMessage error={result && !result.ok ? result.error : null} />
+      <ErrorMessage error={failure} title={patternError ? 'Invalid pattern' : undefined} />
+      {task.timedOut && <RegexTimeoutAlert size={deferred.length} />}
       <SplitPanes>
         <EditorPanel
           title="Input"
@@ -96,15 +110,27 @@ export default function LineFilter() {
           actions={<SampleButton onClick={loadSample} />}
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel
+        <OutputPanel
           title="Filtered"
-          value={result?.ok ? result.text : active ? '' : input}
-          placeholder={active ? 'No lines left after filtering' : 'Enter a filter to see the result'}
+          value={output}
+          placeholder={
+            !input
+              ? 'Filtered lines appear here'
+              : !active
+                ? 'Enter a filter to see the result'
+                : failure || task.timedOut
+                  ? 'Fix the filter to see the result'
+                  : task.pending
+                    ? 'Filtering…'
+                    : 'No lines left after filtering'
+          }
           downloadName="filtered.txt"
           height="420px"
           lineWrapping={false}
+          invalid={Boolean(failure) || task.timedOut}
+          busy={task.pending}
           footer={
-            input && result?.ok ? (
+            input && result && !failure && !task.timedOut ? (
               <Counts
                 items={[
                   { label: 'matched', value: result.matched, tone: 'accent' },

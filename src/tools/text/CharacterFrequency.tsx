@@ -1,13 +1,15 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue } from 'react';
 import { ChartColumn } from 'lucide-react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Switch } from '@/components/ui/Field';
 import { DownloadButton } from '@/components/ui/Actions';
-import { EmptyState } from '@/components/ui/Feedback';
+import { ErrorMessage } from '@/components/ui/Alert';
+import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { Panel } from '@/components/ui/Panel';
 import { useToolState } from '@/lib/hooks';
 import { charFrequency, DEFAULT_CHAR_FREQ_OPTIONS, frequencyToCsv, type CharFrequencyOptions } from './lib/frequency';
 import { Counts, FrequencyTable, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { useTask } from './components/useTask';
 
 const ID = 'character-frequency';
 const SAMPLE = 'Hello, Wörld! 👋🏽 Ça va? Emoji like 👨‍👩‍👧 and flags 🇻🇳 count as one character each.';
@@ -18,7 +20,8 @@ export default function CharacterFrequency() {
   const set = <K extends keyof CharFrequencyOptions>(key: K, value: CharFrequencyOptions[K]) => setO((prev) => ({ ...prev, [key]: value }));
 
   const deferred = useDeferredValue(input);
-  const result = useMemo(() => charFrequency(deferred, o), [deferred, o]);
+  const task = useTask('charFrequency', charFrequency, [deferred, o], { size: deferred.length });
+  const result = task.value;
 
   return (
     <ToolStack>
@@ -29,6 +32,7 @@ export default function CharacterFrequency() {
           <Switch label="Letters and digits only" checked={o.lettersOnly} onChange={(v) => set('lettersOnly', v)} />
         </div>
       </ToolBar>
+      <ErrorMessage error={task.error} title="Could not count the characters" />
       <SplitPanes>
         <EditorPanel
           title="Text"
@@ -44,16 +48,27 @@ export default function CharacterFrequency() {
           title="Character frequency"
           description="Counts user-perceived characters, so emoji and accented letters count once."
           actions={
-            <DownloadButton
-              data={() => frequencyToCsv(result.rows, 'character')}
-              filename="character-frequency.csv"
-              type="text/csv;charset=utf-8"
-              label="CSV"
-              disabled={result.rows.length === 0}
-            />
+            <>
+              {task.pending && <Spinner size={14} label="Counting…" />}
+              <DownloadButton
+                data={() => frequencyToCsv(result?.rows ?? [], 'character')}
+                filename="character-frequency.csv"
+                type="text/csv;charset=utf-8"
+                label="CSV"
+                disabled={!result || result.rows.length === 0}
+              />
+            </>
           }
         >
-          {result.rows.length === 0 ? (
+          {!result ? (
+            task.pending ? (
+              <Spinner label="Counting characters…" className="p-2" />
+            ) : (
+              <EmptyState icon={ChartColumn} title="No text yet">
+                Each character, its code point and share appear here.
+              </EmptyState>
+            )
+          ) : result.rows.length === 0 ? (
             <EmptyState icon={ChartColumn} title={input ? 'Nothing to count with these filters' : 'No text yet'}>
               {input ? 'Turn on “Include whitespace” or allow punctuation.' : 'Each character, its code point and share appear here.'}
             </EmptyState>
@@ -65,7 +80,7 @@ export default function CharacterFrequency() {
                   { label: 'distinct', value: result.unique, tone: 'accent' },
                 ]}
               />
-              <div className="min-h-0 overflow-y-auto">
+              <div className="min-h-0 overflow-y-auto" tabIndex={0} role="region" aria-label="Character frequency table">
                 <FrequencyTable rows={result.rows} itemHeader="Character" mode="char" />
               </div>
             </div>

@@ -1,4 +1,5 @@
-import { countGraphemes, escapeRegExp, joinLines, secureShuffle, splitLines, type Eol } from './common';
+import { describeRegexError } from '../../regex/lib/errors';
+import { compareCodePoints, countGraphemes, escapeRegExp, foldCase, joinLines, secureShuffle, splitLines, type Eol } from './common';
 
 /* ------------------------------------------------------------------------ */
 /* Sort                                                                     */
@@ -32,7 +33,7 @@ export function sortLines(text: string, opts: Partial<SortOptions> = {}): { text
   if (o.unique) {
     const seen = new Set<string>();
     lines = lines.filter((l) => {
-      const key = o.caseInsensitive ? l.toLowerCase() : l;
+      const key = o.caseInsensitive ? foldCase(l) : l;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -54,12 +55,9 @@ export function sortLines(text: string, opts: Partial<SortOptions> = {}): { text
         .map((x) => x.line);
       break;
     case 'codepoint': {
-      const key = (s: string) => (o.caseInsensitive ? s.toLowerCase() : s);
-      lines = lines.slice().sort((a, b) => {
-        const ka = key(a);
-        const kb = key(b);
-        return dir * (ka < kb ? -1 : ka > kb ? 1 : 0);
-      });
+      const decorated = lines.map((line, index) => ({ line, index, key: o.caseInsensitive ? foldCase(line) : line }));
+      decorated.sort((a, b) => dir * compareCodePoints(a.key, b.key) || a.index - b.index);
+      lines = decorated.map((x) => x.line);
       break;
     }
     case 'length': {
@@ -115,7 +113,7 @@ export function dedupeKey(line: string, o: Pick<DedupeOptions, 'caseInsensitive'
   let key = line;
   if (o.whitespace === 'trim') key = key.trim();
   else if (o.whitespace === 'all') key = key.replace(/\s+/gu, ' ').trim();
-  if (o.caseInsensitive) key = key.toLowerCase();
+  if (o.caseInsensitive) key = foldCase(key);
   return key;
 }
 
@@ -375,12 +373,12 @@ export function buildLineMatcher(o: FilterOptions): ((line: string) => boolean) 
     try {
       const re = new RegExp(o.term, o.caseSensitive ? 'u' : 'iu');
       return (line) => re.test(line);
-    } catch (unicodeError) {
+    } catch {
       try {
         const re = new RegExp(o.term, o.caseSensitive ? '' : 'i');
         return (line) => re.test(line);
-      } catch {
-        return `Invalid regular expression: ${(unicodeError as Error).message.replace(/^Invalid regular expression: /, '')}`;
+      } catch (legacyError) {
+        return describeRegexError(legacyError, o.caseSensitive ? '' : 'i');
       }
     }
   }

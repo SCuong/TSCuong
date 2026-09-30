@@ -224,9 +224,9 @@ describe('punycode', () => {
   it('converts domains both ways', () => {
     expect(domainToAscii('Bücher.Example')).toEqual({ ok: true, value: 'xn--bcher-kva.example' });
     expect(domainToAscii('https://müller.de/path?q=1')).toEqual({ ok: true, value: 'https://xn--mller-kva.de/path?q=1' });
-    expect(domainToUnicode('xn--bcher-kva.example')).toEqual({ ok: true, value: 'bücher.example' });
-    expect(domainToUnicode('XN--MNCHEN-3YA.DE')).toEqual({ ok: true, value: 'münchen.de' });
-    expect(domainToUnicode('https://xn--wgv71a119e.jp/x')).toEqual({ ok: true, value: 'https://日本語.jp/x' });
+    expect(domainToUnicode('xn--bcher-kva.example')).toEqual({ ok: true, value: 'bücher.example', warnings: [] });
+    expect(domainToUnicode('XN--MNCHEN-3YA.DE')).toEqual({ ok: true, value: 'münchen.de', warnings: [] });
+    expect(domainToUnicode('https://xn--wgv71a119e.jp/x')).toEqual({ ok: true, value: 'https://日本語.jp/x', warnings: [] });
   });
 
   it('reports invalid domains', () => {

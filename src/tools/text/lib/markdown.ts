@@ -1,4 +1,5 @@
 import { lexer, type Token, type Tokens } from 'marked';
+import { decodeEntities } from '../../encoding/lib/htmlEntities';
 
 export interface MarkdownToTextOptions {
   /** Append link targets: "text (https://…)". */
@@ -21,17 +22,12 @@ export const DEFAULT_MD_OPTIONS: MarkdownToTextOptions = {
   uppercaseHeadings: false,
 };
 
-const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', copy: '©', reg: '®', trade: '™', hellip: '…', mdash: '—', ndash: '–' };
-
-/** Decode character references that commonly appear in Markdown source. */
+/**
+ * Decode character references in Markdown text (CommonMark allows every HTML5 entity, such as
+ * &euro; or &eacute;, plus decimal and hex references), exactly like a browser would.
+ */
 export function decodeBasicEntities(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (m, ref: string) => {
-    if (ref[0] === '#') {
-      const cp = ref[1] === 'x' || ref[1] === 'X' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
-      return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
-    }
-    return NAMED[ref.toLowerCase()] ?? m;
-  });
+  return text.includes('&') ? decodeEntities(text) : text;
 }
 
 function stripTags(html: string): string {
@@ -62,7 +58,8 @@ function inline(tokens: Token[] | undefined, o: MarkdownToTextOptions): string {
         out += inline((t as Tokens.Strong).tokens, o);
         break;
       case 'codespan':
-        out += decodeBasicEntities((t as Tokens.Codespan).text);
+        // Code spans are literal in CommonMark: `&amp;` stays "&amp;".
+        out += (t as Tokens.Codespan).text;
         break;
       case 'br':
         out += '\n';

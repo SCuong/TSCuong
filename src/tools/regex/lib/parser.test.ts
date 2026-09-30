@@ -178,3 +178,13 @@ describe('countCaptureGroups', () => {
     expect(countCaptureGroups('abc')).toEqual({ count: 0, hasNamed: false });
   });
 });
+
+describe('countCaptureGroups class nesting', () => {
+  it('only nests classes with the v flag', () => {
+    // Without v, "[[]" is a complete class, so (a) is group 1 and \1 is a back-reference.
+    expect(countCaptureGroups('[[](a)\\1')).toEqual({ count: 1, hasNamed: false });
+    expect(countCaptureGroups('[[a]](b)', true)).toEqual({ count: 1, hasNamed: false });
+    const ast = parsePattern('[[](a)\\1').ast;
+    expect(ast.alternatives[0].terms.at(-1)).toMatchObject({ type: 'backreference', ref: 1 });
+  });
+});

@@ -43,8 +43,36 @@ export function detectEol(text: string): Eol {
   return '\n';
 }
 
+/** Number of lines (same as `splitLines(text).lines.length`), counted without allocating. */
 export function countLines(text: string): number {
-  return splitLines(text).lines.length;
+  const n = text.length;
+  if (n === 0) return 0;
+  let breaks = 0;
+  for (let i = 0; i < n; i++) {
+    const c = text.charCodeAt(i);
+    if (c === 10) breaks++;
+    else if (c === 13) {
+      breaks++;
+      if (text.charCodeAt(i + 1) === 10) i++;
+    }
+  }
+  const last = text.charCodeAt(n - 1);
+  // A final line break ends the last line instead of starting a new one.
+  return breaks + 1 - (last === 10 || last === 13 ? 1 : 0);
+}
+
+/** Number of code points (lone surrogates count as one), counted without allocating. */
+export function countCodePoints(text: string): number {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) i++;
+    }
+    n++;
+  }
+  return n;
 }
 
 /** Apply a function to every line, keeping line endings and the trailing newline. */
@@ -61,38 +89,110 @@ function hasSegmenter(): boolean {
   return typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function';
 }
 
+/*
+ * Grapheme clusters (UAX #29). Code units below U+0300 are never Extend, SpacingMark, Prepend,
+ * ZWJ, regional indicators or Hangul, so between two of them there is always a boundary (except
+ * CR LF). Runs of such "simple" text are split without Intl.Segmenter, which is slow per call;
+ * only the regions around other characters (accents, emoji, CJK…) go through the segmenter.
+ * The result is identical to segmenting the whole string, just much faster on mostly-Latin text.
+ */
+const SIMPLE_LIMIT = 0x300;
+
+/** End (exclusive) of the complex region starting at `start`: the next guaranteed boundary. */
+function complexRegionEnd(text: string, start: number): number {
+  let j = start + 1;
+  while (j < text.length) {
+    const prev = text.charCodeAt(j - 1);
+    const cur = text.charCodeAt(j);
+    if (prev < SIMPLE_LIMIT && cur < SIMPLE_LIMIT && !(prev === 13 && cur === 10)) break;
+    j++;
+  }
+  return j;
+}
+
+/** Visit every grapheme cluster with its UTF-16 offset. */
+export function forEachGrapheme(text: string, visit: (segment: string, index: number) => void) {
+  const n = text.length;
+  if (!hasSegmenter()) {
+    let index = 0;
+    for (const ch of text) {
+      visit(ch, index);
+      index += ch.length;
+    }
+    return;
+  }
+  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  let i = 0;
+  while (i < n) {
+    const c = text.charCodeAt(i);
+    const next = i + 1 < n ? text.charCodeAt(i + 1) : 0;
+    if (c < SIMPLE_LIMIT && next < SIMPLE_LIMIT) {
+      if (c === 13 && next === 10) {
+        visit('\r\n', i);
+        i += 2;
+      } else {
+        visit(text[i], i);
+        i++;
+      }
+      continue;
+    }
+    const end = complexRegionEnd(text, i);
+    for (const s of graphemeSegmenter.segment(text.slice(i, end))) visit(s.segment, i + s.index);
+    i = end;
+  }
+}
+
 /** Split into user-perceived characters (grapheme clusters), so emoji and combining marks stay intact. */
 export function graphemes(text: string): string[] {
-  if (!text) return [];
+  const out: string[] = [];
+  const n = text.length;
+  if (!n) return out;
   if (!hasSegmenter()) return Array.from(text);
   graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-  const out: string[] = [];
-  for (const s of graphemeSegmenter.segment(text)) out.push(s.segment);
+  let i = 0;
+  while (i < n) {
+    const c = text.charCodeAt(i);
+    const next = i + 1 < n ? text.charCodeAt(i + 1) : 0;
+    if (c < SIMPLE_LIMIT && next < SIMPLE_LIMIT) {
+      if (c === 13 && next === 10) {
+        out.push('\r\n');
+        i += 2;
+      } else {
+        out.push(text[i]);
+        i++;
+      }
+      continue;
+    }
+    const end = complexRegionEnd(text, i);
+    for (const s of graphemeSegmenter.segment(text.slice(i, end))) out.push(s.segment);
+    i = end;
+  }
   return out;
 }
 
 /** Grapheme segments with their UTF-16 offsets. */
 export function graphemeSegments(text: string): Array<{ segment: string; index: number }> {
-  if (!text) return [];
-  if (!hasSegmenter()) {
-    const out: Array<{ segment: string; index: number }> = [];
-    let index = 0;
-    for (const ch of text) {
-      out.push({ segment: ch, index });
-      index += ch.length;
-    }
-    return out;
-  }
-  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-  return Array.from(graphemeSegmenter.segment(text), (s) => ({ segment: s.segment, index: s.index }));
+  const out: Array<{ segment: string; index: number }> = [];
+  if (text) forEachGrapheme(text, (segment, index) => out.push({ segment, index }));
+  return out;
 }
 
 export function countGraphemes(text: string): number {
   if (!text) return 0;
-  if (!hasSegmenter()) return Array.from(text).length;
-  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  if (!hasSegmenter()) return countCodePoints(text);
+  let simple = true;
+  let crlf = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c >= SIMPLE_LIMIT) {
+      simple = false;
+      break;
+    }
+    if (c === 13 && text.charCodeAt(i + 1) === 10) crlf++;
+  }
+  if (simple) return text.length - crlf;
   let n = 0;
-  for (const _ of graphemeSegmenter.segment(text)) n++;
+  forEachGrapheme(text, () => n++);
   return n;
 }
 
@@ -147,6 +247,47 @@ export function utf8Length(text: string): number {
     } else bytes += 3;
   }
   return bytes;
+}
+
+/**
+ * Case-insensitive comparison key. Uppercasing first applies the full Unicode case mappings,
+ * so "Straße" and "STRASSE", or "ǅ" and "ǆ", get the same key (plain toLowerCase does not).
+ */
+export function foldCase(text: string): string {
+  return text.toUpperCase().toLowerCase();
+}
+
+/** Remap a UTF-16 code unit so that comparing remapped units orders strings by code point. */
+function codePointOrderUnit(u: number): number {
+  if (u < 0xd800) return u;
+  return u >= 0xe000 ? u - 0x800 : u + 0x2000;
+}
+
+/**
+ * Compare by Unicode code point (like Python or Rust), not by UTF-16 code unit (like JavaScript's
+ * `<`): an emoji (U+1F600) sorts after "～" (U+FF5E).
+ */
+export function compareCodePoints(a: string, b: string): number {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a.charCodeAt(i);
+    const y = b.charCodeAt(i);
+    if (x !== y) return codePointOrderUnit(x) - codePointOrderUnit(y);
+  }
+  return a.length - b.length;
+}
+
+/**
+ * Combining accents used by Latin, Greek and Cyrillic (the Combining Diacritical Marks blocks).
+ * Deliberately narrower than \p{Mn}: Devanagari vowel signs and viramas, Hebrew points, Japanese
+ * voicing marks (が = か + \u3099) and emoji variation selectors are nonspacing marks too, but removing
+ * them changes or breaks the text.
+ */
+export const DIACRITIC_MARKS = /[\u0300-\u036f\u1dc0-\u1dff\ufe20-\ufe2f\u1ab0-\u1aff]/g;
+
+/** "Crème brûlée" → "Creme brulee" without touching other scripts or emoji. */
+export function stripDiacritics(text: string): string {
+  return text.normalize('NFD').replace(DIACRITIC_MARKS, '').normalize('NFC');
 }
 
 export function escapeRegExp(text: string): string {

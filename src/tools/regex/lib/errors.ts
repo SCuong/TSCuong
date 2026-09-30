@@ -6,7 +6,7 @@
 
 interface Rule {
   test: RegExp;
-  message: (ctx: { flags: string }) => string;
+  message: (ctx: { flags: string; pattern?: string }) => string;
 }
 
 const RULES: Rule[] = [
@@ -79,8 +79,11 @@ const RULES: Rule[] = [
   },
   {
     test: /invalid unicode escape|malformed unicode/i,
-    message: () =>
-      'A Unicode escape is not valid. Use \\uXXXX with four hex digits or \\u{X...} up to 10FFFF (braces need the u or v flag).',
+    message: ({ pattern }) =>
+      // V8 also reports a "\c" without a letter as an invalid Unicode escape.
+      pattern !== undefined && /\\c(?![A-Za-z])/.test(pattern.replace(/\\\\/g, ''))
+        ? 'In u or v mode "\\c" must be followed by a letter (\\cJ is a line feed). Write \\\\c to match a backslash and "c".'
+        : 'A Unicode escape is not valid. Use \\uXXXX with four hex digits or \\u{X...} up to 10FFFF (braces need the u or v flag).',
   },
   {
     test: /invalid decimal escape|invalid class escape|invalid identity escape|invalid escape/i,
@@ -112,10 +115,10 @@ const RULES: Rule[] = [
 ];
 
 /** Returns a human sentence describing why a pattern/flags pair is invalid. */
-export function describeRegexError(error: unknown, flags = ''): string {
+export function describeRegexError(error: unknown, flags = '', pattern?: string): string {
   const raw = error instanceof Error ? error.message : String(error);
   for (const rule of RULES) {
-    if (rule.test.test(raw)) return rule.message({ flags });
+    if (rule.test.test(raw)) return rule.message({ flags, pattern });
   }
   // Unknown engine message: strip the "Invalid regular expression: /.../: " prefix and capitalise.
   const cleaned = raw
@@ -126,13 +129,22 @@ export function describeRegexError(error: unknown, flags = ''): string {
   return text.charAt(0).toUpperCase() + text.slice(1) + (/[.!?]$/.test(text) ? '' : '.');
 }
 
-export type CompileResult = { ok: true; regex: RegExp } | { ok: false; error: string };
+/** The engine's own wording, without the "Invalid regular expression: /…/flags: " prefix. */
+export function engineMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/^invalid regular expression:\s*\/[\s\S]*\/[a-z]*:\s*/i, '')
+    .replace(/^SyntaxError:\s*/i, '')
+    .trim();
+}
 
-/** Compile a pattern, returning a human error instead of throwing. */
+export type CompileResult = { ok: true; regex: RegExp } | { ok: false; error: string; engine: string };
+
+/** Compile a pattern, returning a human error (and the browser's own message) instead of throwing. */
 export function compileRegex(pattern: string, flags: string): CompileResult {
   try {
     return { ok: true, regex: new RegExp(pattern, flags) };
   } catch (error) {
-    return { ok: false, error: describeRegexError(error, flags) };
+    return { ok: false, error: describeRegexError(error, flags, pattern), engine: engineMessage(error) };
   }
 }

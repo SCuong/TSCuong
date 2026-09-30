@@ -6,8 +6,10 @@ import { Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { allShifts, caesar, rot47 } from './lib/rot';
+import { allShifts, rotate } from './lib/rot';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
+import { OutputPanel } from '../text/components/OutputPanel';
+import { useTask } from '../text/components/useTask';
 
 const ID = 'rot13-caesar';
 const SAMPLE = 'Why did the chicken cross the road? Gb trg gb gur bgure fvqr!';
@@ -23,11 +25,8 @@ export default function RotCipher() {
   const [bruteForce, setBruteForce] = useToolState(ID, 'bruteForce', false);
 
   const deferred = useDeferredValue(input);
-  const output = useMemo(() => {
-    if (!deferred) return '';
-    if (algo === 'rot47') return rot47(deferred);
-    return caesar(deferred, decode ? -shift : shift, digits);
-  }, [deferred, algo, shift, decode, digits]);
+  const task = useTask('rotate', rotate, deferred ? [deferred, algo, shift, decode, digits] : null, { size: deferred.length });
+  const output = task.value ?? '';
   const shifts = useMemo(() => (bruteForce && algo === 'caesar' && deferred ? allShifts(deferred.slice(0, 300)) : []), [bruteForce, algo, deferred]);
 
   return (
@@ -89,7 +88,15 @@ export default function RotCipher() {
           height="280px"
           footer={<TextFooter text={input} />}
         />
-        <EditorPanel title="Output" value={output} placeholder="Result appears here" downloadName="rotated.txt" height="280px" footer={<TextFooter text={output} />} />
+        <OutputPanel
+          title="Output"
+          value={output}
+          placeholder="Result appears here"
+          downloadName="rotated.txt"
+          height="280px"
+          busy={task.pending}
+          footer={<TextFooter text={output} />}
+        />
       </SplitPanes>
       {shifts.length > 0 && (
         <Panel title="All shifts" description="Find the readable line to crack an unknown Caesar shift. Click a row to use it." bodyClassName="p-0">
@@ -98,6 +105,7 @@ export default function RotCipher() {
               <li key={s.shift}>
                 <button
                   type="button"
+                  aria-pressed={!decode && s.shift === shift}
                   onClick={() => {
                     setShift(s.shift);
                     setDecode(false);

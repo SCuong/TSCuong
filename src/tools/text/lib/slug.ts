@@ -1,3 +1,5 @@
+import { DIACRITIC_MARKS } from './common';
+
 /** Letters that do not decompose under Unicode normalization but have common Latin spellings. */
 const SPECIAL: Record<string, string> = {
   ß: 'ss', ẞ: 'SS', æ: 'ae', Æ: 'AE', œ: 'oe', Œ: 'OE', ø: 'o', Ø: 'O', ł: 'l', Ł: 'L', đ: 'd', Đ: 'D',
@@ -33,26 +35,24 @@ export interface TransliterateOptions {
   symbols?: boolean;
 }
 
+function transliterateChar(ch: string, options: TransliterateOptions): string {
+  if (options.germanUmlauts && GERMAN[ch]) return GERMAN[ch];
+  if (options.symbols && SYMBOLS[ch]) return SYMBOLS[ch];
+  if (ch.charCodeAt(0) < 0x80) return ch;
+  const special = SPECIAL[ch] ?? mapScript(ch, CYRILLIC) ?? mapScript(ch.normalize('NFD').replace(DIACRITIC_MARKS, ''), GREEK);
+  if (special !== undefined) return special;
+  // Compatibility forms fold (ﬁ → fi, ① → 1, Ｆ → F) and accents drop (é → e). Marks that are
+  // part of other scripts (Devanagari vowel signs, Japanese voicing marks) are kept.
+  return ch.normalize('NFKD').replace(DIACRITIC_MARKS, '');
+}
+
 /** Convert accented and non-Latin letters to ASCII approximations where there is a common spelling. */
 export function transliterate(text: string, options: TransliterateOptions = {}): string {
-  let out = '';
-  for (const ch of text.normalize('NFC')) {
-    if (options.germanUmlauts && GERMAN[ch]) {
-      out += GERMAN[ch];
-      continue;
-    }
-    if (options.symbols && SYMBOLS[ch]) {
-      out += SYMBOLS[ch];
-      continue;
-    }
-    const special = SPECIAL[ch] ?? mapScript(ch, CYRILLIC) ?? mapScript(ch.normalize('NFD').replace(/\p{Mn}/gu, ''), GREEK);
-    if (special !== undefined) {
-      out += special;
-      continue;
-    }
-    out += ch.normalize('NFKD').replace(/\p{Mn}/gu, '');
-  }
-  return out;
+  // Only non-ASCII characters and the ASCII symbols (& @ % + $) need work; plain ASCII is skipped fast.
+  return text
+    .normalize('NFC')
+    .replace(/[^\0-\x7f]|[&@%+$]/gu, (ch) => transliterateChar(ch, options))
+    .normalize('NFC');
 }
 
 export interface SlugOptions {
@@ -82,7 +82,8 @@ export function slugify(input: string, opts: Partial<SlugOptions> = {}): string 
   let text = o.transliterate ? transliterate(input, { germanUmlauts: o.germanUmlauts, symbols: o.symbols }) : input.normalize('NFC');
   // Apostrophes inside words vanish ("don't" → "dont") instead of splitting the word.
   text = text.replace(/(\p{L})['’](\p{L})/gu, '$1$2');
-  const wordRe = o.keepUnicode ? /[\p{L}\p{N}\p{M}]+/gu : /[A-Za-z0-9]+/g;
+  // Marks only count as part of a word after a letter or digit (a lone emoji variation selector is not a word).
+  const wordRe = o.keepUnicode ? /[\p{L}\p{N}][\p{L}\p{N}\p{M}]*/gu : /[A-Za-z0-9]+/g;
   let parts: string[] = text.match(wordRe) ?? [];
   if (o.lowercase) parts = parts.map((p) => p.toLowerCase());
   const sep = o.separator;
@@ -109,4 +110,9 @@ export function slugifyLines(input: string, opts: Partial<SlugOptions> = {}): st
     .split(/\r\n|\r|\n/)
     .map((line) => (line.trim() ? slugify(line, opts) : ''))
     .join('\n');
+}
+
+/** The generator's output in one call (single slug or one per line), so large texts can run in a worker. */
+export function makeSlugs(text: string, bulk: boolean, opts: Partial<SlugOptions>): string {
+  return bulk ? slugifyLines(text, opts) : slugify(text, opts);
 }

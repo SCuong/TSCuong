@@ -96,18 +96,45 @@ export function urlDecode(text: string, o: UrlDecodeOptions): UrlResult {
   }
 }
 
-/** Decode as much as possible, leaving malformed sequences untouched. */
-export function urlDecodeLenient(text: string, plusAsSpace: boolean): string {
+/** Characters that decodeURI keeps percent-encoded so the URL structure does not change. */
+const URI_RESERVED = new Set([...';/?:@&=+$,#']);
+
+/** Length of the UTF-8 sequence a lead byte starts (1–4), or 0 when it cannot start one. */
+function utf8SequenceLength(lead: number): number {
+  if (lead < 0x80) return 1;
+  if (lead >= 0xc2 && lead <= 0xdf) return 2;
+  if (lead >= 0xe0 && lead <= 0xef) return 3;
+  if (lead >= 0xf0 && lead <= 0xf4) return 4;
+  return 0;
+}
+
+/**
+ * Decode as much as possible, leaving malformed sequences untouched: in "%C3%A9%FF" the valid
+ * "é" is decoded and only "%FF" stays. In `uri` mode reserved characters (%2F, %3F…) stay
+ * encoded, like decodeURI.
+ */
+export function urlDecodeLenient(text: string, plusAsSpace: boolean, mode: 'component' | 'uri' = 'component'): string {
   const input = plusAsSpace ? text.replace(/\+/g, ' ') : text;
   return input.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
-    try {
-      return decodeURIComponent(run);
-    } catch {
-      // Decode valid pieces inside the run one sequence at a time.
-      return run.replace(/%[0-9a-f]{2}/gi, (seq) => {
-        const b = parseInt(seq.slice(1), 16);
-        return b < 0x80 ? String.fromCharCode(b) : seq;
-      });
+    const count = run.length / 3;
+    let out = '';
+    let i = 0;
+    while (i < count) {
+      const len = utf8SequenceLength(parseInt(run.slice(i * 3 + 1, i * 3 + 3), 16));
+      if (len > 0 && i + len <= count) {
+        const seq = run.slice(i * 3, (i + len) * 3);
+        try {
+          const ch = decodeURIComponent(seq);
+          out += mode === 'uri' && URI_RESERVED.has(ch) ? seq : ch;
+          i += len;
+          continue;
+        } catch {
+          // Not valid UTF-8: keep this byte encoded and try again from the next one.
+        }
+      }
+      out += run.slice(i * 3, i * 3 + 3);
+      i++;
     }
+    return out;
   });
 }
