@@ -9,6 +9,7 @@ import { formatBytes } from '@/lib/utils';
 import { DEFAULT_OPTIONS, formatErrorText, type FormatOptions, type PrettierParser } from '../lib/prettier';
 import { useCodeJob } from './codeRunner';
 import { JobStatus, settledOutcome, useByteSize } from './shared';
+import { t } from '@/lib/i18n';
 
 export interface ParserOption {
   value: PrettierParser;
@@ -59,7 +60,7 @@ export function FormatterTool({
       <ToolBar>
         {parsers.length > 1 && (
           <div>
-            <Label htmlFor={`${toolId}-parser`}>Language</Label>
+            <Label htmlFor={`${toolId}-parser`}>{t('Language')}</Label>
             <Select id={`${toolId}-parser`} value={current.value} onChange={(e) => setParser(e.target.value as PrettierParser)} className="w-auto min-w-36">
               {parsers.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -70,7 +71,7 @@ export function FormatterTool({
           </div>
         )}
         <div>
-          <Label htmlFor={`${toolId}-width`}>Print width</Label>
+          <Label htmlFor={`${toolId}-width`}>{t('Print width')}</Label>
           <Select id={`${toolId}-width`} value={opts.printWidth} onChange={(e) => set('printWidth', Number(e.target.value))} className="w-auto min-w-24">
             {[40, 60, 80, 100, 120, 160].map((w) => (
               <option key={w} value={w}>
@@ -80,54 +81,54 @@ export function FormatterTool({
           </Select>
         </div>
         <div>
-          <Label>Indent</Label>
+          <Label>{t('Indent')}</Label>
           <Segmented
-            label="Indent"
+            label={t('Indent')}
             value={opts.useTabs ? 'tab' : String(opts.tabWidth)}
             onChange={(v) => setOpts((o) => (v === 'tab' ? { ...o, useTabs: true } : { ...o, useTabs: false, tabWidth: Number(v) }))}
             options={[
-              { value: '2', label: '2 spaces' },
-              { value: '4', label: '4 spaces' },
-              { value: 'tab', label: 'Tabs' },
+              { value: '2', label: t('2 spaces') },
+              { value: '4', label: t('4 spaces') },
+              { value: 'tab', label: t('Tabs') },
             ]}
           />
         </div>
         <div>
-          <Label>Quotes</Label>
+          <Label>{t('Quotes')}</Label>
           <Segmented
-            label="Quotes"
+            label={t('Quotes')}
             value={opts.singleQuote ? 'single' : 'double'}
             onChange={(v) => set('singleQuote', v === 'single')}
             options={[
-              { value: 'double', label: '"Double"' },
-              { value: 'single', label: "'Single'" },
+              { value: 'double', label: t('"Double"') },
+              { value: 'single', label: t('\'Single\'') },
             ]}
           />
         </div>
         {scriptOptions && (
           <>
             <div>
-              <Label htmlFor={`${toolId}-trailing`}>Trailing commas</Label>
+              <Label htmlFor={`${toolId}-trailing`}>{t('Trailing commas')}</Label>
               <Select
                 id={`${toolId}-trailing`}
                 value={opts.trailingComma}
                 onChange={(e) => set('trailingComma', e.target.value as FormatOptions['trailingComma'])}
                 className="w-auto min-w-28"
               >
-                <option value="all">All</option>
+                <option value="all">{t('All')}</option>
                 <option value="es5">ES5</option>
-                <option value="none">None</option>
+                <option value="none">{t('None')}</option>
               </Select>
             </div>
-            <Switch label="Semicolons" checked={opts.semi} onChange={(v) => set('semi', v)} className="h-9" />
+            <Switch label={t('Semicolons')} checked={opts.semi} onChange={(v) => set('semi', v)} className="h-9" />
           </>
         )}
         {markupOptions && (
-          <Switch label="Closing > on same line" checked={opts.bracketSameLine} onChange={(v) => set('bracketSameLine', v)} className="h-9" />
+          <Switch label={t('Closing > on same line')} checked={opts.bracketSameLine} onChange={(v) => set('bracketSameLine', v)} className="h-9" />
         )}
       </ToolBar>
       {error && (
-        <Alert tone="danger" title="Syntax error">
+        <Alert tone="danger" title={t('Syntax error')}>
           <p>{formatErrorText(error)}</p>
           {error.frame && (
             <pre className="mt-2 overflow-x-auto rounded-md bg-surface-sunken p-2 font-mono text-[12px] leading-relaxed text-fg">{error.frame}</pre>
@@ -136,12 +137,12 @@ export function FormatterTool({
       )}
       <SplitPanes>
         <EditorPanel
-          title="Input"
+          title={t('Input')}
           value={input}
           onChange={setInput}
           language={current.language}
           code
-          placeholder={`Paste ${current.label} here…`}
+          placeholder={t('Paste {label} here…', { label: current.label })}
           sample={current.sample}
           fileAccept={fileAccept}
           invalid={Boolean(error)}
@@ -150,21 +151,21 @@ export function FormatterTool({
           footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <EditorPanel
-          title="Formatted"
+          title={t('Formatted')}
           value={output}
           language={current.language}
           code
-          placeholder={empty ? 'Formatted code appears here' : ''}
+          placeholder={empty ? t('Formatted code appears here') : ''}
           downloadName={`formatted.${current.ext}`}
           height="520px"
           lineWrapping={false}
           footer={
             status === 'pending' || status === 'cancelled' ? (
-              <JobStatus status={status} busyLabel="Formatting…" onCancel={job.cancel} />
+              <JobStatus status={status} busyLabel={t('Formatting…')} onCancel={job.cancel} />
             ) : output ? (
               <>
-                <span className="text-success">Formatted with Prettier</span>
-                <span>{outputLines.toLocaleString()} lines</span>
+                <span className="text-success">{t('Formatted with Prettier')}</span>
+                <span>{t('{outputLines} lines', { outputLines: outputLines.toLocaleString() })}</span>
                 <span>{formatBytes(outputBytes)}</span>
               </>
             ) : undefined

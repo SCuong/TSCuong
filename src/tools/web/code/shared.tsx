@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Feedback';
 import { cn, formatBytes } from '@/lib/utils';
 import { byteLength, sizeSavings } from '../lib/sizes';
 import type { CodeJobState, CodeOutcome } from './codeRunner';
+import { t } from '@/lib/i18n';
 
 /** The outcome to display: the current one, or the previous one while a new job runs. */
 export function settledOutcome<T>(state: CodeJobState<T>, previous: CodeOutcome<T> | null): CodeOutcome<T> | null {
@@ -20,12 +21,12 @@ export function JobStatus({ status, busyLabel, onCancel }: { status: CodeJobStat
       <span className="flex items-center gap-2">
         <Spinner size={13} label={busyLabel} />
         <Button size="sm" variant="ghost" onClick={onCancel} className="h-7">
-          Cancel
+          {t('Cancel')}
         </Button>
       </span>
     );
   }
-  if (status === 'cancelled') return <span role="status">Stopped. Edit the input or change an option to run it again.</span>;
+  if (status === 'cancelled') return <span role="status">{t('Stopped. Edit the input or change an option to run it again.')}</span>;
   return null;
 }
 
@@ -54,7 +55,7 @@ export function SizeSavingsBar({ before, after }: { before: string; after: strin
         {s.saved >= 0 ? `−${pct.toFixed(1)}%` : `+${Math.abs(pct).toFixed(1)}%`}
       </span>
       <span className="text-[13px] text-fg-muted">
-        {s.saved >= 0 ? `${formatBytes(s.saved)} saved` : `${formatBytes(-s.saved)} larger`}
+        {s.saved >= 0 ? t('{size} saved', { size: formatBytes(s.saved) }) : t('{size} larger', { size: formatBytes(-s.saved) })}
       </span>
       <div className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-surface-hover" aria-hidden>
         <div className="h-full rounded-full bg-success" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />

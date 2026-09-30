@@ -22,6 +22,7 @@ import {
   type RadialShape,
   type RadialSize,
 } from './lib/gradient';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'css-gradient-generator';
 const clamp = (v: number) => Math.min(100, Math.max(0, Math.round(v * 10) / 10));
@@ -95,15 +96,15 @@ export default function GradientGenerator() {
     <ToolStack>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <div className="lk-checker h-64 overflow-hidden rounded-xl border border-line sm:h-80" role="img" aria-label="Gradient preview">
+          <div className="lk-checker h-64 overflow-hidden rounded-xl border border-line sm:h-80" role="img" aria-label={t('Gradient preview')}>
             <div className="size-full" style={{ backgroundImage: css }} />
           </div>
           <Panel
-            title="Color stops"
-            description="Click the bar or use Add stop to add a stop. Drag handles, or focus one and use the arrow keys (Shift for 10%). Delete removes it."
+            title={t('Color stops')}
+            description={t('Click the bar or use Add stop to add a stop. Drag handles, or focus one and use the arrow keys (Shift for 10%). Delete removes it.')}
             actions={
               <Button size="sm" icon={Plus} onClick={addStop}>
-                Add stop
+                {t('Add stop')}
               </Button>
             }
           >
@@ -119,7 +120,7 @@ export default function GradientGenerator() {
                     key={s.id}
                     type="button"
                     role="slider"
-                    aria-label={`Stop ${stopColor(s)}`}
+                    aria-label={t('Stop {stopColor}', { stopColor: stopColor(s) })}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={s.position}
@@ -149,12 +150,12 @@ export default function GradientGenerator() {
             </div>
             {selected && (
               <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
-                <ColorInput label="Color" value={selected.color} onChange={(color) => updateStop(selected.id, { color })} />
-                <SliderRow label="Opacity" value={Math.round(selected.alpha * 100)} min={0} max={100} unit="%" onChange={(v) => updateStop(selected.id, { alpha: v / 100 })} />
-                <SliderRow label="Position" value={selected.position} min={0} max={100} step={0.5} unit="%" onChange={(v) => updateStop(selected.id, { position: clamp(v) })} />
+                <ColorInput label={t('Color')} value={selected.color} onChange={(color) => updateStop(selected.id, { color })} />
+                <SliderRow label={t('Opacity')} value={Math.round(selected.alpha * 100)} min={0} max={100} unit="%" onChange={(v) => updateStop(selected.id, { alpha: v / 100 })} />
+                <SliderRow label={t('Position')} value={selected.position} min={0} max={100} step={0.5} unit="%" onChange={(v) => updateStop(selected.id, { position: clamp(v) })} />
                 <div className="flex items-end">
                   <Button variant="ghost" size="sm" icon={Trash2} disabled={g.stops.length <= 2} onClick={() => removeStop(selected.id)}>
-                    Remove stop
+                    {t('Remove stop')}
                   </Button>
                 </div>
               </div>
@@ -163,59 +164,59 @@ export default function GradientGenerator() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Panel title="Settings" bodyClassName="flex flex-col gap-4">
+          <Panel title={t('Settings')} bodyClassName="flex flex-col gap-4">
             <div>
-              <Label>Type</Label>
+              <Label>{t('Type')}</Label>
               <Segmented
-                label="Gradient type"
+                label={t('Gradient type')}
                 value={g.type}
                 onChange={(v: GradientType) => set('type', v)}
                 options={[
-                  { value: 'linear', label: 'Linear' },
-                  { value: 'radial', label: 'Radial' },
-                  { value: 'conic', label: 'Conic' },
+                  { value: 'linear', label: t('Linear') },
+                  { value: 'radial', label: t('Radial') },
+                  { value: 'conic', label: t('Conic') },
                 ]}
               />
             </div>
             {g.type !== 'radial' && (
-              <SliderRow label={g.type === 'linear' ? 'Angle' : 'Start angle'} value={g.angle} min={0} max={360} unit="°" onChange={(v) => set('angle', v)} />
+              <SliderRow label={g.type === 'linear' ? t('Angle') : t('Start angle')} value={g.angle} min={0} max={360} unit="°" onChange={(v) => set('angle', v)} />
             )}
             {g.type === 'radial' && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="grad-shape">Shape</Label>
+                  <Label htmlFor="grad-shape">{t('Shape')}</Label>
                   <Select id="grad-shape" value={g.shape} onChange={(e) => set('shape', e.target.value as RadialShape)}>
-                    <option value="ellipse">Ellipse</option>
-                    <option value="circle">Circle</option>
+                    <option value="ellipse">{t('Ellipse')}</option>
+                    <option value="circle">{t('Circle')}</option>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="grad-size">Size</Label>
+                  <Label htmlFor="grad-size">{t('Size')}</Label>
                   <Select id="grad-size" value={g.size} onChange={(e) => set('size', e.target.value as RadialSize)}>
-                    <option value="farthest-corner">Farthest corner</option>
-                    <option value="farthest-side">Farthest side</option>
-                    <option value="closest-corner">Closest corner</option>
-                    <option value="closest-side">Closest side</option>
+                    <option value="farthest-corner">{t('Farthest corner')}</option>
+                    <option value="farthest-side">{t('Farthest side')}</option>
+                    <option value="closest-corner">{t('Closest corner')}</option>
+                    <option value="closest-side">{t('Closest side')}</option>
                   </Select>
                 </div>
               </div>
             )}
             {g.type !== 'linear' && (
               <>
-                <SliderRow label="Center X" value={g.x} min={0} max={100} unit="%" onChange={(v) => set('x', v)} />
-                <SliderRow label="Center Y" value={g.y} min={0} max={100} unit="%" onChange={(v) => set('y', v)} />
+                <SliderRow label={t('Center X')} value={g.x} min={0} max={100} unit="%" onChange={(v) => set('x', v)} />
+                <SliderRow label={t('Center Y')} value={g.y} min={0} max={100} unit="%" onChange={(v) => set('y', v)} />
               </>
             )}
-            <Switch label="Repeating" checked={g.repeating} onChange={(v) => set('repeating', v)} />
+            <Switch label={t('Repeating')} checked={g.repeating} onChange={(v) => set('repeating', v)} />
           </Panel>
-          <Panel title="Presets">
+          <Panel title={t('Presets')}>
             <div className="grid grid-cols-4 gap-2">
               {GRADIENT_PRESETS.map((p) => (
                 <button
                   key={p.name}
                   type="button"
-                  title={p.name}
-                  aria-label={`Preset: ${p.name}`}
+                  title={t(p.name)}
+                  aria-label={t('Preset: {name}', { name: t(p.name) })}
                   onClick={() => {
                     const stops = p.gradient.stops.map((s) => ({ ...s, id: stopId() }));
                     setG({ ...p.gradient, stops });

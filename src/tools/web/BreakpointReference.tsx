@@ -8,6 +8,7 @@ import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { DEVICES, FRAMEWORKS, activeBreakpoint, buildMediaQuery, frameworkQuery, type Device, type MediaQueryOptions } from './lib/breakpoints';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'breakpoint-reference';
 
@@ -66,12 +67,12 @@ export default function BreakpointReference() {
 
   return (
     <ToolStack>
-      <Panel title="Your viewport" description="Updates live as you resize the window.">
+      <Panel title={t('Your viewport')} description={t('Updates live as you resize the window.')}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Width" value={`${vp.width}px`} />
-          <Stat label="Height" value={`${vp.height}px`} />
-          <Stat label="Pixel ratio" value={`${Number(vp.dpr.toFixed(2))}×`} />
-          <Stat label="Orientation" value={vp.width >= vp.height ? 'landscape' : 'portrait'} />
+          <Stat label={t('Width')} value={`${vp.width}px`} />
+          <Stat label={t('Height')} value={`${vp.height}px`} />
+          <Stat label={t('Pixel ratio')} value={`${Number(vp.dpr.toFixed(2))}×`} />
+          <Stat label={t('Orientation')} value={vp.width >= vp.height ? t('Landscape') : t('Portrait')} />
         </div>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[13px]">
           {FRAMEWORKS.map((f) => (
@@ -83,11 +84,11 @@ export default function BreakpointReference() {
       </Panel>
 
       <Panel
-        title="Framework breakpoints"
-        description={framework.approach}
+        title={t('Framework breakpoints')}
+        description={t(framework.approach)}
         actions={
           <Segmented
-            label="Framework"
+            label={t('Framework')}
             size="sm"
             value={framework.id}
             onChange={setFwId}
@@ -96,14 +97,14 @@ export default function BreakpointReference() {
         }
         bodyClassName="p-0"
       >
-        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`${framework.name} breakpoints`}>
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={t('{name} breakpoints', { name: framework.name })}>
           <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead className="text-[12px] text-fg-muted">
               <tr className="border-b border-line">
-                <th className="py-2 pr-3 pl-4 font-medium">Name</th>
-                <th className="py-2 pr-3 font-medium">Min width</th>
-                <th className="py-2 pr-3 font-medium">Range</th>
-                <th className="py-2 pr-4 font-medium">Media query (this size and up / only this range)</th>
+                <th className="py-2 pr-3 pl-4 font-medium">{t('Name')}</th>
+                <th className="py-2 pr-3 font-medium">{t('Min width')}</th>
+                <th className="py-2 pr-3 font-medium">{t('Range')}</th>
+                <th className="py-2 pr-4 font-medium">{t('Media query (this size and up / only this range)')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -118,16 +119,16 @@ export default function BreakpointReference() {
                       <span className="font-mono font-semibold text-fg">{bp.name}</span>
                       {isActive && (
                         <Badge tone="accent" className="ml-2">
-                          current
+                          {t('current')}
                         </Badge>
                       )}
                     </td>
                     <td className="py-2 pr-3 font-mono text-fg tabular-nums">
-                      {bp.min}px{bp.note && /^\d/.test(bp.note) && <span className="ml-1 text-fg-muted">({bp.note})</span>}
+                      {t('{min}px', { min: bp.min })}{bp.note && /^\d/.test(bp.note) && <span className="ml-1 text-fg-muted">({bp.note})</span>}
                     </td>
                     <td className="py-2 pr-3 text-fg-secondary">
                       {range(bp.min, bp.max)}
-                      {bp.note && !/^\d/.test(bp.note) && <span className="block text-[12px] text-fg-muted">{bp.note}</span>}
+                      {bp.note && !/^\d/.test(bp.note) && <span className="block text-[12px] text-fg-muted">{t(bp.note)}</span>}
                     </td>
                     <td className="py-2 pr-4">
                       <div className="flex flex-col gap-1 font-mono text-[12px]">
@@ -135,12 +136,12 @@ export default function BreakpointReference() {
                           qq ? (
                             <span key={i} className="flex items-center gap-1">
                               <code className="min-w-0 flex-1 break-all text-fg-secondary">{qq}</code>
-                              <CopyButton value={`${qq} {\n  \n}`} iconOnly label={`Copy ${i === 0 ? 'min-width' : 'range'} query for ${bp.name}`} />
+                              <CopyButton value={`${qq} {\n  \n}`} iconOnly label={(i === 0) ? t('Copy min-width query for {name}', { name: bp.name }) : t('Copy range query for {name}', { name: bp.name })} />
                             </span>
                           ) : (
                             i === 0 && (
                               <span key={i} className="font-sans text-fg-muted">
-                                Base styles, no media query
+                                {t('Base styles, no media query')}
                               </span>
                             )
                           ),
@@ -156,109 +157,110 @@ export default function BreakpointReference() {
       </Panel>
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-2">
-        <Panel title="Media query builder" bodyClassName="flex flex-col gap-4">
+        <Panel title={t('Media query builder')} bodyClassName="flex flex-col gap-4">
           <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
             <div>
-              <Label>Condition</Label>
+              <Label>{t('Condition')}</Label>
               <Segmented
-                label="Condition"
+                label={t('Condition')}
                 value={q.mode}
                 onChange={(v) => setQ('mode', v)}
                 options={[
-                  { value: 'min', label: 'From' },
-                  { value: 'max', label: 'Below' },
-                  { value: 'between', label: 'Between' },
+                  { value: 'min', label: t('From') },
+                  { value: 'max', label: t('Below') },
+                  { value: 'between', label: t('Between') },
                 ]}
               />
             </div>
             {q.mode !== 'max' && (
               <div className="w-28">
-                <Label htmlFor="bq-min">Min width (px)</Label>
+                <Label htmlFor="bq-min">{t('Min width (px)')}</Label>
                 <NumberInput id="bq-min" min={0} value={q.min} onChange={(v) => setQ('min', v === '' ? 0 : Math.max(0, v))} />
               </div>
             )}
             {q.mode !== 'min' && (
               <div className="w-28">
-                <Label htmlFor="bq-max">{q.mode === 'max' ? 'Width below (px)' : 'Max (exclusive)'}</Label>
+                <Label htmlFor="bq-max">{q.mode === 'max' ? t('Width below (px)') : t('Max (exclusive)')}</Label>
                 <NumberInput id="bq-max" min={0} value={q.max} onChange={(v) => setQ('max', v === '' ? 0 : Math.max(0, v))} />
               </div>
             )}
             <div>
-              <Label>Unit</Label>
-              <Segmented label="Unit" value={q.unit} onChange={(v) => setQ('unit', v)} options={[{ value: 'px', label: 'px' }, { value: 'em', label: 'em' }]} />
+              <Label>{t('Unit')}</Label>
+              <Segmented label={t('Unit')} value={q.unit} onChange={(v) => setQ('unit', v)} options={[{ value: 'px', label: 'px' }, { value: 'em', label: 'em' }]} />
             </div>
             <div>
-              <Label>Syntax</Label>
+              <Label>{t('Syntax')}</Label>
               <Segmented
-                label="Syntax"
+                label={t('Syntax')}
                 value={q.syntax}
                 onChange={(v) => setQ('syntax', v)}
                 options={[
-                  { value: 'classic', label: 'min/max-width' },
-                  { value: 'range', label: 'Range (width >=)' },
+                  { value: 'classic', label: t('min/max-width') },
+                  { value: 'range', label: t('Range (width >=)') },
                 ]}
               />
             </div>
           </div>
           <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
             <div>
-              <Label htmlFor="bq-orient">Orientation</Label>
+              <Label htmlFor="bq-orient">{t('Orientation')}</Label>
               <Select id="bq-orient" value={q.orientation} onChange={(e) => setQ('orientation', e.target.value as MediaQueryOptions['orientation'])} className="w-auto">
-                <option value="any">Any</option>
-                <option value="portrait">Portrait</option>
-                <option value="landscape">Landscape</option>
+                <option value="any">{t('Any')}</option>
+                <option value="portrait">{t('Portrait')}</option>
+                <option value="landscape">{t('Landscape')}</option>
               </Select>
             </div>
             <div>
-              <Label htmlFor="bq-scheme">Color scheme</Label>
+              <Label htmlFor="bq-scheme">{t('Color scheme')}</Label>
               <Select id="bq-scheme" value={q.colorScheme} onChange={(e) => setQ('colorScheme', e.target.value as MediaQueryOptions['colorScheme'])} className="w-auto">
-                <option value="any">Any</option>
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
+                <option value="any">{t('Any')}</option>
+                <option value="dark">{t('Dark')}</option>
+                <option value="light">{t('Light')}</option>
               </Select>
             </div>
-            <Checkbox label="Reduced motion" checked={q.reducedMotion} onChange={(v) => setQ('reducedMotion', v)} className="h-9 items-center" />
-            <Checkbox label="Mouse / fine pointer" checked={q.hover} onChange={(v) => setQ('hover', v)} className="h-9 items-center" />
+            <Checkbox label={t('Reduced motion')} checked={q.reducedMotion} onChange={(v) => setQ('reducedMotion', v)} className="h-9 items-center" />
+            <Checkbox label={t('Mouse / fine pointer')} checked={q.hover} onChange={(v) => setQ('hover', v)} className="h-9 items-center" />
           </div>
           <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-sunken px-3 py-2.5">
             <pre className="min-w-0 flex-1 font-mono text-[13px] break-all whitespace-pre-wrap text-fg">{query}</pre>
-            <CopyButton value={query} iconOnly label="Copy media query" />
+            <CopyButton value={query} iconOnly label={t('Copy media query')} />
           </div>
           {typeof window !== 'undefined' && (
             <p className="text-[12.5px] text-fg-muted">
-              In this window the query currently{' '}
-              <strong className="font-semibold text-fg">{window.matchMedia(query.slice(7, query.indexOf(' {'))).matches ? 'matches' : 'does not match'}</strong>.
-              {q.syntax === 'range' && ' Range syntax works in all current browsers (2023+).'}
+              {window.matchMedia(query.slice(7, query.indexOf(' {'))).matches
+                ? t('In this window the query currently matches.')
+                : t('In this window the query currently does not match.')}
+              {q.syntax === 'range' && <> {t('Range syntax works in all current browsers (2023+).')}</>}
             </p>
           )}
         </Panel>
 
         <Panel
-          title="Common device viewports"
-          description="CSS pixels, portrait. Actual sizes vary with browser UI and zoom."
+          title={t('Common device viewports')}
+          description={t('CSS pixels, portrait. Actual sizes vary with browser UI and zoom.')}
           actions={
             <Segmented
-              label="Device type"
+              label={t('Device type')}
               size="sm"
               value={kind}
               onChange={setKind}
               options={[
-                { value: 'all', label: 'All' },
-                { value: 'Phone', label: 'Phones' },
-                { value: 'Tablet', label: 'Tablets' },
-                { value: 'Laptop', label: 'Laptops' },
-                { value: 'Desktop', label: 'Desktops' },
+                { value: 'all', label: t('All') },
+                { value: 'Phone', label: t('Phones') },
+                { value: 'Tablet', label: t('Tablets') },
+                { value: 'Laptop', label: t('Laptops') },
+                { value: 'Desktop', label: t('Desktops') },
               ]}
             />
           }
           bodyClassName="p-0"
         >
-          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Common device viewports">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={t('Common device viewports')}>
             <table className="w-full min-w-[340px] text-left text-[13px]">
               <thead className="text-[12px] text-fg-muted">
                 <tr className="border-b border-line">
-                  <th className="py-2 pr-3 pl-4 font-medium">Device</th>
-                  <th className="py-2 pr-3 font-medium">Viewport</th>
+                  <th className="py-2 pr-3 pl-4 font-medium">{t('Device')}</th>
+                  <th className="py-2 pr-3 font-medium">{t('Viewport')}</th>
                   <th className="py-2 pr-4 font-medium">{framework.name.split(' ')[0]}</th>
                 </tr>
               </thead>
@@ -270,7 +272,7 @@ export default function BreakpointReference() {
                       <td className="py-2 pr-3 pl-4">
                         <span className="flex items-center gap-2 text-fg">
                           <Icon size={15} className="shrink-0 text-fg-muted" aria-hidden />
-                          {d.name}
+                          {t(d.name)}
                         </span>
                       </td>
                       <td className="py-2 pr-3 font-mono whitespace-nowrap text-fg tabular-nums">

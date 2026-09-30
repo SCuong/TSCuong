@@ -17,6 +17,7 @@ import {
   type Encoding,
   type StringifyOptions,
 } from './lib/queryString';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'query-string-parser';
 const SAMPLE_QUERY = '?q=trail+running+shoes&page=2&sort=price_asc&brand[]=Salomon&brand[]=Hoka&filter[size][min]=42&filter[size][max]=45&filter[waterproof]=true&utm_source=newsletter&debug';
@@ -36,14 +37,14 @@ type Mode = 'parse' | 'build';
 function EncodingControl({ value, onChange }: { value: Encoding; onChange: (v: Encoding) => void }) {
   return (
     <div>
-      <Label>Encoding</Label>
+      <Label>{t('Encoding')}</Label>
       <Segmented
-        label="Encoding"
+        label={t('Encoding')}
         value={value}
         onChange={onChange}
         options={[
-          { value: 'rfc3986', label: 'RFC 3986 (%20)', title: 'Strict percent-encoding; spaces become %20' },
-          { value: 'form', label: 'Form (+)', title: 'application/x-www-form-urlencoded; spaces become +' },
+          { value: 'rfc3986', label: 'RFC 3986 (%20)', title: t('Strict percent-encoding; spaces become %20') },
+          { value: 'form', label: t('Form (+)'), title: t('application/x-www-form-urlencoded; spaces become +') },
         ]}
       />
     </div>
@@ -75,19 +76,19 @@ function ParseMode() {
   return (
     <>
       <ToolBar>
-        <Switch label="+ means space" checked={plusAsSpace} onChange={setPlusAsSpace} className="h-8" />
-        <Switch label="Nested brackets (a[b]=1)" checked={nested} onChange={setNested} className="h-8" />
+        <Switch label={t('+ means space')} checked={plusAsSpace} onChange={setPlusAsSpace} className="h-8" />
+        <Switch label={t('Nested brackets (a[b]=1)')} checked={nested} onChange={setNested} className="h-8" />
         <div>
-          <Label htmlFor="qs-dups">Repeated keys</Label>
+          <Label htmlFor="qs-dups">{t('Repeated keys')}</Label>
           <Select id="qs-dups" value={duplicates} onChange={(e) => setDuplicates(e.target.value as DuplicateMode)} className="w-auto">
-            <option value="array">Collect into an array</option>
-            <option value="first">Keep the first value</option>
-            <option value="last">Keep the last value</option>
+            <option value="array">{t('Collect into an array')}</option>
+            <option value="first">{t('Keep the first value')}</option>
+            <option value="last">{t('Keep the last value')}</option>
           </Select>
         </div>
       </ToolBar>
       {result.warnings.length > 0 && (
-        <Alert tone="warning" title="Some keys conflict">
+        <Alert tone="warning" title={t('Some keys conflict')}>
           <ul className="list-disc pl-4">
             {result.warnings.map((w) => (
               <li key={w}>{w}</li>
@@ -97,14 +98,14 @@ function ParseMode() {
       )}
       <SplitPanes>
         <EditorPanel
-          title="Query string"
+          title={t('Query string')}
           value={input}
           onChange={setInput}
-          placeholder="Paste a query string, ?a=1&b=2, or a full URL…"
+          placeholder={t('Paste a query string, ?a=1&b=2, or a full URL…')}
           sample={SAMPLE_QUERY}
           fileAccept=".txt,text/plain"
           height="320px"
-          footer={hasInput ? <span>{pluralize(pairs.length, 'parameter')}</span> : undefined}
+          footer={hasInput ? <span>{pluralize(pairs.length, t('parameter'), t('parameters'))}</span> : undefined}
         />
         <EditorPanel
           title="JSON"
@@ -112,19 +113,19 @@ function ParseMode() {
           language="json"
           downloadName="query.json"
           downloadType="application/json"
-          placeholder={hasInput ? 'No parameters found in this input.' : 'The parsed object appears here'}
+          placeholder={hasInput ? t('No parameters found in this input.') : t('The parsed object appears here')}
           height="320px"
         />
       </SplitPanes>
       {pairs.length > 0 && (
-        <Panel title={`Parameters (${pairs.length})`} bodyClassName="p-0">
-          <div className="max-h-[420px] overflow-auto" tabIndex={0} role="region" aria-label="Parameters">
+        <Panel title={t('Parameters ({count})', { count: pairs.length })} bodyClassName="p-0">
+          <div className="max-h-[420px] overflow-auto" tabIndex={0} role="region" aria-label={t('Parameters')}>
             <table className="w-full min-w-[420px] text-left text-[13px]">
               <thead className="sticky top-0 bg-surface text-[12px] text-fg-muted">
                 <tr className="border-b border-line">
                   <th className="w-10 py-2 pr-2 pl-4 font-medium">#</th>
-                  <th className="py-2 pr-3 font-medium">Key</th>
-                  <th className="py-2 pr-4 font-medium">Value</th>
+                  <th className="py-2 pr-3 font-medium">{t('Key')}</th>
+                  <th className="py-2 pr-4 font-medium">{t('Value')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line font-mono text-[12.5px]">
@@ -132,7 +133,7 @@ function ParseMode() {
                   <tr key={i} className="align-top">
                     <td className="py-1.5 pr-2 pl-4 font-sans text-fg-muted tabular-nums">{i + 1}</td>
                     <td className="py-1.5 pr-3 break-all text-fg">
-                      {p.key || <span className="font-sans text-fg-muted">(empty key)</span>}
+                      {p.key || <span className="font-sans text-fg-muted">{t('(empty key)')}</span>}
                       {(counts.get(p.key) ?? 0) > 1 && (
                         <Badge tone="warning" className="ml-1.5 align-middle font-sans">
                           ×{counts.get(p.key)}
@@ -140,26 +141,26 @@ function ParseMode() {
                       )}
                     </td>
                     <td className="py-1.5 pr-4 break-all text-fg">
-                      {p.value || <span className="font-sans text-fg-muted">{p.hasEquals ? '(empty)' : '(no value)'}</span>}
+                      {p.value || <span className="font-sans text-fg-muted">{p.hasEquals ? t('(empty)') : t('(no value)')}</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {pairs.length > 1000 && <p className="px-4 py-2 text-[12.5px] text-fg-muted">Showing the first 1,000 of {pairs.length.toLocaleString()} parameters.</p>}
+            {pairs.length > 1000 && <p className="px-4 py-2 text-[12.5px] text-fg-muted">{t('Showing the first 1,000 of {count} parameters.', { count: pairs.length.toLocaleString() })}</p>}
           </div>
         </Panel>
       )}
       {pairs.length > 0 && (
-        <Panel title="Re-encoded query string" description="The same parameters, consistently percent-encoded.">
+        <Panel title={t('Re-encoded query string')} description={t('The same parameters, consistently percent-encoded.')}>
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
               <EncodingControl value={encoding} onChange={setEncoding} />
-              <Switch label="Sort by key" checked={sortKeys} onChange={setSortKeys} className="h-8" />
+              <Switch label={t('Sort by key')} checked={sortKeys} onChange={setSortKeys} className="h-8" />
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-sunken px-3 py-2.5">
               <code className="min-w-0 flex-1 font-mono text-[13px] break-all text-fg">{rebuilt}</code>
-              <CopyButton value={rebuilt} iconOnly label="Copy query string" />
+              <CopyButton value={rebuilt} iconOnly label={t('Copy query string')} />
             </div>
           </div>
         </Panel>
@@ -185,18 +186,18 @@ function BuildMode() {
       <ToolBar>
         <EncodingControl value={encoding} onChange={setEncoding} />
         <div>
-          <Label htmlFor="qs-arrays">Arrays</Label>
+          <Label htmlFor="qs-arrays">{t('Arrays')}</Label>
           <Select id="qs-arrays" value={arrayFormat} onChange={(e) => setArrayFormat(e.target.value as ArrayFormat)} className="w-auto">
-            <option value="brackets">tags[]=a&amp;tags[]=b</option>
-            <option value="indices">tags[0]=a&amp;tags[1]=b</option>
-            <option value="repeat">tags=a&amp;tags=b</option>
-            <option value="comma">tags=a,b</option>
+            <option value="brackets">{t('tags[]=a&tags[]=b')}</option>
+            <option value="indices">{t('tags[0]=a&tags[1]=b')}</option>
+            <option value="repeat">{t('tags=a&tags=b')}</option>
+            <option value="comma">{t('tags=a,b')}</option>
           </Select>
         </div>
-        <Switch label="Sort keys" checked={sortKeys} onChange={setSortKeys} className="h-8" />
-        <Switch label="Readable [ ]" checked={readableBrackets} onChange={setReadableBrackets} className="h-8" />
+        <Switch label={t('Sort keys')} checked={sortKeys} onChange={setSortKeys} className="h-8" />
+        <Switch label={t('Readable [ ]')} checked={readableBrackets} onChange={setReadableBrackets} className="h-8" />
       </ToolBar>
-      <ErrorMessage error={result && !result.ok ? result.error : null} title="Cannot build a query string" />
+      <ErrorMessage error={result && !result.ok ? result.error : null} title={t('Cannot build a query string')} />
       <SplitPanes>
         <EditorPanel
           title="JSON"
@@ -210,15 +211,15 @@ function BuildMode() {
           height="360px"
         />
         <EditorPanel
-          title="Query string"
+          title={t('Query string')}
           value={output}
-          placeholder="The query string appears here"
+          placeholder={t('The query string appears here')}
           height="360px"
           footer={
             result?.ok ? (
               <>
-                <span>{pluralize(result.count, 'parameter')}</span>
-                <span>{pluralize(output.length, 'character')}</span>
+                <span>{pluralize(result.count, t('parameter'), t('parameters'))}</span>
+                <span>{pluralize(output.length, t('character'), t('characters'))}</span>
               </>
             ) : undefined
           }
@@ -234,12 +235,12 @@ export default function QueryStringParser() {
     <ToolStack>
       <div>
         <Segmented
-          label="Direction"
+          label={t('Direction')}
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'parse', label: 'Query → JSON' },
-            { value: 'build', label: 'JSON → Query' },
+            { value: 'parse', label: t('Query → JSON') },
+            { value: 'build', label: t('JSON → Query') },
           ]}
         />
       </div>

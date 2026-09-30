@@ -6,6 +6,7 @@ import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { formatBytes, pluralize } from '@/lib/utils';
 import { CHANGEFREQS, MAX_URLS, buildSitemap, todayIso, type Changefreq, type SitemapOptions } from './lib/sitemap';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'sitemap-generator';
 const SAMPLE = `https://www.example.com/
@@ -66,22 +67,22 @@ export default function SitemapGenerator() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label htmlFor="sm-lastmod">Last modified</Label>
+          <Label htmlFor="sm-lastmod">{t('Last modified')}</Label>
           <div className="flex gap-2">
             <Select id="sm-lastmod" value={s.lastmodMode} onChange={(e) => set('lastmodMode', e.target.value as Settings['lastmodMode'])} className="w-auto">
-              <option value="none">Omit</option>
-              <option value="today">Today</option>
-              <option value="custom">Pick a date</option>
+              <option value="none">{t('Omit')}</option>
+              <option value="today">{t('Today')}</option>
+              <option value="custom">{t('Pick a date')}</option>
             </Select>
             {s.lastmodMode === 'custom' && (
-              <Input type="date" aria-label="Last modified date" value={s.lastmodCustom} onChange={(e) => set('lastmodCustom', e.target.value)} className="w-auto" />
+              <Input type="date" aria-label={t('Last modified date')} value={s.lastmodCustom} onChange={(e) => set('lastmodCustom', e.target.value)} className="w-auto" />
             )}
           </div>
         </div>
         <div>
-          <Label htmlFor="sm-freq">Change frequency</Label>
+          <Label htmlFor="sm-freq">{t('Change frequency')}</Label>
           <Select id="sm-freq" value={s.changefreq} onChange={(e) => set('changefreq', e.target.value as Settings['changefreq'])} className="w-auto">
-            <option value="none">Omit</option>
+            <option value="none">{t('Omit')}</option>
             {CHANGEFREQS.map((f) => (
               <option key={f} value={f}>
                 {f}
@@ -90,16 +91,16 @@ export default function SitemapGenerator() {
           </Select>
         </div>
         <div>
-          <Label htmlFor="sm-priority">Priority</Label>
+          <Label htmlFor="sm-priority">{t('Priority')}</Label>
           <div className="flex gap-2">
             <Select id="sm-priority" value={s.priority} onChange={(e) => set('priority', e.target.value as Settings['priority'])} className="w-auto">
-              <option value="none">Omit</option>
-              <option value="depth">By URL depth</option>
-              <option value="fixed">Same for all</option>
+              <option value="none">{t('Omit')}</option>
+              <option value="depth">{t('By URL depth')}</option>
+              <option value="fixed">{t('Same for all')}</option>
             </Select>
             {s.priority === 'fixed' && (
               <NumberInput
-                aria-label="Priority value"
+                aria-label={t('Priority value')}
                 min={0}
                 max={1}
                 step={0.05}
@@ -110,18 +111,18 @@ export default function SitemapGenerator() {
             )}
           </div>
         </div>
-        <Switch label="Remove duplicates" checked={s.removeDuplicates} onChange={(v) => set('removeDuplicates', v)} className="h-8" />
-        <Switch label="Drop #fragments" checked={s.stripFragments} onChange={(v) => set('stripFragments', v)} className="h-8" />
+        <Switch label={t('Remove duplicates')} checked={s.removeDuplicates} onChange={(v) => set('removeDuplicates', v)} className="h-8" />
+        <Switch label={t('Drop #fragments')} checked={s.stripFragments} onChange={(v) => set('stripFragments', v)} className="h-8" />
       </ToolBar>
       <Panel>
-        <Field label="Base URL for relative paths (optional)" hint="Lets you paste paths such as /about instead of full URLs.">
+        <Field label={t('Base URL for relative paths (optional)')} hint={t('Lets you paste paths such as /about instead of full URLs.')}>
           {({ id, describedBy }) => (
             <Input id={id} aria-describedby={describedBy} mono value={s.baseUrl} placeholder="https://www.example.com/" spellCheck={false} onChange={(e) => set('baseUrl', e.target.value)} />
           )}
         </Field>
       </Panel>
       {build.errors.map((e) => (
-        <ErrorMessage key={e} error={e} title="Cannot create the sitemap" />
+        <ErrorMessage key={e} error={e} title={t('Cannot create the sitemap')} />
       ))}
       {build.warnings.map((w) => (
         <Alert key={w} tone="warning">
@@ -130,10 +131,10 @@ export default function SitemapGenerator() {
       ))}
       <SplitPanes>
         <EditorPanel
-          title="URLs (one per line)"
+          title={t('URLs (one per line)')}
           value={input}
           onChange={setInput}
-          placeholder={'https://example.com/\nhttps://example.com/about'}
+          placeholder={t('https://example.com/\nhttps://example.com/about')}
           sample={SAMPLE}
           fileAccept=".txt,.csv,text/plain"
           height="440px"
@@ -141,9 +142,9 @@ export default function SitemapGenerator() {
           footer={
             input.trim() ? (
               <>
-                <span>{pluralize(build.entries.length, 'URL')}</span>
-                {errorCount > 0 && <span className="text-danger">{pluralize(errorCount, 'error')}</span>}
-                {warningCount > 0 && <span className="text-warning">{pluralize(warningCount, 'warning')}</span>}
+                <span>{pluralize(build.entries.length, t('URL'), t('URLs'))}</span>
+                {errorCount > 0 && <span className="text-danger">{pluralize(errorCount, t('error'), t('errors'))}</span>}
+                {warningCount > 0 && <span className="text-warning">{pluralize(warningCount, t('warning'), t('warnings'))}</span>}
               </>
             ) : undefined
           }
@@ -154,13 +155,13 @@ export default function SitemapGenerator() {
           language="xml"
           downloadName="sitemap.xml"
           downloadType="application/xml"
-          placeholder={input.trim() ? 'Fix the problems above to generate the sitemap' : 'Paste URLs to generate a sitemap'}
+          placeholder={input.trim() ? t('Fix the problems above to generate the sitemap') : t('Paste URLs to generate a sitemap')}
           height="440px"
           footer={
             build.xml ? (
               <>
                 <span className="text-success">
-                  {build.entries.length.toLocaleString()} of {MAX_URLS.toLocaleString()} URLs
+                  {t('{count} of {MAX_URLS} URLs', { count: build.entries.length.toLocaleString(), MAX_URLS: MAX_URLS.toLocaleString() })}
                 </span>
                 <span>{formatBytes(build.bytes)}</span>
               </>
@@ -169,14 +170,14 @@ export default function SitemapGenerator() {
         />
       </SplitPanes>
       {build.issues.length > 0 && (
-        <Panel title={`Problems (${build.issues.length})`} description="Lines with errors are left out of the sitemap." bodyClassName="p-0">
-          <div className="max-h-[360px] overflow-auto" tabIndex={0} role="region" aria-label="Problems by line">
+        <Panel title={t('Problems ({count})', { count: build.issues.length })} description={t('Lines with errors are left out of the sitemap.')} bodyClassName="p-0">
+          <div className="max-h-[360px] overflow-auto" tabIndex={0} role="region" aria-label={t('Problems by line')}>
             <table className="w-full min-w-[480px] text-left text-[13px]">
               <thead className="sticky top-0 bg-surface text-[12px] text-fg-muted">
                 <tr className="border-b border-line">
-                  <th className="w-14 py-2 pr-2 pl-4 font-medium">Line</th>
+                  <th className="w-14 py-2 pr-2 pl-4 font-medium">{t('Line')}</th>
                   <th className="py-2 pr-3 font-medium">URL</th>
-                  <th className="py-2 pr-4 font-medium">Problem</th>
+                  <th className="py-2 pr-4 font-medium">{t('Problem')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -194,7 +195,7 @@ export default function SitemapGenerator() {
                 ))}
               </tbody>
             </table>
-            {build.issues.length > 500 && <p className="px-4 py-2 text-[12.5px] text-fg-muted">Showing the first 500 problems.</p>}
+            {build.issues.length > 500 && <p className="px-4 py-2 text-[12.5px] text-fg-muted">{t('Showing the first 500 problems.')}</p>}
           </div>
         </Panel>
       )}

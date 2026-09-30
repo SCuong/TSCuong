@@ -11,6 +11,7 @@ import { Segmented } from '@/components/ui/Segmented';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { buildUrl, parseUrl, partsFromUrl, toDisplayUrl, type ParsedUrl, type UrlParts } from './lib/url';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'url-parser';
 const SAMPLE = 'https://admin:s3cret@shop.bücher.example:8443/catalog/books/sci-fi%20%26%20fantasy?sort=price&tag=new&tag=sale&q=space+opera#reviews';
@@ -24,7 +25,7 @@ function Value({ value, copy = true }: { value: string; copy?: boolean }) {
   return (
     <span className="flex items-start gap-1">
       <span className="min-w-0 flex-1 break-all">{value}</span>
-      {copy && <CopyButton value={value} iconOnly label="Copy value" className="-my-1" />}
+      {copy && <CopyButton value={value} iconOnly label={t('Copy value')} className="-my-1" />}
     </span>
   );
 }
@@ -32,24 +33,24 @@ function Value({ value, copy = true }: { value: string; copy?: boolean }) {
 function Components({ url }: { url: ParsedUrl }) {
   const [showPassword, setShowPassword] = useState(false);
   const items: Array<{ label: ReactNode; value: ReactNode; key: string }> = [
-    { key: 'scheme', label: 'Scheme', value: <Value value={url.protocol} /> },
+    { key: 'scheme', label: t('Scheme'), value: <Value value={url.protocol} /> },
   ];
   if (url.hasAuthority) {
-    items.push({ key: 'user', label: 'Username', value: <Value value={url.username} /> });
+    items.push({ key: 'user', label: t('Username'), value: <Value value={url.username} /> });
     items.push({
       key: 'pass',
-      label: 'Password',
+      label: t('Password'),
       value: url.password ? (
         <span className="flex items-start gap-1">
           <span className="min-w-0 flex-1 break-all">{showPassword ? url.password : '•'.repeat(Math.min(12, Math.max(6, url.password.length)))}</span>
           <IconButton
             icon={showPassword ? EyeOff : Eye}
-            label={showPassword ? 'Hide password' : 'Show password'}
+            label={showPassword ? t('Hide password') : t('Show password')}
             size="sm"
             className="-my-1"
             onClick={() => setShowPassword((v) => !v)}
           />
-          <CopyButton value={url.password} iconOnly label="Copy password" className="-my-1" />
+          <CopyButton value={url.password} iconOnly label={t('Copy password')} className="-my-1" />
         </span>
       ) : (
         <Muted />
@@ -57,16 +58,16 @@ function Components({ url }: { url: ParsedUrl }) {
     });
     items.push({
       key: 'host',
-      label: 'Hostname',
+      label: t('Hostname'),
       value: url.hostname ? (
         <span className="flex flex-col gap-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="break-all">{url.hostnameUnicode}</span>
-            {url.hostKind !== 'domain' && url.hostKind !== 'none' && <Badge>{url.hostKind === 'ipv4' ? 'IPv4' : 'IPv6'}</Badge>}
+            {url.hostKind !== 'domain' && url.hostKind !== 'none' && <Badge>{url.hostKind === 'ipv4' ? t('IPv4') : t('IPv6')}</Badge>}
             {url.isIdn && <Badge tone="accent">IDN</Badge>}
-            <CopyButton value={url.hostname} iconOnly label="Copy hostname" className="-my-1" />
+            <CopyButton value={url.hostname} iconOnly label={t('Copy hostname')} className="-my-1" />
           </span>
-          {url.isIdn && <span className="text-fg-muted">Punycode: {url.hostname}</span>}
+          {url.isIdn && <span className="text-fg-muted">{t('Punycode: {hostname}', { hostname: url.hostname })}</span>}
         </span>
       ) : (
         <Muted />
@@ -74,31 +75,31 @@ function Components({ url }: { url: ParsedUrl }) {
     });
     items.push({
       key: 'port',
-      label: 'Port',
+      label: t('Port'),
       value: url.port ? (
         <Value value={url.port} />
       ) : url.defaultPort ? (
         <span>
-          {url.defaultPort} <Muted>(default for {url.scheme})</Muted>
+          {url.defaultPort} <Muted>{t('(default for {scheme})', { scheme: url.scheme })}</Muted>
         </span>
       ) : (
-        <Muted>(none)</Muted>
+        <Muted>{t('(none)')}</Muted>
       ),
     });
-    items.push({ key: 'origin', label: 'Origin', value: <Value value={url.origin} /> });
+    items.push({ key: 'origin', label: t('Origin'), value: <Value value={url.origin} /> });
   }
-  items.push({ key: 'path', label: url.hasAuthority ? 'Path' : 'Path (opaque)', value: <Value value={url.pathname} /> });
-  items.push({ key: 'query', label: 'Query', value: <Value value={url.search} /> });
+  items.push({ key: 'path', label: url.hasAuthority ? t('Path') : t('Path (opaque)'), value: <Value value={url.pathname} /> });
+  items.push({ key: 'query', label: t('Query'), value: <Value value={url.search} /> });
   items.push({
     key: 'hash',
-    label: 'Fragment',
+    label: t('Fragment'),
     value: url.rawHash ? (
       <span className="flex items-start gap-1">
         <span className="min-w-0 flex-1 break-all">
           #{url.hash}
-          {url.hash !== url.rawHash && <span className="block text-fg-muted">Raw: #{url.rawHash}</span>}
+          {url.hash !== url.rawHash && <span className="block text-fg-muted">{t('Raw: #{rawHash}', { rawHash: url.rawHash })}</span>}
         </span>
-        <CopyButton value={`#${url.rawHash}`} iconOnly label="Copy fragment" className="-my-1" />
+        <CopyButton value={`#${url.rawHash}`} iconOnly label={t('Copy fragment')} className="-my-1" />
       </span>
     ) : (
       <Muted />
@@ -126,36 +127,36 @@ function Params({ url }: { url: ParsedUrl }) {
 
   return (
     <Panel
-      title={`Query parameters (${url.params.length})`}
+      title={t('Query parameters ({count})', { count: url.params.length })}
       actions={
         url.params.length > 0 && (
           <>
             <Segmented
-              label="Parameter display"
+              label={t('Parameter display')}
               size="sm"
               value={view}
               onChange={setView}
               options={[
-                { value: 'decoded', label: 'Decoded' },
-                { value: 'raw', label: 'Raw' },
+                { value: 'decoded', label: t('Decoded') },
+                { value: 'raw', label: t('Raw') },
               ]}
             />
-            <CopyButton value={json} label="Copy as JSON" />
+            <CopyButton value={json} label={t('Copy as JSON')} />
           </>
         )
       }
       bodyClassName={url.params.length ? 'p-0' : undefined}
     >
       {url.params.length === 0 ? (
-        <p className="text-[13px] text-fg-muted">This URL has no query string.</p>
+        <p className="text-[13px] text-fg-muted">{t('This URL has no query string.')}</p>
       ) : (
-        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Query parameters">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={t('Query parameters')}>
           <table className="w-full min-w-[420px] text-left text-[13px]">
             <thead className="text-[12px] text-fg-muted">
               <tr className="border-b border-line">
                 <th className="w-10 py-2 pr-2 pl-4 font-medium">#</th>
-                <th className="py-2 pr-3 font-medium">Key</th>
-                <th className="py-2 pr-4 font-medium">Value</th>
+                <th className="py-2 pr-3 font-medium">{t('Key')}</th>
+                <th className="py-2 pr-4 font-medium">{t('Value')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line font-mono text-[12.5px]">
@@ -170,16 +171,16 @@ function Params({ url }: { url: ParsedUrl }) {
                       <span className="break-all text-fg">{key || <Muted />}</span>
                       {repeated && (
                         <Badge tone="warning" className="ml-1.5 align-middle font-sans">
-                          repeated
+                          {t('repeated')}
                         </Badge>
                       )}
                     </td>
                     <td className="py-2 pr-4">
                       <span className="flex items-start gap-1">
                         <span className="min-w-0 flex-1 break-all text-fg">
-                          {value ? value : p.hasEquals ? <Muted>(empty)</Muted> : <Muted>(no value)</Muted>}
+                          {value ? value : p.hasEquals ? <Muted>{t('(empty)')}</Muted> : <Muted>{t('(no value)')}</Muted>}
                         </span>
-                        <CopyButton value={value} iconOnly label="Copy value" className="-my-1" />
+                        <CopyButton value={value} iconOnly label={t('Copy value')} className="-my-1" />
                       </span>
                     </td>
                   </tr>
@@ -233,7 +234,7 @@ function Builder({ url, onBuild }: { url: ParsedUrl; onBuild: (href: string) => 
   );
 
   return (
-    <Panel title="Edit and rebuild" description="Changes update the URL above; parameters you edit are percent-encoded for you.">
+    <Panel title={t('Edit and rebuild')} description={t('Changes update the URL above; parameters you edit are percent-encoded for you.')}>
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[140px_minmax(0,1fr)_110px]">
           {text('protocol', 'Scheme', { placeholder: 'https' })}
@@ -251,23 +252,23 @@ function Builder({ url, onBuild }: { url: ParsedUrl; onBuild: (href: string) => 
           {text('hash', 'Fragment', { placeholder: 'section' })}
         </div>
         <div>
-          <Label>Query parameters</Label>
+          <Label>{t('Query parameters')}</Label>
           <div className="flex flex-col gap-2">
             {parts.params.map((p, i) => (
               <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-center gap-2">
-                <Input mono aria-label={`Parameter ${i + 1} key`} placeholder="key" value={p.key} onChange={(e) => setParam(i, 'key', e.target.value)} />
-                <Input mono aria-label={`Parameter ${i + 1} value`} placeholder="value" value={p.value} onChange={(e) => setParam(i, 'value', e.target.value)} />
-                <IconButton icon={X} label={`Remove parameter ${i + 1}`} size="sm" onClick={() => set('params', parts.params.filter((_, j) => j !== i))} />
+                <Input mono aria-label={t('Parameter {i} key', { i: i + 1 })} placeholder="key" value={p.key} onChange={(e) => setParam(i, 'key', e.target.value)} />
+                <Input mono aria-label={t('Parameter {i} value', { i: i + 1 })} placeholder="value" value={p.value} onChange={(e) => setParam(i, 'value', e.target.value)} />
+                <IconButton icon={X} label={t('Remove parameter {i}', { i: i + 1 })} size="sm" onClick={() => set('params', parts.params.filter((_, j) => j !== i))} />
               </div>
             ))}
             <div>
               <Button size="sm" variant="ghost" icon={Plus} onClick={() => update({ ...parts, params: [...parts.params, { key: '', value: '' }] })}>
-                Add parameter
+                {t('Add parameter')}
               </Button>
             </div>
           </div>
         </div>
-        <ErrorMessage error={error} title="Cannot rebuild the URL" />
+        <ErrorMessage error={error} title={t('Cannot rebuild the URL')} />
       </div>
     </Panel>
   );
@@ -286,7 +287,7 @@ export default function UrlParser() {
   return (
     <ToolStack>
       <Panel bodyClassName="flex flex-col gap-4">
-        <Field label="URL" hint={useBase ? 'Relative URLs are resolved against the base URL below.' : undefined}>
+        <Field label="URL" hint={useBase ? t('Relative URLs are resolved against the base URL below.') : undefined}>
           {({ id, describedBy }) => (
             <div className="flex gap-2">
               <Input
@@ -300,36 +301,36 @@ export default function UrlParser() {
                 placeholder="https://example.com/path?query=value#fragment"
                 onChange={(e) => setInput(e.target.value)}
               />
-              <IconButton icon={FlaskConical} label="Load sample" variant="secondary" onClick={() => setInput(SAMPLE)} />
-              <IconButton icon={X} label="Clear" variant="secondary" disabled={!input} onClick={() => setInput('')} />
+              <IconButton icon={FlaskConical} label={t('Load sample')} variant="secondary" onClick={() => setInput(SAMPLE)} />
+              <IconButton icon={X} label={t('Clear')} variant="secondary" disabled={!input} onClick={() => setInput('')} />
             </div>
           )}
         </Field>
         <div className="flex flex-col gap-3">
-          <Switch label="Resolve against a base URL" checked={useBase} onChange={setUseBase} />
+          <Switch label={t('Resolve against a base URL')} checked={useBase} onChange={setUseBase} />
           {useBase && (
-            <Field label="Base URL">
+            <Field label={t('Base URL')}>
               {({ id }) => <Input id={id} mono autoComplete="off" spellCheck={false} value={base} placeholder="https://example.com/docs/" onChange={(e) => setBase(e.target.value)} />}
             </Field>
           )}
         </div>
-        {result && !result.ok && <ErrorMessage error={result.error} title="Invalid URL" />}
+        {result && !result.ok && <ErrorMessage error={result.error} title={t('Invalid URL')} />}
         {url && (
           <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface-sunken px-3 py-2.5">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <div className="text-[12px] text-fg-muted">{resolved ? 'Resolved URL' : 'Normalized URL'}</div>
+                <div className="text-[12px] text-fg-muted">{resolved ? t('Resolved URL') : t('Normalized URL')}</div>
                 <div className="font-mono text-[13px] break-all text-fg">{url.href}</div>
               </div>
-              <CopyButton value={url.href} iconOnly label="Copy URL" />
+              <CopyButton value={url.href} iconOnly label={t('Copy URL')} />
             </div>
             {display !== url.href && (
               <div className="flex items-start gap-2 border-t border-line pt-2">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[12px] text-fg-muted">Readable (decoded, Unicode host)</div>
+                  <div className="text-[12px] text-fg-muted">{t('Readable (decoded, Unicode host)')}</div>
                   <div className="font-mono text-[13px] break-all text-fg-secondary">{display}</div>
                 </div>
-                <CopyButton value={display} iconOnly label="Copy readable URL" />
+                <CopyButton value={display} iconOnly label={t('Copy readable URL')} />
               </div>
             )}
           </div>
@@ -338,8 +339,8 @@ export default function UrlParser() {
 
       {!result && (
         <Panel>
-          <EmptyState icon={Link} title="Enter a URL to inspect it">
-            Paste any absolute URL, or turn on the base URL option to resolve relative links such as ../images/logo.png.
+          <EmptyState icon={Link} title={t('Enter a URL to inspect it')}>
+            {t('Paste any absolute URL, or turn on the base URL option to resolve relative links such as ../images/logo.png.')}
           </EmptyState>
         </Panel>
       )}
@@ -347,13 +348,13 @@ export default function UrlParser() {
       {url && (
         <>
           <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            <Panel title="Components">
+            <Panel title={t('Components')}>
               <Components url={url} />
             </Panel>
             <div className="flex min-w-0 flex-col gap-4">
-              <Panel title={`Path segments (${url.segments.length})`}>
+              <Panel title={t('Path segments ({count})', { count: url.segments.length })}>
                 {url.segments.length === 0 ? (
-                  <p className="text-[13px] text-fg-muted">{url.hasAuthority ? 'The path is just “/”.' : 'This URL has an opaque path without segments.'}</p>
+                  <p className="text-[13px] text-fg-muted">{url.hasAuthority ? t('The path is just “/”.') : t('This URL has an opaque path without segments.')}</p>
                 ) : (
                   <ol className="flex flex-wrap items-center gap-1.5 font-mono text-[12.5px]">
                     {url.segments.map((s, i) => (
@@ -361,9 +362,9 @@ export default function UrlParser() {
                         <span className="text-fg-muted">/</span>
                         <span
                           className={cn('rounded-md border border-line bg-surface-sunken px-2 py-0.5 break-all', s.decoded ? 'text-fg' : 'text-fg-muted')}
-                          title={s.raw !== s.decoded ? `Raw: ${s.raw}` : undefined}
+                          title={s.raw !== s.decoded ? t('Raw: {raw}', { raw: s.raw }) : undefined}
                         >
-                          {s.decoded || '(empty)'}
+                          {s.decoded || t('(empty)')}
                         </span>
                       </li>
                     ))}

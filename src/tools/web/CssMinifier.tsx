@@ -6,6 +6,7 @@ import { formatBytes, pluralize } from '@/lib/utils';
 import type { CssMinifyOptions } from './lib/cssMinify';
 import { useCodeJob } from './code/codeRunner';
 import { JobStatus, SizeSavingsBar, settledOutcome, useByteSize } from './code/shared';
+import { t } from '@/lib/i18n';
 
 const DEFAULTS: CssMinifyOptions = { restructure: true, keepLicense: true };
 
@@ -63,17 +64,16 @@ export default function CssMinifier() {
   return (
     <ToolStack>
       <ToolBar>
-        <Switch label="Restructure rules" checked={opts.restructure} onChange={(v) => setOpts((o) => ({ ...DEFAULTS, ...o, restructure: v }))} />
-        <Switch label="Keep /*! license */ comments" checked={opts.keepLicense} onChange={(v) => setOpts((o) => ({ ...DEFAULTS, ...o, keepLicense: v }))} />
+        <Switch label={t('Restructure rules')} checked={opts.restructure} onChange={(v) => setOpts((o) => ({ ...DEFAULTS, ...o, restructure: v }))} />
+        <Switch label={t('Keep /*! license */ comments')} checked={opts.keepLicense} onChange={(v) => setOpts((o) => ({ ...DEFAULTS, ...o, keepLicense: v }))} />
         <p className="basis-full text-[12.5px] text-fg-muted sm:basis-auto">
-          Restructuring merges and moves rules for smaller output; turn it off if rule order matters in unusual cascades.
+          {t('Restructuring merges and moves rules for smaller output; turn it off if rule order matters in unusual cascades.')}
         </p>
       </ToolBar>
-      <ErrorMessage error={error} title="Could not minify" />
+      <ErrorMessage error={error} title={t('Could not minify')} />
       {done?.engine === 'compact' && (
-        <Alert tone="info" title="CSS nesting detected">
-          CSSO cannot optimize nested rules, so this stylesheet was compacted instead: comments and unneeded whitespace were
-          removed and every rule was kept as written.
+        <Alert tone="info" title={t('CSS nesting detected')}>
+          {t('CSSO cannot optimize nested rules, so this stylesheet was compacted instead: comments and unneeded whitespace were removed and every rule was kept as written.')}
         </Alert>
       )}
       {done && done.issues.length > 0 && (
@@ -81,21 +81,21 @@ export default function CssMinifier() {
           tone="warning"
           title={
             done.engine === 'compact'
-              ? `${pluralize(done.issues.length, 'syntax problem')} found`
-              : `${pluralize(done.issues.length, 'part')} of the stylesheet could not be parsed`
+              ? t('{count} found', { count: pluralize(done.issues.length, t('syntax problem'), t('syntax problems')) })
+              : t('{count} of the stylesheet could not be parsed', { count: pluralize(done.issues.length, t('part'), t('parts')) })
           }
         >
           <ul className="list-disc space-y-0.5 pl-4">
             {done.issues.slice(0, 8).map((i, n) => (
               <li key={n}>
-                Line {i.line}, column {i.column}: {i.message}
+                {t('Line {line}, column {column}: {message}', { line: i.line, column: i.column, message: i.message })}
               </li>
             ))}
           </ul>
           <p className="mt-1">
             {done.engine === 'compact'
-              ? 'Check these lines: browsers will ignore or misread them.'
-              : 'This is either a syntax error or CSS syntax newer than the minifier. Such parts may be repaired or dropped, so compare the output before using it.'}
+              ? t('Check these lines: browsers will ignore or misread them.')
+              : t('This is either a syntax error or CSS syntax newer than the minifier. Such parts may be repaired or dropped, so compare the output before using it.')}
           </p>
         </Alert>
       )}
@@ -106,7 +106,7 @@ export default function CssMinifier() {
           value={input}
           onChange={setInput}
           language="css"
-          placeholder="Paste CSS here…"
+          placeholder={t('Paste CSS here…')}
           sample={SAMPLE}
           fileAccept=".css,text/css,text/plain"
           invalid={Boolean(error)}
@@ -114,16 +114,16 @@ export default function CssMinifier() {
           footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <EditorPanel
-          title="Minified"
+          title={t('Minified')}
           value={output}
           language="css"
-          placeholder="Minified CSS appears here"
+          placeholder={t('Minified CSS appears here')}
           downloadName="styles.min.css"
           downloadType="text/css"
           height="460px"
           footer={
             status === 'pending' || status === 'cancelled' ? (
-              <JobStatus status={status} busyLabel="Minifying…" onCancel={job.cancel} />
+              <JobStatus status={status} busyLabel={t('Minifying…')} onCancel={job.cancel} />
             ) : output ? (
               <span>{formatBytes(outputBytes)}</span>
             ) : undefined

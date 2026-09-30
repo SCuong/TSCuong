@@ -5,6 +5,7 @@ import { Label, Switch } from '@/components/ui/Field';
 import { useToolState } from '@/lib/hooks';
 import { CssOutput, SliderRow } from './design/Controls';
 import { CORNER_KEYS, RADIUS_PRESETS, borderRadiusLonghand, borderRadiusValue, type CornerKey, type RadiusConfig } from './lib/radius';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'border-radius-generator';
 const NAMES: Record<CornerKey, string> = { topLeft: 'Top left', topRight: 'Top right', bottomRight: 'Bottom right', bottomLeft: 'Bottom left' };
@@ -37,33 +38,33 @@ export default function BorderRadiusGenerator() {
               className="max-h-full max-w-full bg-accent shadow-raised"
               style={{ width: size.w, height: size.h, borderRadius: value }}
               role="img"
-              aria-label={`Shape with border-radius ${value}`}
+              aria-label={t('Shape with border-radius {value}', { value })}
             />
           </div>
-          <Panel title="Preview size" bodyClassName="grid gap-4 sm:grid-cols-2">
-            <SliderRow label="Width" value={size.w} min={40} max={400} unit="px" onChange={(w) => setSize((s) => ({ ...s, w }))} />
-            <SliderRow label="Height" value={size.h} min={40} max={320} unit="px" onChange={(h) => setSize((s) => ({ ...s, h }))} />
+          <Panel title={t('Preview size')} bodyClassName="grid gap-4 sm:grid-cols-2">
+            <SliderRow label={t('Width')} value={size.w} min={40} max={400} unit="px" onChange={(w) => setSize((s) => ({ ...s, w }))} />
+            <SliderRow label={t('Height')} value={size.h} min={40} max={320} unit="px" onChange={(h) => setSize((s) => ({ ...s, h }))} />
           </Panel>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Panel title="Radius" bodyClassName="flex flex-col gap-4">
+          <Panel title={t('Radius')} bodyClassName="flex flex-col gap-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <Label>Unit</Label>
-                <Segmented label="Unit" value={cfg.unit} onChange={(unit) => setCfg((c) => ({ ...c, unit }))} options={[{ value: 'px', label: 'px' }, { value: '%', label: '%' }]} />
+                <Label>{t('Unit')}</Label>
+                <Segmented label={t('Unit')} value={cfg.unit} onChange={(unit) => setCfg((c) => ({ ...c, unit }))} options={[{ value: 'px', label: 'px' }, { value: '%', label: '%' }]} />
               </div>
-              <Switch label="Same for all corners" checked={linked} onChange={setLinked} className="h-8" />
-              <Switch label="Elliptical corners" checked={cfg.elliptical} onChange={(elliptical) => setCfg((c) => ({ ...c, elliptical }))} className="h-8" />
+              <Switch label={t('Same for all corners')} checked={linked} onChange={setLinked} className="h-8" />
+              <Switch label={t('Elliptical corners')} checked={cfg.elliptical} onChange={(elliptical) => setCfg((c) => ({ ...c, elliptical }))} className="h-8" />
             </div>
             {corners.map((k) => (
               <fieldset key={k} className="flex flex-col gap-3 rounded-lg border border-line p-3">
-                <legend className="px-1 text-[12.5px] font-semibold text-fg">{linked ? 'All corners' : NAMES[k]}</legend>
-                <SliderRow label={cfg.elliptical ? 'Horizontal' : 'Radius'} value={cfg[k].x} min={0} max={max} unit={cfg.unit} onChange={(v) => setCorner(k, 'x', v)} />
-                {cfg.elliptical && <SliderRow label="Vertical" value={cfg[k].y} min={0} max={max} unit={cfg.unit} onChange={(v) => setCorner(k, 'y', v)} />}
+                <legend className="px-1 text-[12.5px] font-semibold text-fg">{linked ? t('All corners') : NAMES[k]}</legend>
+                <SliderRow label={cfg.elliptical ? t('Horizontal') : t('Radius')} value={cfg[k].x} min={0} max={max} unit={cfg.unit} onChange={(v) => setCorner(k, 'x', v)} />
+                {cfg.elliptical && <SliderRow label={t('Vertical')} value={cfg[k].y} min={0} max={max} unit={cfg.unit} onChange={(v) => setCorner(k, 'y', v)} />}
               </fieldset>
             ))}
           </Panel>
-          <Panel title="Presets">
+          <Panel title={t('Presets')}>
             <div className="grid grid-cols-4 gap-2">
               {RADIUS_PRESETS.map((p) => (
                 <button

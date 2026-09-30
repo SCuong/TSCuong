@@ -21,6 +21,7 @@ import {
   solveWidth,
   type Ratio,
 } from './lib/aspectRatio';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'aspect-ratio-calculator';
 
@@ -94,24 +95,24 @@ export default function AspectRatioCalculator() {
     <ToolStack>
       <Panel bodyClassName="flex flex-col gap-4">
         <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
-          <Field label="Width">
+          <Field label={t('Width')}>
             {({ id }) => <NumberInput id={id} min={0} step="any" value={s.width} onChange={setWidth} className="text-[16px]" />}
           </Field>
-          <IconButton icon={ArrowLeftRight} label="Swap width and height" variant="secondary" onClick={swap} className="justify-self-start" />
-          <Field label="Height">
+          <IconButton icon={ArrowLeftRight} label={t('Swap width and height')} variant="secondary" onClick={swap} className="justify-self-start" />
+          <Field label={t('Height')}>
             {({ id }) => <NumberInput id={id} min={0} step="any" value={s.height} onChange={setHeight} className="text-[16px]" />}
           </Field>
           <IconButton
             icon={s.locked ? Lock : LockOpen}
             // A toggle keeps one name; aria-pressed tells whether it is on (the text below explains the effect).
-            label="Lock aspect ratio"
+            label={t('Lock aspect ratio')}
             variant="secondary"
             active={s.locked}
             aria-pressed={s.locked}
             onClick={() => update({ locked: !s.locked })}
             className="justify-self-start"
           />
-          <Field label="Aspect ratio" error={s.ratioText.trim() && !ratio ? 'Use a form like 16:9, 4/3 or 2.39.' : null}>
+          <Field label={t('Aspect ratio')} error={s.ratioText.trim() && !ratio ? t('Use a form like 16:9, 4/3 or 2.39.') : null}>
             {({ id, describedBy, invalid }) => (
               <Input
                 id={id}
@@ -128,19 +129,19 @@ export default function AspectRatioCalculator() {
         </div>
         <p className="text-[12.5px] text-fg-muted">
           {s.locked
-            ? 'Ratio locked: change the width or height and the other side is solved for you.'
-            : 'Ratio unlocked: the ratio follows the width and height you type.'}
+            ? t('Ratio locked: change the width or height and the other side is solved for you.')
+            : t('Ratio unlocked: the ratio follows the width and height you type.')}
           {mismatch && dimRatio && (
-            <span className="text-warning"> The dimensions are {ratioLabel(dimRatio)}, not {s.ratioText.trim()}.</span>
+            <span className="text-warning">{' '}{t('The dimensions are {ratioLabel}, not {ratioText}.', { ratioLabel: ratioLabel(dimRatio), ratioText: s.ratioText.trim() })}</span>
           )}
         </p>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Common ratios">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Common ratios')}>
           {RATIO_PRESETS.map((p) => (
             <Button
               key={p.label}
               size="sm"
               variant={ratio && Math.abs(ratioDecimal(ratio) - ratioDecimal(p.ratio)) < 1e-9 ? 'primary' : 'secondary'}
-              title={p.use}
+              title={t(p.use)}
               onClick={() => setRatio(p.label)}
             >
               {p.label}
@@ -150,21 +151,21 @@ export default function AspectRatioCalculator() {
       </Panel>
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <Panel title="Result">
+        <Panel title={t('Result')}>
           {shown ? (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-2">
-                <Stat label="Simplified ratio" value={ratioLabel(shown)} />
-                <Stat label="Decimal (width ÷ height)" value={fmt(ratioDecimal(shown), 4)} />
-                <Stat label="Dimensions" value={dims ? `${fmt(dims.w, 2)} × ${fmt(dims.h, 2)}` : '—'} />
-                <Stat label="Orientation" value={ratioDecimal(shown) > 1 ? 'Landscape' : ratioDecimal(shown) < 1 ? 'Portrait' : 'Square'} />
+                <Stat label={t('Simplified ratio')} value={ratioLabel(shown)} />
+                <Stat label={t('Decimal (width ÷ height)')} value={fmt(ratioDecimal(shown), 4)} />
+                <Stat label={t('Dimensions')} value={dims ? `${fmt(dims.w, 2)} × ${fmt(dims.h, 2)}` : '—'} />
+                <Stat label={t('Orientation')} value={ratioDecimal(shown) > 1 ? 'Landscape' : ratioDecimal(shown) < 1 ? 'Portrait' : 'Square'} />
               </div>
               {near && !near.exact && (
                 <p className="text-[13px] text-fg-secondary">
-                  Close to <strong className="font-semibold text-fg">{near.preset.label}</strong> ({near.preset.use}).
+                  {t('Close to {ratio} ({usage}).', { ratio: near.preset.label, usage: t(near.preset.use) })}
                 </p>
               )}
-              {near?.exact && <p className="text-[13px] text-fg-secondary">{near.preset.use}.</p>}
+              {near?.exact && <p className="text-[13px] text-fg-secondary">{t(near.preset.use)}.</p>}
               <div className="flex min-h-[216px] items-center justify-center rounded-lg border border-line bg-surface-sunken lk-grid-bg p-2">
                 <div
                   className="flex max-w-full items-center justify-center rounded-md border-2 border-accent bg-accent-soft font-mono text-[13px] font-semibold text-accent-text"
@@ -175,7 +176,7 @@ export default function AspectRatioCalculator() {
               </div>
             </div>
           ) : (
-            <p className="text-[13px] text-fg-muted">Enter a width and height, or a ratio such as 16:9.</p>
+            <p className="text-[13px] text-fg-muted">{t('Enter a width and height, or a ratio such as 16:9.')}</p>
           )}
         </Panel>
 
@@ -184,13 +185,13 @@ export default function AspectRatioCalculator() {
             <Panel title="CSS">
               <div className="flex flex-col gap-3">
                 {[
-                  { label: 'Modern: aspect-ratio', code: css.modern },
-                  { label: `Legacy: padding-top ${paddingPercent(shown)}`, code: css.legacy },
+                  { label: t('Modern: aspect-ratio'), code: css.modern },
+                  { label: t('Legacy: padding-top {paddingPercent}', { paddingPercent: paddingPercent(shown) }), code: css.legacy },
                 ].map((b) => (
                   <div key={b.label}>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
                       <span className="text-[12.5px] font-medium text-fg-secondary">{b.label}</span>
-                      <CopyButton value={b.code} label="Copy" />
+                      <CopyButton value={b.code} label={t('Copy')} />
                     </div>
                     <pre className="overflow-x-auto rounded-lg border border-line bg-surface-sunken px-3 py-2 font-mono text-[12.5px] text-fg">{b.code}</pre>
                   </div>
@@ -199,7 +200,7 @@ export default function AspectRatioCalculator() {
             </Panel>
           )}
           {ratio && (
-            <Panel title={`Common sizes for ${ratioLabel(ratio)}`} description="Whole-pixel sizes; click one to use it.">
+            <Panel title={t('Common sizes for {ratioLabel}', { ratioLabel: ratioLabel(ratio) })} description={t('Whole-pixel sizes; click one to use it.')}>
               {sizes.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {sizes.map((z) => {
@@ -220,7 +221,7 @@ export default function AspectRatioCalculator() {
                   })}
                 </div>
               ) : (
-                <p className="text-[13px] text-fg-muted">No common widths give a whole-pixel height for this ratio.</p>
+                <p className="text-[13px] text-fg-muted">{t('No common widths give a whole-pixel height for this ratio.')}</p>
               )}
             </Panel>
           )}

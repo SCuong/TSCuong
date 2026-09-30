@@ -6,6 +6,7 @@ import { formatBytes, pluralize } from '@/lib/utils';
 import { DEFAULT_HTML_OPTIONS, type HtmlMinifyOptions } from './lib/htmlMinify';
 import { useCodeJob } from './code/codeRunner';
 import { JobStatus, SizeSavingsBar, settledOutcome, useByteSize } from './code/shared';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `<!doctype html>
 <html lang="en">
@@ -65,23 +66,23 @@ export default function HtmlMinifier() {
   return (
     <ToolStack>
       <ToolBar>
-        <Switch label="Remove comments" checked={opts.removeComments} onChange={(v) => set('removeComments', v)} />
-        <Switch label="Keep “!” license comments" checked={opts.keepBangComments} onChange={(v) => set('keepBangComments', v)} disabled={!opts.removeComments} />
-        <Switch label="Collapse whitespace" checked={opts.collapseWhitespace} onChange={(v) => set('collapseWhitespace', v)} />
-        <Switch label="Minify inline CSS" checked={opts.minifyCss} onChange={(v) => set('minifyCss', v)} />
-        <Switch label="Minify inline JS" checked={opts.minifyJs} onChange={(v) => set('minifyJs', v)} />
+        <Switch label={t('Remove comments')} checked={opts.removeComments} onChange={(v) => set('removeComments', v)} />
+        <Switch label={t('Keep “!” license comments')} checked={opts.keepBangComments} onChange={(v) => set('keepBangComments', v)} disabled={!opts.removeComments} />
+        <Switch label={t('Collapse whitespace')} checked={opts.collapseWhitespace} onChange={(v) => set('collapseWhitespace', v)} />
+        <Switch label={t('Minify inline CSS')} checked={opts.minifyCss} onChange={(v) => set('minifyCss', v)} />
+        <Switch label={t('Minify inline JS')} checked={opts.minifyJs} onChange={(v) => set('minifyJs', v)} />
       </ToolBar>
-      <ErrorMessage error={error} title="Could not minify" />
+      <ErrorMessage error={error} title={t('Could not minify')} />
       {warnings.length > 0 && (
-        <Alert tone="warning" title={`${pluralize(warnings.length, 'block')} could not be minified and ${warnings.length === 1 ? 'was' : 'were'} kept as written`}>
+        <Alert tone="warning" title={(warnings.length === 1) ? t('{count} could not be minified and was kept as written', { count: pluralize(warnings.length, t('block'), t('blocks')) }) : t('{count} could not be minified and were kept as written', { count: pluralize(warnings.length, t('block'), t('blocks')) })}>
           <ul className="list-disc space-y-0.5 pl-4">
             {warnings.slice(0, 8).map((w, n) => (
               <li key={n}>
-                Line {w.line}, column {w.column} (&lt;{w.block}&gt;): {w.message}
+                {t('Line {line}, column {column} (<{block}>): {message}', { line: w.line, column: w.column, block: w.block, message: w.message })}
               </li>
             ))}
           </ul>
-          {warnings.length > 8 && <p className="mt-1">…and {warnings.length - 8} more.</p>}
+          {warnings.length > 8 && <p className="mt-1">{t('…and {count} more.', { count: warnings.length - 8 })}</p>}
         </Alert>
       )}
       {output && <SizeSavingsBar before={input} after={output} />}
@@ -91,7 +92,7 @@ export default function HtmlMinifier() {
           value={input}
           onChange={setInput}
           language="html"
-          placeholder="Paste HTML here…"
+          placeholder={t('Paste HTML here…')}
           sample={SAMPLE}
           fileAccept=".html,.htm,.xhtml,text/html,text/plain"
           invalid={Boolean(error)}
@@ -99,16 +100,16 @@ export default function HtmlMinifier() {
           footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <EditorPanel
-          title="Minified"
+          title={t('Minified')}
           value={output}
           language="html"
-          placeholder="Minified HTML appears here"
+          placeholder={t('Minified HTML appears here')}
           downloadName="index.min.html"
           downloadType="text/html"
           height="480px"
           footer={
             status === 'pending' || status === 'cancelled' ? (
-              <JobStatus status={status} busyLabel="Minifying…" onCancel={job.cancel} />
+              <JobStatus status={status} busyLabel={t('Minifying…')} onCancel={job.cancel} />
             ) : output ? (
               <span>{formatBytes(outputBytes)}</span>
             ) : undefined
@@ -116,10 +117,7 @@ export default function HtmlMinifier() {
         />
       </SplitPanes>
       <p className="text-[12.5px] leading-relaxed text-fg-muted">
-        Conditional comments, server-side include directives (<code className="font-mono">&lt;!--#include …--&gt;</code>) and
-        Knockout bindings are kept. The contents of &lt;pre&gt;, &lt;textarea&gt;, &lt;script&gt;, &lt;style&gt; and of elements
-        styled with <code className="font-mono">white-space: pre</code> are never reflowed. Whitespace next to inline elements is kept as a single space so words never merge. Scripts with an unknown
-        type (templates) are left untouched; JSON and JSON-LD scripts are compacted.
+        {t('Conditional comments, server-side include directives (<!--#include …-->) and Knockout bindings are kept. The contents of <pre>, <textarea>, <script>, <style> and of elements styled with white-space: pre are never reflowed. Whitespace next to inline elements is kept as a single space so words never merge. Scripts with an unknown type (templates) are left untouched; JSON and JSON-LD scripts are compacted.')}
       </p>
     </ToolStack>
   );

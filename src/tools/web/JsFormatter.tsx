@@ -1,4 +1,5 @@
 import { FormatterTool, type ParserOption } from './code/FormatterTool';
+import { t } from '@/lib/i18n';
 
 const JS_SAMPLE = `import {useState,useEffect} from 'react'
 export default function Search({initial=''}){const [query,setQuery]=useState(initial);const [results,setResults]=useState([])
@@ -21,11 +22,11 @@ const GRAPHQL_SAMPLE = `query GetRepo($owner:String!,$name:String!,$first:Int=10
 fragment UserFields on User{id login avatarUrl}`;
 
 const PARSERS: ParserOption[] = [
-  { value: 'babel', label: 'JavaScript / JSX', language: 'jsx', ext: 'js', sample: JS_SAMPLE },
-  { value: 'typescript', label: 'TypeScript / TSX', language: 'tsx', ext: 'ts', sample: TS_SAMPLE },
+  { value: 'babel', label: t('JavaScript / JSX'), language: 'jsx', ext: 'js', sample: JS_SAMPLE },
+  { value: 'typescript', label: t('TypeScript / TSX'), language: 'tsx', ext: 'ts', sample: TS_SAMPLE },
   { value: 'json', label: 'JSON', language: 'json', ext: 'json', sample: JSON_SAMPLE },
   { value: 'json5', label: 'JSON5', language: 'javascript', ext: 'json5', sample: JSON5_SAMPLE },
-  { value: 'graphql', label: 'GraphQL', language: 'plain', ext: 'graphql', sample: GRAPHQL_SAMPLE },
+  { value: 'graphql', label: t('GraphQL'), language: 'plain', ext: 'graphql', sample: GRAPHQL_SAMPLE },
 ];
 
 export default function JsFormatter() {

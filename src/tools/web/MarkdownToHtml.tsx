@@ -10,6 +10,7 @@ import { blockRemoteContent } from '@/lib/remoteContent';
 import { useTheme } from '@/lib/theme';
 import { RemoteContentNotice } from '@/components/RemoteContentNotice';
 import { firstHeading, markdownToHtml, previewDocument, standaloneDocument, type PreviewPalette } from './lib/markdown';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `# Release notes
 
@@ -82,40 +83,40 @@ export default function MarkdownToHtml() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Output</Label>
+          <Label>{t('Output')}</Label>
           <Segmented
-            label="Output view"
+            label={t('Output view')}
             value={view}
             onChange={setView}
             options={[
-              { value: 'preview', label: 'Preview', icon: Eye },
+              { value: 'preview', label: t('Preview'), icon: Eye },
               { value: 'html', label: 'HTML', icon: Code },
             ]}
           />
         </div>
-        <Switch label="Line breaks become <br>" checked={breaks} onChange={setBreaks} className="h-8" />
-        <Switch label="Full HTML document" checked={standalone} onChange={setStandalone} className="h-8" />
+        <Switch label={t('Line breaks become <br>')} checked={breaks} onChange={setBreaks} className="h-8" />
+        <Switch label={t('Full HTML document')} checked={standalone} onChange={setStandalone} className="h-8" />
       </ToolBar>
       <SplitPanes>
         <EditorPanel
-          title="Markdown"
+          title={t('Markdown')}
           value={input}
           onChange={setInput}
           language="markdown"
-          placeholder="Write or paste Markdown…"
+          placeholder={t('Write or paste Markdown…')}
           sample={SAMPLE}
           fileAccept=".md,.markdown,.txt,text/markdown,text/plain"
           height="560px"
         />
         {view === 'html' ? (
-          <EditorPanel title="HTML" value={html} language="html" placeholder="HTML appears here" downloadName="document.html" downloadType="text/html" height="560px" />
+          <EditorPanel title="HTML" value={html} language="html" placeholder={t('HTML appears here')} downloadName="document.html" downloadType="text/html" height="560px" />
         ) : (
           <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card">
             <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line py-1.5 pr-2 pl-4">
-              <h2 className="text-[13px] font-semibold tracking-tight text-fg">Preview</h2>
+              <h2 className="text-[13px] font-semibold tracking-tight text-fg">{t('Preview')}</h2>
               <div className="flex items-center gap-1">
-                <DownloadButton data={html} filename="document.html" type="text/html" label="Save" variant="ghost" />
-                <CopyButton value={html} iconOnly label="Copy HTML" />
+                <DownloadButton data={html} filename="document.html" type="text/html" label={t('Save')} variant="ghost" />
+                <CopyButton value={html} iconOnly label={t('Copy HTML')} />
               </div>
             </header>
             <div className="flex h-[560px] min-h-0 flex-col">
@@ -134,7 +135,7 @@ export default function MarkdownToHtml() {
                     scripts, inline handlers and javascript: URLs. Popups are allowed so links open in a new tab.
                   */}
                   <iframe
-                    title="Rendered Markdown preview"
+                    title={t('Rendered Markdown preview')}
                     sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
                     srcDoc={previewSrc}
                     referrerPolicy="no-referrer"
@@ -143,8 +144,8 @@ export default function MarkdownToHtml() {
                 </>
               ) : (
                 <div className="p-5">
-                  <EmptyState icon={Eye} title="Nothing to preview yet">
-                    Type Markdown on the left, or load the sample.
+                  <EmptyState icon={Eye} title={t('Nothing to preview yet')}>
+                    {t('Type Markdown on the left, or load the sample.')}
                   </EmptyState>
                 </div>
               )}
@@ -153,9 +154,7 @@ export default function MarkdownToHtml() {
         )}
       </SplitPanes>
       <p className="text-[12.5px] text-fg-muted">
-        GitHub-flavored Markdown: tables, task lists, strikethrough and autolinks. The HTML is sanitized, so scripts, event
-        handlers and javascript: links are removed. The preview is isolated from this page and makes no network requests; links
-        open in a new tab.
+        {t('GitHub-flavored Markdown: tables, task lists, strikethrough and autolinks. The HTML is sanitized, so scripts, event handlers and javascript: links are removed. The preview is isolated from this page and makes no network requests; links open in a new tab.')}
       </p>
     </ToolStack>
   );

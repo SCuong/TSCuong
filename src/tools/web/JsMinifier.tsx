@@ -6,6 +6,7 @@ import { formatBytes } from '@/lib/utils';
 import { DEFAULT_JS_OPTIONS, type JsMinifyOptions, type SourceType } from './lib/jsMinify';
 import { useCodeJob } from './code/codeRunner';
 import { JobStatus, SizeSavingsBar, settledOutcome, useByteSize } from './code/shared';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `/*! analytics-lite v1.0 | MIT */
 import { sendBeacon } from './transport.js';
@@ -66,19 +67,19 @@ export default function JsMinifier() {
   return (
     <ToolStack>
       <ToolBar>
-        <Switch label="Compress" checked={opts.compress} onChange={(v) => set('compress', v)} className="h-9" />
-        <Switch label="Mangle names" checked={opts.mangle} onChange={(v) => set('mangle', v)} className="h-9" />
-        <Switch label="Keep license comments" checked={opts.keepLicense} onChange={(v) => set('keepLicense', v)} className="h-9" />
+        <Switch label={t('Compress')} checked={opts.compress} onChange={(v) => set('compress', v)} className="h-9" />
+        <Switch label={t('Mangle names')} checked={opts.mangle} onChange={(v) => set('mangle', v)} className="h-9" />
+        <Switch label={t('Keep license comments')} checked={opts.keepLicense} onChange={(v) => set('keepLicense', v)} className="h-9" />
         <div>
-          <Label htmlFor="js-source-type">Source type</Label>
+          <Label htmlFor="js-source-type">{t('Source type')}</Label>
           <Select id="js-source-type" value={opts.sourceType} onChange={(e) => set('sourceType', e.target.value as SourceType)} className="w-auto min-w-40">
-            <option value="auto">Auto-detect</option>
-            <option value="script">Classic script</option>
-            <option value="module">ES module</option>
+            <option value="auto">{t('Auto-detect')}</option>
+            <option value="script">{t('Classic script')}</option>
+            <option value="module">{t('ES module')}</option>
           </Select>
         </div>
         <div>
-          <Label htmlFor="js-ecma">Output syntax</Label>
+          <Label htmlFor="js-ecma">{t('Output syntax')}</Label>
           <Select id="js-ecma" value={opts.ecma} onChange={(e) => set('ecma', Number(e.target.value) as JsMinifyOptions['ecma'])} className="w-auto min-w-32">
             <option value={2020}>ES2020</option>
             <option value={2015}>ES2015</option>
@@ -86,15 +87,15 @@ export default function JsMinifier() {
           </Select>
         </div>
       </ToolBar>
-      <ErrorMessage error={error} title="Syntax error" />
+      <ErrorMessage error={error} title={t('Syntax error')} />
       {output && <SizeSavingsBar before={input} after={output} />}
       <SplitPanes>
         <EditorPanel
-          title="JavaScript"
+          title={t('JavaScript')}
           value={input}
           onChange={setInput}
           language="javascript"
-          placeholder="Paste JavaScript here…"
+          placeholder={t('Paste JavaScript here…')}
           sample={SAMPLE}
           fileAccept=".js,.mjs,.cjs,text/javascript,text/plain"
           invalid={Boolean(error)}
@@ -102,27 +103,24 @@ export default function JsMinifier() {
           footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <EditorPanel
-          title="Minified"
+          title={t('Minified')}
           value={output}
           language="javascript"
-          placeholder={done && !output ? 'Nothing left: the module exports nothing and has no side effects' : 'Minified code appears here'}
+          placeholder={done && !output ? t('Nothing left: the module exports nothing and has no side effects') : t('Minified code appears here')}
           downloadName="script.min.js"
           downloadType="text/javascript"
           height="460px"
           footer={
             status === 'pending' || status === 'cancelled' ? (
-              <JobStatus status={status} busyLabel="Minifying…" onCancel={job.cancel} />
+              <JobStatus status={status} busyLabel={t('Minifying…')} onCancel={job.cancel} />
             ) : done ? (
-              <span>{done.module ? 'Minified as an ES module' : 'Minified as a classic script: top-level names are kept'}</span>
+              <span>{done.module ? t('Minified as an ES module') : t('Minified as a classic script: top-level names are kept')}</span>
             ) : undefined
           }
         />
       </SplitPanes>
       <p className="text-[12.5px] leading-relaxed text-fg-muted">
-        A classic script’s top-level functions and variables are globals that other scripts and HTML attributes may use, so they
-        keep their names. In an ES module they are private: unused ones are removed and the rest renamed. Auto-detect treats code
-        with import or export statements (or top-level await) as a module. “Output syntax” limits which newer syntax Terser may
-        introduce; it does not transpile your code down.
+        {t('A classic script’s top-level functions and variables are globals that other scripts and HTML attributes may use, so they keep their names. In an ES module they are private: unused ones are removed and the rest renamed. Auto-detect treats code with import or export statements (or top-level await) as a module. “Output syntax” limits which newer syntax Terser may introduce; it does not transpile your code down.')}
       </p>
     </ToolStack>
   );

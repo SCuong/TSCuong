@@ -1,4 +1,5 @@
 import { FormatterTool, type ParserOption } from './code/FormatterTool';
+import { t } from '@/lib/i18n';
 
 const HTML_SAMPLE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>LocalKit demo</title>
 <style>body{font-family:system-ui;margin:0}.card{padding:16px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1)}</style></head>
@@ -14,8 +15,8 @@ const ANGULAR_SAMPLE = `<div class="list"><app-item *ngFor="let item of items; t
 
 const PARSERS: ParserOption[] = [
   { value: 'html', label: 'HTML', language: 'html', ext: 'html', sample: HTML_SAMPLE },
-  { value: 'vue', label: 'Vue SFC', language: 'html', ext: 'vue', sample: VUE_SAMPLE },
-  { value: 'angular', label: 'Angular template', language: 'html', ext: 'html', sample: ANGULAR_SAMPLE },
+  { value: 'vue', label: t('Vue SFC'), language: 'html', ext: 'vue', sample: VUE_SAMPLE },
+  { value: 'angular', label: t('Angular template'), language: 'html', ext: 'html', sample: ANGULAR_SAMPLE },
 ];
 
 export default function HtmlFormatter() {

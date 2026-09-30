@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { CopyButton } from '@/components/ui/Actions';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /** Label + range slider + number field, kept in sync. */
 export function SliderRow({
@@ -78,7 +79,7 @@ export function ColorInput({ label, value, onChange, className }: { label: strin
       <div className="flex items-center gap-2">
         <input
           type="color"
-          aria-label={`${label} picker`}
+          aria-label={t('{label} picker', { label })}
           value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'}
           onChange={(e) => onChange(e.target.value)}
           className="h-8 w-10 shrink-0 cursor-pointer rounded-md border border-line-strong bg-surface-sunken p-0.5"
@@ -116,7 +117,7 @@ export function CssOutput({ title = 'CSS', code }: { title?: string; code: strin
     <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card">
       <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line py-1.5 pr-2 pl-4">
         <h2 className="text-[13px] font-semibold tracking-tight text-fg">{title}</h2>
-        <CopyButton value={code} label="Copy CSS" />
+        <CopyButton value={code} label={t('Copy CSS')} />
       </header>
       <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap text-fg">{code}</pre>
     </section>

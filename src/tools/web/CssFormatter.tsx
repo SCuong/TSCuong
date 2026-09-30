@@ -1,4 +1,5 @@
 import { FormatterTool, type ParserOption } from './code/FormatterTool';
+import { t } from '@/lib/i18n';
 
 const CSS_SAMPLE = `:root{--accent:#2563eb;--radius:12px}*,*::before,*::after{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:#0f172a}
 .card{padding:16px 20px;border-radius:var(--radius);box-shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px -8px rgba(0,0,0,.2)}.card:hover{transform:translateY(-2px)}
@@ -14,7 +15,7 @@ const LESS_SAMPLE = `@accent:#2563eb;.rounded(@r:8px){border-radius:@r}
 const PARSERS: ParserOption[] = [
   { value: 'css', label: 'CSS', language: 'css', ext: 'css', sample: CSS_SAMPLE },
   { value: 'scss', label: 'SCSS', language: 'css', ext: 'scss', sample: SCSS_SAMPLE },
-  { value: 'less', label: 'Less', language: 'css', ext: 'less', sample: LESS_SAMPLE },
+  { value: 'less', label: t('Less'), language: 'css', ext: 'less', sample: LESS_SAMPLE },
 ];
 
 export default function CssFormatter() {

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Panel';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { buildPreviewDocument, type ConsoleMessage } from './lib/preview';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'html-preview';
 
@@ -96,9 +97,9 @@ export default function HtmlPreview() {
   }, [token]);
 
   const editors: Record<Tab, { value: string; set: (v: string) => void; language: 'html' | 'css' | 'javascript'; title: string }> = {
-    html: { value: html, set: setHtml, language: 'html', title: 'HTML (body)' },
+    html: { value: html, set: setHtml, language: 'html', title: t('HTML (body)') },
     css: { value: css, set: setCss, language: 'css', title: 'CSS' },
-    js: { value: js, set: setJs, language: 'javascript', title: 'JavaScript' },
+    js: { value: js, set: setJs, language: 'javascript', title: t('JavaScript') },
   };
   const current = editors[tab];
   const frameWidth = width === 'full' ? '100%' : `${width}px`;
@@ -108,13 +109,13 @@ export default function HtmlPreview() {
       <div className="grid min-w-0 gap-4 xl:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-3">
           <Segmented
-            label="Editor"
+            label={t('Editor')}
             value={tab}
             onChange={setTab}
             options={[
               { value: 'html', label: 'HTML' },
               { value: 'css', label: 'CSS' },
-              { value: 'js', label: 'JavaScript' },
+              { value: 'js', label: t('JavaScript') },
             ]}
           />
           <EditorPanel
@@ -124,10 +125,10 @@ export default function HtmlPreview() {
             onChange={current.set}
             language={current.language}
             sample={SAMPLE[tab]}
-            placeholder={`Write ${current.title}…`}
+            placeholder={t('Write {title}…', { title: current.title })}
             height="560px"
             footer={
-              tab === 'js' && !runScripts ? <span className="text-warning">JavaScript is off. Turn on “Run JavaScript” to execute it.</span> : undefined
+              tab === 'js' && !runScripts ? <span className="text-warning">{t('JavaScript is off. Turn on “Run JavaScript” to execute it.')}</span> : undefined
             }
           />
         </div>
@@ -135,37 +136,37 @@ export default function HtmlPreview() {
         <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card">
           <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
             <Segmented
-              label="Preview width"
+              label={t('Preview width')}
               size="sm"
               value={width}
               onChange={setWidth}
               options={[
-                { value: 'full', label: 'Full', icon: Monitor },
-                { value: '1024', label: '1024', icon: Monitor, title: 'Laptop, 1024px' },
-                { value: '768', label: '768', icon: Tablet, title: 'Tablet, 768px' },
-                { value: '375', label: '375', icon: Smartphone, title: 'Phone, 375px' },
+                { value: 'full', label: t('Full'), icon: Monitor },
+                { value: '1024', label: '1024', icon: Monitor, title: t('Laptop, 1024px') },
+                { value: '768', label: '768', icon: Tablet, title: t('Tablet, 768px') },
+                { value: '375', label: '375', icon: Smartphone, title: t('Phone, 375px') },
               ]}
             />
             <div className="flex items-center gap-2">
               <Switch
-                label="Run JavaScript"
+                label={t('Run JavaScript')}
                 checked={runScripts}
                 onChange={(v) => {
                   setRunScripts(v);
                   setLogs([]);
                 }}
               />
-              <IconButton icon={RotateCw} label="Reload preview" size="sm" onClick={() => { setLogs([]); setReloadKey((k) => k + 1); }} />
+              <IconButton icon={RotateCw} label={t('Reload preview')} size="sm" onClick={() => { setLogs([]); setReloadKey((k) => k + 1); }} />
             </div>
           </header>
-          <div className="lk-checker h-[460px] overflow-auto" tabIndex={0} role="region" aria-label="Preview area">
+          <div className="lk-checker h-[460px] overflow-auto" tabIndex={0} role="region" aria-label={t('Preview area')}>
             <iframe
               // A new frame whenever the sandbox changes: browsers apply sandbox flags when a document loads, so
               // reusing the frame would load the next document with the previous flags (scripts still running
               // after "Run JavaScript" is turned off, or not running after it is turned on).
               key={`${reloadKey}-${runScripts ? 'js' : 'nojs'}`}
               ref={frame}
-              title="Live preview"
+              title={t('Live preview')}
               // Never allow-same-origin: the page runs in an opaque origin, isolated from LocalKit.
               sandbox={runScripts ? 'allow-scripts' : ''}
               srcDoc={doc}
@@ -176,12 +177,12 @@ export default function HtmlPreview() {
           </div>
           <div className="border-t border-line">
             <div className="flex items-center justify-between px-3 py-1.5">
-              <span className="text-[12.5px] font-medium text-fg-secondary">Console {logs.length > 0 && <Badge>{logs.length}</Badge>}</span>
-              <IconButton icon={Trash2} label="Clear console" size="sm" disabled={!logs.length} onClick={() => setLogs([])} />
+              <span className="text-[12.5px] font-medium text-fg-secondary">{t('Console')}{' '}{logs.length > 0 && <Badge>{logs.length}</Badge>}</span>
+              <IconButton icon={Trash2} label={t('Clear console')} size="sm" disabled={!logs.length} onClick={() => setLogs([])} />
             </div>
-            <div className="h-24 overflow-auto px-3 pb-2 font-mono text-[12px]" role="log" aria-label="Console output" tabIndex={0}>
-              {!runScripts && <p className="text-fg-muted">Console output appears here when JavaScript is running.</p>}
-              {runScripts && logs.length === 0 && <p className="text-fg-muted">No output yet.</p>}
+            <div className="h-24 overflow-auto px-3 pb-2 font-mono text-[12px]" role="log" aria-label={t('Console output')} tabIndex={0}>
+              {!runScripts && <p className="text-fg-muted">{t('Console output appears here when JavaScript is running.')}</p>}
+              {runScripts && logs.length === 0 && <p className="text-fg-muted">{t('No output yet.')}</p>}
               {logs.map((l) => (
                 <div
                   key={l.id}
@@ -200,9 +201,7 @@ export default function HtmlPreview() {
       <div className="flex gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5 text-[13px] text-fg-secondary">
         <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" aria-hidden />
         <p>
-          The preview runs in a sandboxed frame with its own isolated origin. JavaScript is off until you turn it on, and even
-          then it cannot read LocalKit’s storage, cookies or pages, open pop-ups or dialogs, submit forms or navigate this tab. Loading
-          external images, fonts or scripts referenced by your code does contact those servers.
+          {t('The preview runs in a sandboxed frame with its own isolated origin. JavaScript is off until you turn it on, and even then it cannot read LocalKit’s storage, cookies or pages, open pop-ups or dialogs, submit forms or navigate this tab. Loading external images, fonts or scripts referenced by your code does contact those servers.')}
         </p>
       </div>
     </ToolStack>

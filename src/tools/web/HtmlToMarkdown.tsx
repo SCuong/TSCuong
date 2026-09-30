@@ -6,6 +6,7 @@ import { ErrorMessage } from '@/components/ui/Alert';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { errorMessage } from '@/lib/utils';
 import { DEFAULT_TURNDOWN, htmlToMarkdown, type HtmlToMarkdownOptions } from './lib/turndown';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `<article>
   <h1>Getting started</h1>
@@ -39,7 +40,7 @@ export default function HtmlToMarkdown() {
     try {
       return { md: htmlToMarkdown(debounced, opts), error: null };
     } catch (error) {
-      return { md: '', error: errorMessage(error, 'This HTML could not be converted.') };
+      return { md: '', error: errorMessage(error, t('This HTML could not be converted.')) };
     }
   }, [debounced, opts]);
 
@@ -47,36 +48,36 @@ export default function HtmlToMarkdown() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Headings</Label>
-          <Segmented label="Heading style" value={opts.headingStyle} onChange={(v) => set('headingStyle', v)} options={[{ value: 'atx', label: '# ATX' }, { value: 'setext', label: 'Underline' }]} />
+          <Label>{t('Headings')}</Label>
+          <Segmented label={t('Heading style')} value={opts.headingStyle} onChange={(v) => set('headingStyle', v)} options={[{ value: 'atx', label: '# ATX' }, { value: 'setext', label: t('Underline') }]} />
         </div>
         <div>
-          <Label>Bullets</Label>
-          <Segmented label="Bullet marker" value={opts.bulletListMarker} onChange={(v) => set('bulletListMarker', v)} options={[{ value: '-', label: '-' }, { value: '*', label: '*' }, { value: '+', label: '+' }]} />
+          <Label>{t('Bullets')}</Label>
+          <Segmented label={t('Bullet marker')} value={opts.bulletListMarker} onChange={(v) => set('bulletListMarker', v)} options={[{ value: '-', label: '-' }, { value: '*', label: '*' }, { value: '+', label: '+' }]} />
         </div>
         <div>
-          <Label>Code blocks</Label>
+          <Label>{t('Code blocks')}</Label>
           <Segmented
-            label="Code block style"
+            label={t('Code block style')}
             value={opts.codeBlockStyle === 'indented' ? 'indented' : opts.fence}
             onChange={(v) => setOpts((o) => (v === 'indented' ? { ...o, codeBlockStyle: 'indented' } : { ...o, codeBlockStyle: 'fenced', fence: v }))}
-            options={[{ value: '```', label: '```' }, { value: '~~~', label: '~~~' }, { value: 'indented', label: 'Indented' }]}
+            options={[{ value: '```', label: '```' }, { value: '~~~', label: '~~~' }, { value: 'indented', label: t('Indented') }]}
           />
         </div>
         <div>
-          <Label>Emphasis</Label>
+          <Label>{t('Emphasis')}</Label>
           <Segmented
-            label="Emphasis delimiters"
+            label={t('Emphasis delimiters')}
             value={opts.emDelimiter === '*' ? 'star' : 'underscore'}
             onChange={(v) => setOpts((o) => (v === 'star' ? { ...o, emDelimiter: '*', strongDelimiter: '**' } : { ...o, emDelimiter: '_', strongDelimiter: '__' }))}
-            options={[{ value: 'star', label: '*em* **strong**' }, { value: 'underscore', label: '_em_ __strong__' }]}
+            options={[{ value: 'star', label: t('*em* **strong**') }, { value: 'underscore', label: t('_em_ __strong__') }]}
           />
         </div>
         <div>
-          <Label>Links</Label>
-          <Segmented label="Link style" value={opts.linkStyle} onChange={(v) => set('linkStyle', v)} options={[{ value: 'inlined', label: 'Inline' }, { value: 'referenced', label: 'Reference' }]} />
+          <Label>{t('Links')}</Label>
+          <Segmented label={t('Link style')} value={opts.linkStyle} onChange={(v) => set('linkStyle', v)} options={[{ value: 'inlined', label: t('Inline') }, { value: 'referenced', label: t('Reference') }]} />
         </div>
-        <Switch label="GFM tables & strikethrough" checked={opts.gfm} onChange={(v) => set('gfm', v)} className="h-8" />
+        <Switch label={t('GFM tables & strikethrough')} checked={opts.gfm} onChange={(v) => set('gfm', v)} className="h-8" />
       </ToolBar>
       <ErrorMessage error={result.error} />
       <SplitPanes>
@@ -85,14 +86,14 @@ export default function HtmlToMarkdown() {
           value={input}
           onChange={setInput}
           language="html"
-          placeholder="Paste HTML here…"
+          placeholder={t('Paste HTML here…')}
           sample={SAMPLE}
           fileAccept=".html,.htm,text/html,text/plain"
           height="520px"
         />
-        <EditorPanel title="Markdown" value={input.trim() ? result.md : ''} language="markdown" placeholder="Markdown appears here" downloadName="document.md" downloadType="text/markdown" height="520px" />
+        <EditorPanel title={t('Markdown')} value={input.trim() ? result.md : ''} language="markdown" placeholder={t('Markdown appears here')} downloadName="document.md" downloadType="text/markdown" height="520px" />
       </SplitPanes>
-      <p className="text-[12.5px] text-fg-muted">The HTML is sanitized first: scripts, styles and event handlers are dropped before conversion.</p>
+      <p className="text-[12.5px] text-fg-muted">{t('The HTML is sanitized first: scripts, styles and event handlers are dropped before conversion.')}</p>
     </ToolStack>
   );
 }

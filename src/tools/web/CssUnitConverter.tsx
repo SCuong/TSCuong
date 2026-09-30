@@ -6,6 +6,7 @@ import { CopyButton } from '@/components/ui/Actions';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { CSS_UNITS, DEFAULT_CONTEXT, UNIT_INFO, batchConvert, convert, formatNumber, parseLength, type CssUnit, type UnitContext } from './lib/cssUnits';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'css-unit-converter';
 
@@ -22,7 +23,7 @@ function ContextField({ label, value, onChange, hint }: { label: string; value: 
             onChange={(v) => onChange(v === '' ? 0 : Math.max(0, v))}
             className="pr-8"
           />
-          <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-fg-muted">px</span>
+          <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-fg-muted">{t('px')}</span>
         </div>
       )}
     </Field>
@@ -45,13 +46,13 @@ export default function CssUnitConverter() {
     <ToolStack>
       <Panel bodyClassName="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_160px]">
-          <Field label="Value" hint="A number with a unit, e.g. 24px, 1.5rem, 12pt or 50%." error={input.trim() && !parsed ? 'Enter a number followed by a CSS unit.' : null}>
+          <Field label={t('Value')} hint={t('A number with a unit, e.g. 24px, 1.5rem, 12pt or 50%.')} error={input.trim() && !parsed ? t('Enter a number followed by a CSS unit.') : null}>
             {({ id, describedBy, invalid }) => (
               <Input id={id} aria-describedby={describedBy} aria-invalid={invalid || undefined} mono value={input} onChange={(e) => setInput(e.target.value)} className="text-[16px]" />
             )}
           </Field>
           <div>
-            <Label htmlFor="cu-precision">Decimals</Label>
+            <Label htmlFor="cu-precision">{t('Decimals')}</Label>
             <Select id="cu-precision" value={precision} onChange={(e) => setPrecision(Number(e.target.value))}>
               {[0, 1, 2, 3, 4, 6].map((p) => (
                 <option key={p} value={p}>
@@ -76,7 +77,7 @@ export default function CssUnitConverter() {
                     <div className="text-[11.5px] text-fg-muted">{u}</div>
                     <div className="truncate font-mono text-[14px] font-semibold text-fg tabular-nums">{text}</div>
                   </div>
-                  <CopyButton value={Number.isFinite(v) ? text : ''} iconOnly label={`Copy ${text}`} />
+                  <CopyButton value={Number.isFinite(v) ? text : ''} iconOnly label={t('Copy {text}', { text })} />
                 </div>
               );
             })}
@@ -84,22 +85,22 @@ export default function CssUnitConverter() {
         )}
       </Panel>
 
-      <Panel title="Reference sizes" description="Relative units depend on these. Absolute units (pt, in, cm…) use the CSS standard of 96px per inch.">
+      <Panel title={t('Reference sizes')} description={t('Relative units depend on these. Absolute units (pt, in, cm…) use the CSS standard of 96px per inch.')}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <ContextField label="Root font size (rem)" value={ctx.rootFontSize} onChange={set('rootFontSize')} />
-          <ContextField label="Parent font size (em)" value={ctx.parentFontSize} onChange={set('parentFontSize')} />
-          <ContextField label="Viewport width (vw)" value={ctx.viewportWidth} onChange={set('viewportWidth')} />
-          <ContextField label="Viewport height (vh)" value={ctx.viewportHeight} onChange={set('viewportHeight')} />
-          <ContextField label="100% equals" value={ctx.percentBase} onChange={set('percentBase')} hint="e.g. the parent's width" />
+          <ContextField label={t('Root font size (rem)')} value={ctx.rootFontSize} onChange={set('rootFontSize')} />
+          <ContextField label={t('Parent font size (em)')} value={ctx.parentFontSize} onChange={set('parentFontSize')} />
+          <ContextField label={t('Viewport width (vw)')} value={ctx.viewportWidth} onChange={set('viewportWidth')} />
+          <ContextField label={t('Viewport height (vh)')} value={ctx.viewportHeight} onChange={set('viewportHeight')} />
+          <ContextField label={t('100% equals')} value={ctx.percentBase} onChange={set('percentBase')} hint={t('e.g. the parent\'s width')} />
         </div>
       </Panel>
 
       <Panel
-        title="Batch conversion"
+        title={t('Batch conversion')}
         actions={
           <div className="flex items-center gap-2">
             <Label htmlFor="cu-target" className="mb-0">
-              Convert to
+              {t('Convert to')}
             </Label>
             <Select id="cu-target" value={target} onChange={(e) => setTarget(e.target.value as CssUnit)} className="w-auto">
               {CSS_UNITS.map((u) => (
@@ -108,21 +109,21 @@ export default function CssUnitConverter() {
                 </option>
               ))}
             </Select>
-            <CopyButton value={batchOutput} label="Copy results" />
+            <CopyButton value={batchOutput} label={t('Copy results')} />
           </div>
         }
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label htmlFor="cu-batch">Values (one per line or comma-separated; bare numbers are px)</Label>
+            <Label htmlFor="cu-batch">{t('Values (one per line or comma-separated; bare numbers are px)')}</Label>
             <Textarea id="cu-batch" rows={10} value={batch} onChange={(e) => setBatch(e.target.value)} />
           </div>
-          <div className="min-w-0 overflow-x-auto" tabIndex={0} role="region" aria-label="Converted values">
+          <div className="min-w-0 overflow-x-auto" tabIndex={0} role="region" aria-label={t('Converted values')}>
             <table className="w-full text-left text-[13px]">
               <thead className="text-[12px] text-fg-muted">
                 <tr className="border-b border-line">
-                  <th className="py-2 pr-3 font-medium">Input</th>
-                  <th className="py-2 pr-3 font-medium">px</th>
+                  <th className="py-2 pr-3 font-medium">{t('Input')}</th>
+                  <th className="py-2 pr-3 font-medium">{t('px')}</th>
                   <th className="py-2 font-medium">{target}</th>
                 </tr>
               </thead>
@@ -130,7 +131,7 @@ export default function CssUnitConverter() {
                 {rows.length === 0 && (
                   <tr>
                     <td colSpan={3} className="py-4 font-sans text-fg-muted">
-                      Enter some values to convert.
+                      {t('Enter some values to convert.')}
                     </td>
                   </tr>
                 )}
@@ -143,7 +144,7 @@ export default function CssUnitConverter() {
                 ))}
               </tbody>
             </table>
-            {rows.length > 500 && <p className="mt-2 text-[12.5px] text-fg-muted">Showing 500 of {rows.length} rows; “Copy results” includes all of them.</p>}
+            {rows.length > 500 && <p className="mt-2 text-[12.5px] text-fg-muted">{t('Showing 500 of {count} rows; “Copy results” includes all of them.', { count: rows.length })}</p>}
           </div>
         </div>
       </Panel>

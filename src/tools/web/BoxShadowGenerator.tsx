@@ -8,6 +8,7 @@ import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { ColorInput, CssOutput, SliderRow } from './design/Controls';
 import { SHADOW_PRESETS, layerCss, layerId, shadowCss, type ShadowLayer } from './lib/shadow';
+import { t } from '@/lib/i18n';
 
 const TOOL = 'box-shadow-generator';
 
@@ -59,18 +60,18 @@ export default function BoxShadowGenerator() {
           <div className="grid gap-3 sm:grid-cols-2">
             <figure className="m-0">
               {surface(false)}
-              <figcaption className="mt-1.5 text-center text-[12px] text-fg-muted">Light surface</figcaption>
+              <figcaption className="mt-1.5 text-center text-[12px] text-fg-muted">{t('Light surface')}</figcaption>
             </figure>
             <figure className="m-0">
               {surface(true)}
-              <figcaption className="mt-1.5 text-center text-[12px] text-fg-muted">Dark surface</figcaption>
+              <figcaption className="mt-1.5 text-center text-[12px] text-fg-muted">{t('Dark surface')}</figcaption>
             </figure>
           </div>
-          <Panel title="Preview element" bodyClassName="grid gap-4 sm:grid-cols-2">
-            <ColorInput label="Background (light preview)" value={box.background} onChange={(background) => setBox((b) => ({ ...b, background }))} />
-            <SliderRow label="Corner radius" value={box.radius} min={0} max={80} unit="px" onChange={(radius) => setBox((b) => ({ ...b, radius }))} />
+          <Panel title={t('Preview element')} bodyClassName="grid gap-4 sm:grid-cols-2">
+            <ColorInput label={t('Background (light preview)')} value={box.background} onChange={(background) => setBox((b) => ({ ...b, background }))} />
+            <SliderRow label={t('Corner radius')} value={box.radius} min={0} max={80} unit="px" onChange={(radius) => setBox((b) => ({ ...b, radius }))} />
           </Panel>
-          <Panel title="Presets">
+          <Panel title={t('Presets')}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {SHADOW_PRESETS.map((p) => (
                 <button
@@ -93,17 +94,17 @@ export default function BoxShadowGenerator() {
 
         <div className="flex min-w-0 flex-col gap-4">
           <Panel
-            title="Layers"
-            description="The first layer is drawn on top."
+            title={t('Layers')}
+            description={t('The first layer is drawn on top.')}
             actions={
               <Button size="sm" icon={Plus} onClick={() => add()}>
-                Add
+                {t('Add')}
               </Button>
             }
             bodyClassName="p-2"
           >
             {layers.length === 0 ? (
-              <p className="px-2 py-4 text-center text-[13px] text-fg-muted">No layers. The element has no shadow.</p>
+              <p className="px-2 py-4 text-center text-[13px] text-fg-muted">{t('No layers. The element has no shadow.')}</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {layers.map((l, i) => (
@@ -127,14 +128,14 @@ export default function BoxShadowGenerator() {
                         {/* Hidden layers are struck through (not faded: faded text would fail contrast). */}
                         <span className={cn('truncate font-mono text-[12px]', l.visible ? 'text-fg' : 'text-fg-secondary line-through')}>
                           {layerCss(l)}
-                          {!l.visible && <span className="sr-only"> (hidden)</span>}
+                          {!l.visible && <span className="sr-only">{' '}{t('(hidden)')}</span>}
                         </span>
                       </button>
-                      <IconButton icon={l.visible ? Eye : EyeOff} label={l.visible ? 'Hide layer' : 'Show layer'} size="sm" onClick={() => update(l.id, { visible: !l.visible })} />
-                      <IconButton icon={ArrowUp} label="Move up" size="sm" disabled={i === 0} onClick={() => move(l.id, -1)} />
-                      <IconButton icon={ArrowDown} label="Move down" size="sm" disabled={i === layers.length - 1} onClick={() => move(l.id, 1)} />
-                      <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => add(l)} />
-                      <IconButton icon={Trash2} label="Delete layer" size="sm" onClick={() => remove(l.id)} />
+                      <IconButton icon={l.visible ? Eye : EyeOff} label={l.visible ? t('Hide layer') : t('Show layer')} size="sm" onClick={() => update(l.id, { visible: !l.visible })} />
+                      <IconButton icon={ArrowUp} label={t('Move up')} size="sm" disabled={i === 0} onClick={() => move(l.id, -1)} />
+                      <IconButton icon={ArrowDown} label={t('Move down')} size="sm" disabled={i === layers.length - 1} onClick={() => move(l.id, 1)} />
+                      <IconButton icon={Copy} label={t('Duplicate layer')} size="sm" onClick={() => add(l)} />
+                      <IconButton icon={Trash2} label={t('Delete layer')} size="sm" onClick={() => remove(l.id)} />
                     </div>
                   </li>
                 ))}
@@ -142,16 +143,16 @@ export default function BoxShadowGenerator() {
             )}
           </Panel>
           {selected && (
-            <Panel title="Selected layer" bodyClassName="flex flex-col gap-3">
-              <SliderRow label="Horizontal offset" value={selected.x} min={-100} max={100} unit="px" onChange={(x) => update(selected.id, { x })} />
-              <SliderRow label="Vertical offset" value={selected.y} min={-100} max={100} unit="px" onChange={(y) => update(selected.id, { y })} />
-              <SliderRow label="Blur" value={selected.blur} min={0} max={150} unit="px" onChange={(blur) => update(selected.id, { blur: Math.max(0, blur) })} />
-              <SliderRow label="Spread" value={selected.spread} min={-60} max={60} unit="px" onChange={(spread) => update(selected.id, { spread })} />
+            <Panel title={t('Selected layer')} bodyClassName="flex flex-col gap-3">
+              <SliderRow label={t('Horizontal offset')} value={selected.x} min={-100} max={100} unit="px" onChange={(x) => update(selected.id, { x })} />
+              <SliderRow label={t('Vertical offset')} value={selected.y} min={-100} max={100} unit="px" onChange={(y) => update(selected.id, { y })} />
+              <SliderRow label={t('Blur')} value={selected.blur} min={0} max={150} unit="px" onChange={(blur) => update(selected.id, { blur: Math.max(0, blur) })} />
+              <SliderRow label={t('Spread')} value={selected.spread} min={-60} max={60} unit="px" onChange={(spread) => update(selected.id, { spread })} />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <ColorInput label="Color" value={selected.color} onChange={(color) => update(selected.id, { color })} />
-                <SliderRow label="Opacity" value={Math.round(selected.opacity * 100)} min={0} max={100} unit="%" onChange={(v) => update(selected.id, { opacity: v / 100 })} />
+                <ColorInput label={t('Color')} value={selected.color} onChange={(color) => update(selected.id, { color })} />
+                <SliderRow label={t('Opacity')} value={Math.round(selected.opacity * 100)} min={0} max={100} unit="%" onChange={(v) => update(selected.id, { opacity: v / 100 })} />
               </div>
-              <Switch label="Inset (inner shadow)" checked={selected.inset} onChange={(inset) => update(selected.id, { inset })} />
+              <Switch label={t('Inset (inner shadow)')} checked={selected.inset} onChange={(inset) => update(selected.id, { inset })} />
             </Panel>
           )}
         </div>
