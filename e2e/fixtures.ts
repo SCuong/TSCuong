@@ -6,6 +6,9 @@ export const test = base.extend<{ consoleErrors: string[] }>({
     async ({ page }, use) => {
       const errors: string[] = [];
       page.on('console', (msg) => {
+        // Playwright's trace recorder injects a script into every frame; in a fully sandboxed
+        // preview frame (scripts off by design) Chrome reports that injection as blocked.
+        if (/^Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed/.test(msg.text())) return;
         if (msg.type() === 'error') errors.push(msg.text());
       });
       page.on('pageerror', (err) => errors.push(err.message));

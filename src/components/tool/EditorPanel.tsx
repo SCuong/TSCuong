@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { Eraser, FileUp, FlaskConical } from 'lucide-react';
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/Field';
 import { IconButton } from '@/components/ui/Button';
 import { CopyButton, DownloadButton } from '@/components/ui/Actions';
 import { toast } from '@/components/ui/Toast';
+import { matchesAccept } from '@/components/ui/FileDrop';
 
 const MAX_TEXT_FILE = 50 * 1024 * 1024;
 /** Read-only plain outputs longer than this show a leading slice (textareas re-lay out all text). */
@@ -84,6 +85,9 @@ export function EditorPanel({
   const useCode = code || extensions !== undefined || onReady !== undefined || (language !== undefined && language !== 'plain');
   const label = ariaLabel ?? (typeof title === 'string' ? title : 'Editor');
   const truncated = readOnly && !useCode && value.length > PLAIN_DISPLAY_LIMIT;
+  /** Editable panels that offer "Open file" also accept a dropped file. */
+  const canDropFile = !readOnly && fileAccept !== undefined;
+  const [dragging, setDragging] = useState(false);
 
   async function openFile(file: File) {
     if (file.size > MAX_TEXT_FILE) {
@@ -104,8 +108,41 @@ export function EditorPanel({
       className={cn(
         'flex min-w-0 flex-col rounded-xl border bg-surface shadow-card',
         invalid ? 'border-danger/60' : 'border-line',
+        dragging && 'border-accent ring-2 ring-accent-line',
         className,
       )}
+      onDragOver={
+        canDropFile
+          ? (e) => {
+              if (!Array.from(e.dataTransfer.types).includes('Files')) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+              if (!dragging) setDragging(true);
+            }
+          : undefined
+      }
+      onDragLeave={
+        canDropFile
+          ? (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+            }
+          : undefined
+      }
+      onDrop={
+        canDropFile
+          ? (e) => {
+              const file = e.dataTransfer.files[0];
+              setDragging(false);
+              if (!file) return;
+              e.preventDefault();
+              if (!matchesAccept(file, fileAccept)) {
+                toast(`That file type is not supported here (expected ${fileAccept?.replace(/,/g, ', ')}).`, 'error');
+                return;
+              }
+              void openFile(file);
+            }
+          : undefined
+      }
     >
       <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line py-1.5 pr-2 pl-4">
         <h2 className="text-[13px] font-semibold tracking-tight text-fg">{title}</h2>

@@ -79,10 +79,36 @@ function NavigationProgress() {
   );
 }
 
+/**
+ * Browsers open a file that is dropped outside a drop zone, navigating away and losing
+ * unsaved work. Drop zones handle (and preventDefault) their own drops; anything left over
+ * is swallowed here, with a "no drop" cursor while dragging.
+ */
+function useDropGuard() {
+  useEffect(() => {
+    const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
+    const onDragOver = (event: DragEvent) => {
+      if (event.defaultPrevented || !hasFiles(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!event.defaultPrevented && hasFiles(event)) event.preventDefault();
+    };
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, []);
+}
+
 export function Layout() {
   const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
   useGlobalShortcuts();
+  useDropGuard();
 
   useEffect(() => setNavOpen(false), [location.pathname]);
 

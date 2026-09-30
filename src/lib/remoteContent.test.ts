@@ -39,6 +39,27 @@ describe('blockRemoteContent', () => {
     expect(r.html).toContain('src="images/local.png"');
   });
 
+  it('removes CSS that can fetch through @import, image-set() or escapes', () => {
+    const r = blockRemoteContent(
+      [
+        '<style>@import url("https://css.test/a.css"); p { color: red }</style>',
+        '<style>h1 { background: url(https://bg.test/h.png) }</style>',
+        '<style>p { color: blue }</style>',
+        '<div style="background-image: image-set(\'https://set.test/x.png\' 1x)">a</div>',
+        '<div style="background: u\\72l(https://esc.test/y.png)">b</div>',
+        '<div style="color: green">c</div>',
+      ].join(''),
+    );
+    expect(r.html).not.toContain('@import');
+    expect(r.html).not.toContain('bg.test');
+    expect(r.html).not.toContain('set.test');
+    expect(r.html).not.toContain('esc.test');
+    expect(r.html).toContain('p { color: blue }');
+    expect(r.html).toContain('style="color: green"');
+    expect(r.blocked).toBe(4);
+    expect(r.hosts).toEqual(['bg.test', 'css.test', 'set.test']);
+  });
+
   it('handles empty input', () => {
     expect(blockRemoteContent('')).toEqual({ html: '', blocked: 0, hosts: [] });
   });

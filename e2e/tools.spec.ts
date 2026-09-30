@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { Download, Page } from '@playwright/test';
+import type { Download, Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { imageSize, makePdf, makePng, pdfPageCount } from './files';
 
@@ -29,6 +29,47 @@ test.describe('JSON formatter', () => {
 
     await fillEditor(page, 'Input JSON', '{"a": 1,}');
     await expect(page.getByRole('alert').filter({ hasText: 'Invalid JSON' })).toBeVisible();
+  });
+});
+
+test.describe('File drops', () => {
+  async function dropFile(page: Page, target: Locator, name: string, type: string, content: string) {
+    const element = await target.elementHandle();
+    return page.evaluate(
+      ({ element, name, type, content }) => {
+        const target = element!;
+        const dt = new DataTransfer();
+        dt.items.add(new File([content], name, { type }));
+        const over = new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true });
+        target.dispatchEvent(over);
+        const drop = new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true });
+        target.dispatchEvent(drop);
+        return { overPrevented: over.defaultPrevented, dropPrevented: drop.defaultPrevented };
+      },
+      { element, name, type, content },
+    );
+  }
+
+  test('a file dropped on an editor panel is opened in it', async ({ page }) => {
+    await page.goto('/tools/json-formatter');
+    const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Input JSON', exact: true }) });
+    const result = await dropFile(page, panel, 'data.json', 'application/json', '{"dropped":true}');
+    expect(result.dropPrevented).toBe(true);
+    await expect(page.getByRole('textbox', { name: 'Formatted', exact: true })).toContainText('"dropped": true');
+  });
+
+  test('an unsupported file dropped on a panel is refused with a message', async ({ page }) => {
+    await page.goto('/tools/json-formatter');
+    const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Input JSON', exact: true }) });
+    await dropFile(page, panel, 'photo.png', 'image/png', 'not json');
+    await expect(page.getByText(/That file type is not supported here/)).toBeVisible();
+  });
+
+  test('a file dropped outside any drop zone never navigates away', async ({ page }) => {
+    await page.goto('/tools/json-formatter');
+    const result = await dropFile(page, page.locator('header').first(), 'notes.txt', 'text/plain', 'hello');
+    expect(result).toEqual({ overPrevented: true, dropPrevented: true });
+    await expect(page).toHaveURL(/\/tools\/json-formatter$/);
   });
 });
 

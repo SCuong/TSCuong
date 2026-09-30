@@ -17,8 +17,16 @@ export interface RemoteContentResult {
 
 const REMOTE_URL = /^\s*(?:https?:)?\/\//i;
 const CSS_REMOTE_URL = /url\(\s*(['"]?)\s*((?:https?:)?\/\/[^'")\s]+)\1\s*\)/gi;
+/**
+ * CSS that can fetch in ways a simple url() match cannot see reliably: @import, image-set(),
+ * and escapes (e.g. `u\72l(` is `url(`). Styles containing these are removed outright.
+ */
+const CSS_FETCH_RISK = /@import|image-set\s*\(|\\/i;
+const CSS_ANY_URL = /url\s*\(|@import/i;
+const FIRST_URL = /(?:url\(\s*['"]?|@import\s+['"]|image-set\(\s*['"]?)\s*((?:https?:)?\/\/[^'")\s]+)/i;
 
 function hostOf(url: string): string | null {
+  if (!REMOTE_URL.test(url)) return null;
   try {
     return new URL(url.trim(), 'https://localkit.invalid').hostname || null;
   } catch {
@@ -63,13 +71,28 @@ export function blockRemoteContent(html: string): RemoteContentResult {
     }
     const style = el.getAttribute('style');
     if (style) {
-      let found = false;
-      const cleaned = style.replace(CSS_REMOTE_URL, (_match, _quote: string, url: string) => {
-        found = true;
-        record(url);
-        return 'none';
-      });
-      if (found) el.setAttribute('style', cleaned);
+      if (CSS_FETCH_RISK.test(style)) {
+        // Cannot be neutralized reliably: drop the whole inline style.
+        record(style.match(FIRST_URL)?.[1] ?? '');
+        el.removeAttribute('style');
+      } else {
+        let found = false;
+        const cleaned = style.replace(CSS_REMOTE_URL, (_match, _quote: string, url: string) => {
+          found = true;
+          record(url);
+          return 'none';
+        });
+        if (found) el.setAttribute('style', cleaned);
+      }
+    }
+  }
+
+  // <style> elements that reference anything external (or hide it behind escapes) are removed.
+  for (const styleEl of root.querySelectorAll('style')) {
+    const css = styleEl.textContent ?? '';
+    if (CSS_ANY_URL.test(css) || CSS_FETCH_RISK.test(css)) {
+      record(css.match(FIRST_URL)?.[1] ?? '');
+      styleEl.remove();
     }
   }
 
