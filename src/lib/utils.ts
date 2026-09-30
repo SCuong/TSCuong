@@ -46,8 +46,16 @@ export function formatDuration(ms: number): string {
 export function errorMessage(error: unknown, fallback = 'Something went wrong.'): string {
   if (error instanceof DOMException && error.name === 'AbortError') return 'The operation was cancelled.';
   if (error instanceof DOMException && error.name === 'NotAllowedError') return 'Permission was denied.';
-  if (error instanceof RangeError && /array buffer|allocation|memory/i.test(error.message)) {
-    return 'The file is too large to process in this browser (out of memory).';
+  if (error instanceof RangeError && /array buffer|allocation|memory|invalid string length/i.test(error.message)) {
+    return 'The data is too large to process in this browser tab (out of memory). Try a smaller input.';
+  }
+  // A lazily loaded part of the app (an engine or tool chunk) could not be fetched: offline,
+  // or LocalKit was updated since this page loaded. Never show the raw module URL.
+  if (
+    error instanceof TypeError &&
+    /dynamically imported module|importing a module script failed|error loading dynamically imported/i.test(error.message)
+  ) {
+    return 'Part of LocalKit could not be loaded. Check your connection and reload the page.';
   }
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === 'string' && error) return error;

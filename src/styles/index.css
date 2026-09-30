@@ -307,6 +307,11 @@
     resize: vertical;
     tab-size: 2;
   }
+  /* Huge text (hundreds of KB): system monospace fonts lay out far faster than the web font,
+     especially with many emoji (fallback lookups per glyph). Set by EditorPanel. */
+  .lk-textarea.lk-textarea-large {
+    font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
 
   select.lk-field {
     appearance: none;

@@ -2,7 +2,7 @@ import { useRef, type ReactNode } from 'react';
 import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { Eraser, FileUp, FlaskConical } from 'lucide-react';
-import { cn, errorMessage } from '@/lib/utils';
+import { cn, errorMessage, formatNumber } from '@/lib/utils';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import type { EditorLanguage } from '@/components/editor/languages';
 import { Textarea } from '@/components/ui/Field';
@@ -11,6 +11,16 @@ import { CopyButton, DownloadButton } from '@/components/ui/Actions';
 import { toast } from '@/components/ui/Toast';
 
 const MAX_TEXT_FILE = 50 * 1024 * 1024;
+/** Read-only plain outputs longer than this show a leading slice (textareas re-lay out all text). */
+const PLAIN_DISPLAY_LIMIT = 1_000_000;
+/** Beyond this size the textarea uses system monospace fonts, which lay out huge text far faster. */
+const LARGE_TEXT = 200_000;
+
+/** A display slice that never ends in the middle of a surrogate pair. */
+function displaySlice(value: string, limit: number): string {
+  const last = value.charCodeAt(limit - 1);
+  return value.slice(0, last >= 0xd800 && last <= 0xdbff ? limit - 1 : limit);
+}
 
 export interface EditorPanelProps {
   title: ReactNode;
@@ -73,6 +83,7 @@ export function EditorPanel({
   const fileInput = useRef<HTMLInputElement>(null);
   const useCode = code || extensions !== undefined || onReady !== undefined || (language !== undefined && language !== 'plain');
   const label = ariaLabel ?? (typeof title === 'string' ? title : 'Editor');
+  const truncated = readOnly && !useCode && value.length > PLAIN_DISPLAY_LIMIT;
 
   async function openFile(file: File) {
     if (file.size > MAX_TEXT_FILE) {
@@ -147,20 +158,26 @@ export function EditorPanel({
           />
         ) : (
           <Textarea
-            value={value}
+            value={truncated ? displaySlice(value, PLAIN_DISPLAY_LIMIT) : value}
             onChange={onChange ? (e) => onChange(e.target.value) : undefined}
             readOnly={readOnly}
             placeholder={placeholder}
             aria-label={label}
             aria-invalid={invalid || undefined}
-            className={cn('h-full resize-none', !lineWrapping && 'whitespace-pre')}
+            className={cn('h-full resize-none', !lineWrapping && 'whitespace-pre', value.length > LARGE_TEXT && 'lk-textarea-large')}
             wrap={lineWrapping ? 'soft' : 'off'}
           />
         )}
       </div>
-      {footer && (
+      {(footer || truncated) && (
         <footer className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-1.5 text-[12.5px] text-fg-muted">
           {footer}
+          {truncated && (
+            <span>
+              Showing the first {formatNumber(PLAIN_DISPLAY_LIMIT)} of {formatNumber(value.length)} characters. Copy and
+              Save include everything.
+            </span>
+          )}
         </footer>
       )}
     </section>
@@ -177,7 +194,8 @@ export function ToolBar({ children, className }: { children: ReactNode; classNam
   return (
     <div
       className={cn(
-        'flex flex-wrap items-end gap-x-4 gap-y-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-card',
+        // Children may shrink (min-w-0) so scrollable controls such as Segmented stay inside the card on phones.
+        'flex flex-wrap items-end gap-x-4 gap-y-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-card [&>*]:max-w-full [&>*]:min-w-0',
         className,
       )}
     >

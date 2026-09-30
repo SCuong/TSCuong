@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cn } from './utils';
+import { cn, errorMessage } from './utils';
 
 describe('cn', () => {
   it('skips falsy values', () => {
@@ -35,5 +35,30 @@ describe('cn', () => {
 
   it('leaves non-Tailwind classes untouched', () => {
     expect(cn('lk-field', 'w-48', 'lk-textarea')).toBe('lk-field w-48 lk-textarea');
+  });
+});
+
+describe('errorMessage', () => {
+  it('turns failed lazy loads into an actionable sentence without the module URL', () => {
+    const chrome = new TypeError('Failed to fetch dynamically imported module: http://localhost:5173/assets/Tool-abc.js');
+    const safari = new TypeError('Importing a module script failed.');
+    const firefox = new TypeError('error loading dynamically imported module: http://x/y.js');
+    for (const error of [chrome, safari, firefox]) {
+      expect(errorMessage(error)).toBe('Part of LocalKit could not be loaded. Check your connection and reload the page.');
+    }
+  });
+
+  it('does not relabel ordinary network failures', () => {
+    expect(errorMessage(new TypeError('Failed to fetch'))).toBe('Failed to fetch');
+  });
+
+  it('maps out-of-memory style errors, including oversized strings', () => {
+    expect(errorMessage(new RangeError('Invalid string length'))).toMatch(/too large to process/);
+    expect(errorMessage(new RangeError('Array buffer allocation failed'))).toMatch(/too large to process/);
+  });
+
+  it('keeps cancellation and permission messages short', () => {
+    expect(errorMessage(new DOMException('x', 'AbortError'))).toBe('The operation was cancelled.');
+    expect(errorMessage(new DOMException('x', 'NotAllowedError'))).toBe('Permission was denied.');
   });
 });
