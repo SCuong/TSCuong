@@ -1,5 +1,6 @@
 /** PDF tools and image OCR. */
 const pdf: Record<string, string> = {
+  'Delete {page}': 'Xóa {page}',
   // Shared words and components
   page: 'trang',
   pages: 'trang',

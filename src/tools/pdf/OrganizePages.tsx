@@ -247,7 +247,7 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
             {t('Duplicate')}
           </Button>
           <Button size="sm" variant="ghost" icon={Trash} disabled={!hasSel || selected.size >= items.length} onClick={() => remove()}>
-            Delete
+            {t('Delete')}
           </Button>
           <span className="mx-1 hidden h-5 w-px bg-line sm:block" aria-hidden />
           <Button size="sm" variant="ghost" icon={Square} onClick={addBlank} title={hasSel ? t('Insert after the selection') : t('Insert at the end')}>
@@ -342,7 +342,7 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
               <CardButton label={t('Duplicate {label}', { label: item.label })} onClick={() => duplicate(item.id)}>
                 <Copy size={14} aria-hidden />
               </CardButton>
-              <CardButton label={`Delete ${item.label}`} danger disabled={items.length <= 1} onClick={() => remove(item.id)}>
+              <CardButton label={t('Delete {page}', { page: item.label })} danger disabled={items.length <= 1} onClick={() => remove(item.id)}>
                 <Trash size={14} aria-hidden />
               </CardButton>
             </>

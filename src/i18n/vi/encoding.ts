@@ -1,5 +1,6 @@
 /** Encoding tools. */
 const encoding: Record<string, string> = {
+  'Shift amount': 'Số bước dịch',
   // Base64 file
   'Base64 → File': 'Base64 → Tệp',
   'Base64 is about 33% larger than the file. Very long strings can make pasting and copying slow; downloading the result as a file is the most reliable option.':

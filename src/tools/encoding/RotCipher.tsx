@@ -51,7 +51,7 @@ export default function RotCipher() {
           <>
             <div className="min-w-56 flex-1 sm:max-w-sm">
               <label htmlFor="rot-shift" className="mb-1.5 flex items-center justify-between text-[13px] font-medium text-fg-secondary">
-                <span>Shift</span>
+                <span>{t('Shift amount')}</span>
                 <span className="font-mono text-fg">
                   {shift}
                   {shift === 13 && <span className="ml-1.5 text-[12px] text-accent-text">ROT13</span>}
