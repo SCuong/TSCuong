@@ -90,10 +90,21 @@ export interface StatementResult {
 
 export interface ExecResult {
   results: StatementResult[];
-  error: { index: number; sql: string; message: string } | null;
+  error: {
+    index: number;
+    sql: string;
+    message: string;
+    /** Where the failing statement starts in the executed text (UTF-16 offset). */
+    offset: number;
+    /** Where the error itself is, when it could be located exactly. */
+    errorOffset?: number;
+    errorLength?: number;
+  } | null;
   totalMs: number;
   /** A statement that may have changed the database ran successfully. */
   wrote: boolean;
+  /** An explicit transaction is still open after the script (BEGIN without COMMIT). */
+  inTransaction: boolean;
 }
 
 export type OpenSource = { kind: 'bytes'; bytes: ArrayBuffer } | { kind: 'empty' } | { kind: 'sample' };

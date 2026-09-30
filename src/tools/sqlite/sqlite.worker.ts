@@ -19,8 +19,9 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from './lib/protocol';
+import { bindable, inTransaction as transactionOpen, insertableColumns, readRow } from './lib/engine';
 import { buildBrowseQuery, quoteIdent, type BrowseQuery, type SqlValue } from './lib/sqlBuild';
-import { classifyStatement, splitStatements, validateWhereClause } from './lib/sqlClassifier';
+import { classifyStatement, errorLocation, splitStatements, validateWhereClause } from './lib/sqlClassifier';
 import { toCsv, toJson, toSqlDump } from './lib/sqlFormat';
 import { buildSampleSql } from './lib/sample';
 
@@ -85,8 +86,8 @@ function friendlyError(error: unknown): string {
 function scalar(sql: string, params: SqlValue[] = []): SqlValue {
   const stmt = requireDb().prepare(sql);
   try {
-    stmt.bind(params);
-    return stmt.step() ? (stmt.get()[0] ?? null) : null;
+    stmt.bind(bindable(params));
+    return stmt.step() ? (readRow(stmt)[0] ?? null) : null;
   } finally {
     stmt.free();
   }
@@ -95,14 +96,16 @@ function scalar(sql: string, params: SqlValue[] = []): SqlValue {
 function all(sql: string, params: SqlValue[] = []): { columns: string[]; rows: SqlValue[][] } {
   const stmt = requireDb().prepare(sql);
   try {
-    stmt.bind(params);
+    stmt.bind(bindable(params));
     const rows: SqlValue[][] = [];
-    while (stmt.step()) rows.push(stmt.get() as SqlValue[]);
+    while (stmt.step()) rows.push(readRow(stmt));
     return { columns: stmt.getColumnNames(), rows };
   } finally {
     stmt.free();
   }
 }
+
+const inTransaction = () => transactionOpen(requireDb());
 
 function objects(sql: string, params: SqlValue[] = []): Array<Record<string, SqlValue>> {
   const { columns, rows } = all(sql, params);
@@ -237,8 +240,26 @@ function browse(q: BrowseQuery): BrowseResult {
   return { columns, rows, total, sql: built.sql, timeMs: performance.now() - t0 };
 }
 
-function firstStatementText(sql: string): string {
-  return splitStatements(sql)[0]?.text ?? sql.trim();
+/**
+ * Where the statement at the start of `remaining` begins in `sql`: `remaining`
+ * is always a suffix of the script, and leading whitespace/comments are skipped.
+ */
+function statementAt(sql: string, remaining: string): { text: string; offset: number } {
+  const base = sql.length - remaining.length;
+  const first = splitStatements(remaining)[0];
+  return first ? { text: first.text, offset: base + first.start } : { text: remaining.trim(), offset: base };
+}
+
+function failure(index: number, sql: string, remaining: string, message: string): NonNullable<ExecResult['error']> {
+  const at = statementAt(sql, remaining);
+  const local = errorLocation(at.text, message);
+  return {
+    index,
+    sql: at.text,
+    message,
+    offset: at.offset,
+    ...(local ? { errorOffset: at.offset + local.start, errorLength: local.length } : {}),
+  };
 }
 
 function exec(sql: string, ro: boolean, maxRows: number): ExecResult {
@@ -254,25 +275,26 @@ function exec(sql: string, ro: boolean, maxRows: number): ExecResult {
   const iterator = database.iterateStatements(sql);
   let index = 0;
   for (;;) {
-    const remaining = iterator.getRemainingSQL();
+    const remaining = iterator.getRemainingSQL() ?? '';
     let stmt: Statement;
     try {
       const next = iterator.next();
       if (next.done) break;
       stmt = next.value;
     } catch (e) {
-      error = { index, sql: firstStatementText(remaining ?? ''), message: friendlyError(e) };
+      error = failure(index, sql, remaining, friendlyError(e));
       break;
     }
     const text = stmt.getSQL().trim();
     const cls = classifyStatement(text) ?? { kind: 'write' as const, verb: '?', destructive: false };
     if (readOnly && cls.kind === 'write') {
       stmt.free();
-      error = {
+      error = failure(
         index,
-        sql: text,
-        message: `Blocked in read-only mode: ${cls.verb || 'this statement'} can change the database. Turn on Write mode to run it.`,
-      };
+        sql,
+        remaining,
+        `Blocked in read-only mode: ${cls.verb || 'this statement'} can change the database. Turn on Write mode to run it.`,
+      );
       break;
     }
     const start = performance.now();
@@ -285,7 +307,7 @@ function exec(sql: string, ro: boolean, maxRows: number): ExecResult {
           truncated = true;
           break;
         }
-        rows.push(stmt.get() as SqlValue[]);
+        rows.push(readRow(stmt));
       }
       if (cls.kind === 'write') wrote = true;
       results.push({
@@ -300,7 +322,7 @@ function exec(sql: string, ro: boolean, maxRows: number): ExecResult {
         timeMs: performance.now() - start,
       });
     } catch (e) {
-      error = { index, sql: text, message: friendlyError(e) };
+      error = failure(index, sql, remaining, friendlyError(e));
       break;
     } finally {
       stmt.free();
@@ -309,10 +331,15 @@ function exec(sql: string, ro: boolean, maxRows: number): ExecResult {
   }
   // A PRAGMA in write mode may have changed query_only; keep the flag authoritative.
   applyReadOnly();
-  return { results, error, totalMs: performance.now() - t0, wrote };
+  return { results, error, totalMs: performance.now() - t0, wrote, inTransaction: inTransaction() };
 }
 
 function exportDb(): Uint8Array {
+  // sql.js exports by closing and reopening the connection, which would silently roll back
+  // (and lose) an open transaction's changes.
+  if (inTransaction()) {
+    throw new Error('A transaction is still open (BEGIN without COMMIT). Run COMMIT to keep its changes, or ROLLBACK to drop them, then export again.');
+  }
   const bytes = requireDb().export();
   // sql.js resets connection pragmas on export; restore them.
   requireDb().run('PRAGMA foreign_keys = ON');
@@ -323,17 +350,23 @@ function exportDb(): Uint8Array {
 function exportTable(name: string, format: 'csv' | 'json' | 'sql'): { text: string; rows: number } {
   const master = objects("SELECT type, sql FROM sqlite_master WHERE name = ? AND type IN ('table', 'view')", [name])[0];
   if (!master) throw new Error(`There is no table or view named "${name}".`);
-  const { columns, rows } = all(`SELECT * FROM ${quoteIdent(name)}`);
-  if (format === 'csv') return { text: toCsv(columns, rows), rows: rows.length };
-  if (format === 'json') return { text: toJson(columns, rows), rows: rows.length };
+  if (format === 'csv' || format === 'json') {
+    const { columns, rows } = all(`SELECT * FROM ${quoteIdent(name)}`);
+    return { text: format === 'csv' ? toCsv(columns, rows) : toJson(columns, rows), rows: rows.length };
+  }
   if (master.type === 'view') {
     return { text: `${String(master.sql).trim().replace(/;?$/, ';')}\n`, rows: 0 };
   }
+  // Generated columns cannot be inserted into (SQLite recomputes them), so the dump leaves them out.
+  const insertable = insertableColumns(objects('SELECT name, hidden FROM pragma_table_xinfo(?) ORDER BY cid', [name]));
+  const { columns, rows } = all(`SELECT ${insertable.map(quoteIdent).join(', ') || '*'} FROM ${quoteIdent(name)}`);
+  // Internal tables (sqlite_sequence, sqlite_stat1 …) are created by SQLite itself; CREATE would fail on restore.
+  const create = name.toLowerCase().startsWith('sqlite_') || master.sql === null ? null : String(master.sql);
   // Include the table's indexes and triggers so the dump restores the full definition.
   const extras = all("SELECT sql FROM sqlite_master WHERE tbl_name = ? AND type IN ('index', 'trigger') AND sql IS NOT NULL", [name]).rows.map(
     (r) => `${String(r[0]).trim().replace(/;?$/, ';')}`,
   );
-  const dump = toSqlDump(name, master.sql === null ? null : String(master.sql), columns, rows);
+  const dump = toSqlDump(name, create, columns, rows);
   return { text: extras.length ? `${dump}${extras.join('\n')}\n` : dump, rows: rows.length };
 }
 

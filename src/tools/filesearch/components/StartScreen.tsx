@@ -6,8 +6,8 @@ import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Label, NumberInput, Switch, Textarea } from '@/components/ui/Field';
 import { Spinner } from '@/components/ui/Feedback';
 import { Badge } from '@/components/ui/Panel';
-import { cn, formatBytes, formatNumber } from '@/lib/utils';
-import { DEFAULT_IGNORES } from '../lib/ignore';
+import { cn, formatBytes, formatNumber, pluralize } from '@/lib/utils';
+import { DEFAULT_IGNORES, parseIgnoreList } from '../lib/ignore';
 import type { BrowserSupport } from '../lib/folders';
 import type { StoredIndex } from '../lib/persist';
 import { timeAgo } from '../lib/snippets';
@@ -116,7 +116,7 @@ export function StartScreen({
           {showOptions ? <ChevronDown size={15} aria-hidden /> : <ChevronRight size={15} aria-hidden />}
           Indexing options
           <span className="ml-auto text-[12px] font-normal text-fg-muted">
-            Text up to {options.maxTextMb} MB per file · {options.ignore.split('\n').filter((l) => l.trim()).length} ignore rules
+            Text up to {options.maxTextMb} MB per file · {pluralize(parseIgnoreList(options.ignore).length, 'ignore rule')}
           </span>
         </button>
         {showOptions && (
@@ -131,7 +131,7 @@ export function StartScreen({
                 className="text-[12.5px]"
               />
               <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[12px] text-fg-muted">
-                <span>One name or pattern per line. * and ? are wildcards; patterns with “/” match paths.</span>
+                <span>One name or pattern per line. * and ? are wildcards, ** spans folders; patterns with “/” match paths from the folder root.</span>
                 <Button size="sm" variant="ghost" onClick={() => onOptions({ ...options, ignore: DEFAULT_IGNORES.join('\n') })}>
                   Reset
                 </Button>

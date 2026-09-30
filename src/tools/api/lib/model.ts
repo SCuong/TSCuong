@@ -279,8 +279,22 @@ export const SENSITIVE_HEADERS = new Set([
   'x-xsrf-token',
 ]);
 
+/**
+ * Words that mark a header, query parameter or body field as a credential:
+ * X-Goog-Api-Key, Private-Token, X-Amz-Security-Token, accessToken,
+ * client_secret, password, sig, key … (camelCase is split first).
+ */
+const SENSITIVE_NAME =
+  /(?:^|[^a-z0-9])(?:auth|authorization|authentication|bearer|token|secret|passwords?|passwd|pwd|pass|passphrase|apikey|api[-_ ]?key|access[-_ ]?key|private[-_ ]?key|subscription[-_ ]?key|session(?:[-_ ]?id)?|j?sessionid|phpsessid|cookie|signature|sig|credentials?|otp|jwt|key)(?:[^a-z0-9]|$)/;
+
+/** Does this header, parameter or field name conventionally carry a credential? */
+export function isSensitiveName(name: string): boolean {
+  const normalized = name.trim().replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  return SENSITIVE_HEADERS.has(normalized) || SENSITIVE_NAME.test(normalized);
+}
+
 export function isSensitiveHeader(name: string): boolean {
-  return SENSITIVE_HEADERS.has(name.trim().toLowerCase());
+  return isSensitiveName(name);
 }
 
 /** A value that is only a variable reference (e.g. "{{token}}" or "Bearer {{token}}") holds no secret itself. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bashQuote, cmdQuote, compactJsonText, generateCode, jsString, prettyJson, pyString, toCodeRequest, type CodeRequest } from './codegen';
+import { bashQuote, cmdQuote, compactJsonText, generateCode, jsString, normalizeRequestUrl, prettyJson, pyString, toCodeRequest, type CodeRequest } from './codegen';
+import { formatJsonBody } from './jsonBody';
 import { prepareRequest } from './prepare';
 import { emptyDraft, kv } from './model';
 import { tokenizeBash, tokenizeCmd } from '@/tools/network/lib/curl';
@@ -140,5 +141,49 @@ describe('generateCode', () => {
 
   it('empty header values use curl\'s "Name;" syntax', () => {
     expect(generateCode(code({ headers: [kv('X-Empty', '')], timeoutMs: 0 }), 'curl')).toContain("-H 'X-Empty;'");
+  });
+});
+
+describe('code that runs as sent', () => {
+  it('percent-encodes the URL like the browser and turns off curl globbing for [] and {}', () => {
+    const req = code({ url: 'https://api.example.com/items?filter[name]=a b&emoji=😀', timeoutMs: 0 });
+    expect(req.url).toBe('https://api.example.com/items?filter[name]=a%20b&emoji=%F0%9F%98%80');
+    expect(generateCode(req, 'curl')).toContain('--globoff');
+    expect(generateCode(code({ timeoutMs: 0 }), 'curl')).not.toContain('--globoff');
+  });
+
+  it('quotes -F file names that contain curl option characters', () => {
+    const form = code({
+      method: 'POST',
+      timeoutMs: 0,
+      body: { ...emptyDraft().body, mode: 'form-data', form: [{ ...kv('f', ''), kind: 'file', file: new Blob(['x']), fileName: 'a;b "c".txt' }] },
+    });
+    expect(generateCode(form, 'curl')).toContain(`-F 'f=@"a;b \\"c\\".txt"'`);
+  });
+
+  it('escapes HTTPie values that would change the item type', () => {
+    const req = code({
+      method: 'POST',
+      timeoutMs: 0,
+      headers: [kv('X-Val', '=start')],
+      body: { ...emptyDraft().body, mode: 'form-data', form: [{ ...kv('handle', '@john'), kind: 'text' }, { ...kv('eq', '=x'), kind: 'text' }] },
+    });
+    const out = generateCode(req, 'httpie');
+    expect(out).toContain(`'X-Val:\\=start'`);
+    expect(out).toContain(`'handle=\\@john'`);
+    expect(out).toContain(`'eq=\\=x'`);
+  });
+
+  it('keeps <placeholders> readable in URLs', () => {
+    expect(normalizeRequestUrl('https://a.test/x?key=<apiKey>')).toBe('https://a.test/x?key=<apiKey>');
+  });
+});
+
+describe('JSON body formatting', () => {
+  it('re-indents without rounding numbers or rewriting escapes, with {{variables}} as values', () => {
+    expect(formatJsonBody('{"id":12345678901234567890,"price":1.0,"s":"\u00e9","v":{{id}},"t":"Bearer {{tok}}"}')).toBe(
+      '{\n  "id": 12345678901234567890,\n  "price": 1.0,\n  "s": "\u00e9",\n  "v": {{id}},\n  "t": "Bearer {{tok}}"\n}',
+    );
+    expect(formatJsonBody('{bad')).toBeNull();
   });
 });

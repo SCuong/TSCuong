@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { toast } from '@/components/ui/Toast';
 import { cn, formatBytes } from '@/lib/utils';
+import { formatJsonBody } from '../lib/jsonBody';
 import type { BodyMode, FormField, KeyValue, RawLanguage, RequestBody } from '../lib/model';
 import type { Scope } from '../lib/vars';
 import { KeyValueEditor } from './KeyValueEditor';
@@ -57,11 +58,10 @@ export function BodyEditor({
   const problem = useMemo(() => (body.mode === 'raw' && body.rawLanguage === 'json' ? jsonProblem(body.raw) : null), [body.mode, body.rawLanguage, body.raw]);
 
   function formatJson() {
-    try {
-      set({ raw: JSON.stringify(JSON.parse(body.raw), null, 2) });
-    } catch {
-      toast(/\{\{/.test(body.raw) ? 'Format needs {{variables}} to be inside quotes.' : 'Fix the JSON errors first.', 'info');
-    }
+    // Re-indents the text itself, so big integers, 1.0 and escapes are kept exactly (JSON.parse would round them).
+    const pretty = formatJsonBody(body.raw);
+    if (pretty === null) toast('Fix the JSON errors first.', 'info');
+    else set({ raw: pretty });
   }
 
   const canFormat = body.rawLanguage === 'json' && body.raw.trim() !== '' && !problem;

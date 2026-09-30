@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  CircleStop,
   Code,
   Database,
   Download,
@@ -17,7 +18,7 @@ import {
 import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
-import { EmptyState, ProgressBar } from '@/components/ui/Feedback';
+import { EmptyState, ProgressBar, Spinner } from '@/components/ui/Feedback';
 import { FileDrop } from '@/components/ui/FileDrop';
 import { Switch } from '@/components/ui/Field';
 import { Badge } from '@/components/ui/Panel';
@@ -26,7 +27,7 @@ import { toast } from '@/components/ui/Toast';
 import { useMediaQuery, useToolState } from '@/lib/hooks';
 import { downloadBlob, errorMessage, formatBytes, formatNumber } from '@/lib/utils';
 import type { DbInfo, OpenSource, SchemaObject, TableDetails } from './lib/protocol';
-import { parseSqliteHeader } from './lib/sqliteHeader';
+import { isWalMode, missingBytes, parseSqliteHeader } from './lib/sqliteHeader';
 import { SAMPLE_QUERY } from './lib/sample';
 import { SqliteClient } from './sqliteClient';
 import { BrowsePanel } from './components/BrowsePanel';
@@ -38,10 +39,27 @@ import type { SqlCall } from './components/types';
 
 const TOOL_ID = 'sqlite-viewer';
 const LARGE_FILE = 500 * 1024 * 1024;
-const ACCEPT = '.sqlite,.sqlite3,.db,.db3,.s3db,.sl3,.gpkg,.mbtiles';
 
 type Source = { kind: 'file'; file: File } | { kind: 'sample' } | { kind: 'empty' };
 type Tab = 'browse' | 'sql' | 'structure' | 'info';
+
+/** Facts about the opened file itself, derived from its header: WAL journaling and truncation. */
+function inspectFile(head: Uint8Array, file: File): { notices: string[]; truncated: string | null } {
+  const parsed = parseSqliteHeader(head, file.size);
+  if (!parsed.ok) return { notices: [], truncated: null };
+  const notices: string[] = [];
+  if (isWalMode(parsed.header)) {
+    notices.push(
+      `${file.name} uses WAL (write-ahead log) journaling. Only this file was opened: changes still waiting in its separate “-wal” file are not included. For the latest data, close the app that uses the database (so SQLite folds the log into the file) and open it again.`,
+    );
+  }
+  let truncated: string | null = null;
+  if (missingBytes(parsed.header, file.size) > 0) {
+    truncated = `The file is incomplete: its header describes ${formatBytes(parsed.header.pageCount * parsed.header.pageSize)}, but only ${formatBytes(file.size)} are present (a partial download or copy?).`;
+    notices.push(`${truncated} Tables stored in the missing part cannot be read.`);
+  }
+  return { notices, truncated };
+}
 
 function sourceName(source: Source): string {
   if (source.kind === 'file') return source.file.name;
@@ -84,6 +102,9 @@ export default function SqliteStudio() {
   const [info, setInfo] = useState<DbInfo | null>(null);
   const [readOnly, setReadOnly] = useState(true);
   const [dirty, setDirty] = useState(false);
+  const [notices, setNotices] = useState<string[]>([]);
+  const [inTransaction, setInTransaction] = useState(false);
+  const [queryRunning, setQueryRunning] = useState(false);
   const [tab, setTab] = useState<Tab>('browse');
   const [selected, setSelected] = useState<SchemaObject | null>(null);
   const [details, setDetails] = useState<TableDetails | null>(null);
@@ -128,6 +149,8 @@ export default function SqliteStudio() {
       setLoadError(null);
       setProgress({ value: null, label: 'Preparing…' });
       const ro = options.keepMode ? readOnly : next.kind !== 'empty';
+      let nextNotices: string[] = [];
+      let truncated: string | null = null;
       try {
         let openSource: OpenSource;
         const transfer: Transferable[] = [];
@@ -135,6 +158,7 @@ export default function SqliteStudio() {
           const head = new Uint8Array(await next.file.slice(0, 100).arrayBuffer());
           const header = parseSqliteHeader(head, next.file.size);
           if (!header.ok) throw new Error(header.error);
+          ({ notices: nextNotices, truncated } = inspectFile(head, next.file));
           setProgress({ value: 0, label: `Reading ${next.file.name}…` });
           const bytes = await readWithProgress(next.file, (f) => setProgress({ value: f, label: `Reading ${next.file.name}…` }), ctrl.signal);
           openSource = { kind: 'bytes', bytes };
@@ -151,6 +175,9 @@ export default function SqliteStudio() {
         setOriginalSize(next.kind === 'file' ? next.file.size : null);
         setReadOnly(ro);
         setDirty(false);
+        setInTransaction(false);
+        setQueryRunning(false);
+        setNotices(nextNotices);
         const objects = await refresh();
         if (!options.keepMode) {
           const firstTable = objects.find((o) => o.type === 'table' && !o.internal) ?? null;
@@ -164,7 +191,9 @@ export default function SqliteStudio() {
         if (ctrl.signal.aborted) return;
         client.terminate('Loading failed.');
         if (clientRef.current === client) clientRef.current = null;
-        setLoadError(errorMessage(error, 'The database could not be opened.'));
+        const message = errorMessage(error, 'The database could not be opened.');
+        // A truncated copy is the usual reason for "malformed"; say so when the header proves it.
+        setLoadError(truncated && /corrupt|malformed/i.test(message) ? `${truncated} SQLite reports: database disk image is malformed.` : message);
         setPhase('idle');
         setSource(null);
       }
@@ -209,6 +238,9 @@ export default function SqliteStudio() {
     setInfo(null);
     setSelected(null);
     setDirty(false);
+    setInTransaction(false);
+    setQueryRunning(false);
+    setNotices([]);
     setConfirmClose(false);
   }
 
@@ -242,6 +274,11 @@ export default function SqliteStudio() {
 
   async function exportDatabase() {
     if (!source) return;
+    if (inTransaction) {
+      toast('A transaction is still open. Run COMMIT (or ROLLBACK) in the SQL editor, then export again.', 'error', 6000);
+      setTab('sql');
+      return;
+    }
     try {
       const bytes = await call('exportDb', null);
       const name = sourceName(source);
@@ -286,13 +323,12 @@ export default function SqliteStudio() {
           </section>
         ) : (
           <>
+            {/* No `accept` filter: SQLite files use many extensions (or none, like Chrome's "History"); the header check decides. */}
             <FileDrop
               onFiles={([file]) => chooseFile(file)}
-              accept={ACCEPT}
               icon={Database}
               title="Drop a SQLite database"
-              hint="SQLite 3 files (.sqlite, .db, .sqlite3 …). The file is opened in memory on this device and never uploaded or modified."
-              onReject={() => setLoadError(null)}
+              hint="Any SQLite 3 file (.sqlite, .db, .sqlite3, .gpkg, Chrome “History” …). It is opened in memory on this device and never uploaded or modified."
             />
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button icon={FlaskConical} onClick={() => void open({ kind: 'sample' })}>
@@ -366,6 +402,7 @@ export default function SqliteStudio() {
           </span>
           {info && <span className="shrink-0 text-[12px] text-fg-muted">{formatBytes(info.fileSize)}</span>}
           {dirty && <Badge tone="warning">Unsaved changes</Badge>}
+          {inTransaction && <Badge tone="warning">Transaction open</Badge>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-sunken py-1 pr-2.5 pl-2">
@@ -385,6 +422,12 @@ export default function SqliteStudio() {
           </Button>
         </div>
       </div>
+
+      {notices.map((n) => (
+        <Alert key={n} tone="info">
+          {n}
+        </Alert>
+      ))}
 
       {!readOnly && (
         <Alert tone="warning" title="Write mode is on">
@@ -428,6 +471,15 @@ export default function SqliteStudio() {
                 {selected.rows !== null && <span className="text-fg-muted"> · {formatNumber(selected.rows, 0)} rows</span>}
               </span>
             )}
+            {queryRunning && tab !== 'sql' && (
+              // The engine runs one thing at a time: while a query runs, browsing waits for it.
+              <span className="ml-auto flex items-center gap-2">
+                <Spinner size={13} label="A query is running" />
+                <Button size="sm" variant="danger" icon={CircleStop} onClick={onStop}>
+                  Stop
+                </Button>
+              </span>
+            )}
           </div>
 
           {tab === 'browse' &&
@@ -466,7 +518,8 @@ export default function SqliteStudio() {
               </EmptyState>
             ))}
 
-          {tab === 'sql' && (
+          {/* Kept mounted while hidden, so results and a running query (with its Stop button) survive tab switches. */}
+          <div hidden={tab !== 'sql'} className="min-w-0">
             <SqlPanel
               call={call}
               sql={sql}
@@ -475,8 +528,10 @@ export default function SqliteStudio() {
               onRequestWriteMode={() => setConfirmWrite(true)}
               onWrote={onWrote}
               onStop={onStop}
+              onRunningChange={setQueryRunning}
+              onTransactionChange={setInTransaction}
             />
-          )}
+          </div>
 
           {tab === 'structure' &&
             (selected ? (

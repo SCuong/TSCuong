@@ -148,6 +148,11 @@ export default function ApiClient() {
   const savedCollection = saved ? (collections.find((c) => c.id === saved.collectionId) ?? null) : null;
   const activeEnv = environments.find((e) => e.id === settings.activeEnvId) ?? null;
   const scope = useMemo(() => buildScope(savedCollection?.variables, activeEnv?.variables), [savedCollection, activeEnv]);
+  /** The same variables with secret values replaced by <name> placeholders, for code samples and "Copy as cURL". */
+  const maskedScope = useMemo(
+    () => buildScope(savedCollection?.variables, activeEnv?.variables.map((v) => (v.secret ? { ...v, value: `<${v.key.trim()}>` } : v))),
+    [savedCollection, activeEnv],
+  );
   const dirty = !draftsEqual(draft, saved ?? baseline);
 
   // ------------------------------------------------------------ companion status
@@ -381,9 +386,12 @@ export default function ApiClient() {
   }, []);
 
   // ------------------------------------------------------------ derived
-  const preparedForCode = useMemo(() => (codeOpen ? prepareRequest(draft, scope) : null), [codeOpen, draft, scope]);
+  const preparedForCode = useMemo(
+    () => (codeOpen ? { full: prepareRequest(draft, scope), masked: prepareRequest(draft, maskedScope) } : null),
+    [codeOpen, draft, scope, maskedScope],
+  );
   const curlText = () => {
-    const p = prepareRequest(draft, scope);
+    const p = prepareRequest(draft, maskedScope);
     return p.ok ? generateCode(toCodeRequest(p.request, false), 'curl') : null;
   };
   const secrets = useMemo(() => (saveOpen || secretsOpen ? findSecrets(draft) : []), [saveOpen, secretsOpen, draft]);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
-import { Clock, CircleStop, Copy, Download, Eraser, FlaskConical, LockOpen, Play, ShieldAlert, Trash } from 'lucide-react';
+import { Clock, CircleStop, Copy, Crosshair, Download, Eraser, FlaskConical, LockOpen, Play, ShieldAlert, Trash } from 'lucide-react';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -13,7 +13,7 @@ import { readRaw, writeRaw } from '@/lib/storage/local';
 import { cn, copyText, downloadBlob, errorMessage, formatDuration, formatNumber, modKey, pluralize } from '@/lib/utils';
 import type { ExecResult, StatementResult } from '../lib/protocol';
 import { addToHistory, parseHistory, type HistoryEntry } from '../lib/history';
-import { classifyScript, type ClassifiedStatement } from '../lib/sqlClassifier';
+import { classifyScript, lineColumn, type ClassifiedStatement } from '../lib/sqlClassifier';
 import { toCsv, toJson, toTsv } from '../lib/sqlFormat';
 import { SAMPLE_QUERY } from '../lib/sample';
 import { DataGrid } from './DataGrid';
@@ -35,6 +35,8 @@ export function SqlPanel({
   onRequestWriteMode,
   onWrote,
   onStop,
+  onRunningChange,
+  onTransactionChange,
 }: {
   call: SqlCall;
   sql: string;
@@ -43,14 +45,20 @@ export function SqlPanel({
   onRequestWriteMode: () => void;
   onWrote: () => void;
   onStop: () => void;
+  /** Reports whether a query is running (so the workspace can offer Stop on other tabs). */
+  onRunningChange?: (running: boolean) => void;
+  /** Reports whether an explicit transaction is open after a run. */
+  onTransactionChange?: (open: boolean) => void;
 }) {
   const viewRef = useRef<EditorView | null>(null);
   const [running, setRunning] = useState(false);
   const [showStop, setShowStop] = useState(false);
   const [result, setResult] = useState<ExecResult | null>(null);
+  /** The editor text at run time and the executed part's offset in it (a selection's start), to map error positions back. */
+  const [ran, setRan] = useState<{ offset: number; doc: string }>({ offset: 0, doc: '' });
   const [runError, setRunError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<ClassifiedStatement[]>([]);
-  const [confirm, setConfirm] = useState<{ text: string; statements: ClassifiedStatement[] } | null>(null);
+  const [confirm, setConfirm] = useState<{ text: string; offset: number; statements: ClassifiedStatement[] } | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
@@ -86,13 +94,31 @@ export function SqlPanel({
     return () => clearTimeout(t);
   }, [running]);
 
-  function textToRun(): string {
+  const runningRef = useRef(onRunningChange);
+  runningRef.current = onRunningChange;
+  useEffect(() => {
+    runningRef.current?.(running);
+  }, [running]);
+  useEffect(() => () => runningRef.current?.(false), []);
+
+  function textToRun(): { text: string; offset: number } {
     const view = viewRef.current;
     if (view) {
       const { from, to } = view.state.selection.main;
-      if (to > from) return view.state.sliceDoc(from, to);
+      if (to > from) return { text: view.state.sliceDoc(from, to), offset: from };
     }
-    return sql;
+    return { text: sql, offset: 0 };
+  }
+
+  /** Select a range of the editor (e.g. the failing statement) and bring it into view. */
+  function revealInEditor(from: number, to: number) {
+    const view = viewRef.current;
+    if (!view) return;
+    const max = view.state.doc.length;
+    const a = Math.min(Math.max(0, from), max);
+    const b = Math.min(Math.max(a, to), max);
+    view.dispatch({ selection: { anchor: a, head: b }, effects: EditorView.scrollIntoView(a, { y: 'center' }) });
+    view.focus();
   }
 
   function saveHistory(entry: HistoryEntry) {
@@ -103,13 +129,16 @@ export function SqlPanel({
     });
   }
 
-  async function execute(text: string) {
+  async function execute(text: string, offset: number) {
     setRunning(true);
     setRunError(null);
     setBlocked([]);
     try {
+      const doc = viewRef.current?.state.doc.toString() ?? sql;
       const res = await call('exec', { sql: text, readOnly, maxRows: MAX_ROWS });
       setResult(res);
+      setRan({ offset, doc });
+      onTransactionChange?.(res.inTransaction);
       saveHistory({ sql: text, at: Date.now(), ok: !res.error, ms: res.totalMs });
       if (res.wrote) onWrote();
     } catch (error) {
@@ -122,7 +151,7 @@ export function SqlPanel({
 
   function run() {
     if (running) return;
-    const text = textToRun();
+    const { text, offset } = textToRun();
     const statements = classifyScript(text);
     if (statements.length === 0) {
       setResult(null);
@@ -140,14 +169,25 @@ export function SqlPanel({
     }
     const destructive = statements.filter((s) => s.destructive);
     if (!readOnly && destructive.length) {
-      setConfirm({ text, statements: destructive });
+      setConfirm({ text, offset, statements: destructive });
       return;
     }
-    void execute(text);
+    void execute(text, offset);
   }
   runRef.current = run;
 
   const statementCount = result ? result.results.length + (result.error ? 1 : 0) : 0;
+  // Where the error is in the editor: the located token if SQLite's message allows it, else the statement start.
+  const errorAt = (() => {
+    const e = result?.error;
+    if (!e) return null;
+    const exact = e.errorOffset !== undefined;
+    const from = ran.offset + (exact ? e.errorOffset! : e.offset);
+    const to = exact ? from + (e.errorLength ?? 0) : ran.offset + e.offset + e.sql.length;
+    const { line, column } = lineColumn(ran.doc, from);
+    // Selecting only makes sense while the editor still holds the text that ran.
+    return { from, to, label: exact ? `Line ${line}, column ${column}` : `Line ${line}`, current: ran.doc === sql };
+  })();
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -224,19 +264,41 @@ export function SqlPanel({
       )}
 
       {result && (
-        <div className="flex min-w-0 flex-col gap-3" aria-live="polite">
-          <p className="text-[12.5px] text-fg-muted">
+        <div className="flex min-w-0 flex-col gap-3">
+          {/* Only the summary is live: announcing whole result grids would drown screen reader users. */}
+          <p className="text-[12.5px] text-fg-muted" aria-live="polite">
             {pluralize(statementCount, 'statement')} · {formatDuration(result.totalMs)}
             {result.error ? ' · stopped at the first error' : ''}
           </p>
+          {result.inTransaction && (
+            <Alert tone="warning" title="A transaction is open">
+              Changes made since BEGIN are not committed yet. Run COMMIT to keep them or ROLLBACK to undo them. Export database is
+              blocked until then, and stopping a query or closing the database discards them.
+            </Alert>
+          )}
           {result.results.map((r) => (
             <StatementCard key={r.index} result={r} />
           ))}
           {result.error && (
-            <Alert tone="danger" title={`Statement ${result.error.index + 1} failed`}>
+            <Alert
+              tone="danger"
+              title={`Statement ${result.error.index + 1} failed${errorAt ? ` (${errorAt.label})` : ''}`}
+              action={
+                errorAt?.current ? (
+                  <Button size="sm" variant="secondary" icon={Crosshair} onClick={() => revealInEditor(errorAt.from, errorAt.to)}>
+                    Show in editor
+                  </Button>
+                ) : undefined
+              }
+            >
               <p>{result.error.message}</p>
               {result.error.sql && (
-                <pre className="mt-1.5 max-h-24 overflow-auto rounded bg-surface-sunken px-2 py-1 font-mono text-[12px] whitespace-pre-wrap text-fg-secondary">
+                <pre
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Failing statement"
+                  className="mt-1.5 max-h-24 overflow-auto rounded bg-surface-sunken px-2 py-1 font-mono text-[12px] whitespace-pre-wrap text-fg-secondary"
+                >
                   {result.error.sql}
                 </pre>
               )}
@@ -257,9 +319,9 @@ export function SqlPanel({
         confirmLabel="Run anyway"
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
-          const text = confirm?.text ?? '';
+          const pending = confirm;
           setConfirm(null);
-          void execute(text);
+          if (pending) void execute(pending.text, pending.offset);
         }}
       >
         <p>These statements permanently change data in the in-memory copy:</p>
@@ -351,9 +413,14 @@ function StatementCard({ result }: { result: StatementResult }) {
             label="Export"
             icon={Download}
             items={[
-              { label: 'Download CSV', onSelect: () => downloadBlob(toCsv(result.columns, result.rows), `${base}.csv`, 'text/csv') },
+              {
+                label: 'Download CSV',
+                hint: 'BLOBs as 0x hex',
+                onSelect: () => downloadBlob(toCsv(result.columns, result.rows), `${base}.csv`, 'text/csv'),
+              },
               {
                 label: 'Download JSON',
+                hint: 'BLOBs as Base64',
                 onSelect: () => downloadBlob(toJson(result.columns, result.rows), `${base}.json`, 'application/json'),
               },
               {

@@ -7,10 +7,12 @@ import { Badge } from '@/components/ui/Panel';
 import { useObjectUrl } from '@/lib/hooks';
 import { cn, downloadBlob, formatBytes, formatNumber } from '@/lib/utils';
 import type { SqlValue } from '../lib/sqlBuild';
-import { cellKind, cellPreview, hexDump, rowToObject, rowToTsv, textValue } from '../lib/sqlFormat';
+import { cellKind, cellPreview, hexDump, rowToObject, rowToTsv, textValue, toJsonText } from '../lib/sqlFormat';
 
 const ROW_HEIGHT = 32;
 const NUM_COL = 56;
+/** The cell inspector renders at most this many characters; Copy value still copies everything. */
+const INSPECT_CHARS = 100_000;
 
 export interface GridSort {
   column: string;
@@ -218,7 +220,7 @@ export function DataGrid({
                   {columns.map((_, c) => {
                     const value = row[c] ?? null;
                     const isSel = selected?.row === item.index && selected.col === c;
-                    const numeric = typeof value === 'number';
+                    const numeric = typeof value === 'number' || typeof value === 'bigint';
                     return (
                       <div
                         key={c}
@@ -297,13 +299,18 @@ function CellInspector({
         {blob && <span className="text-[12px] text-fg-muted">{formatBytes(blob.length)}</span>}
         <div className="ml-auto flex flex-wrap items-center gap-1">
           <CopyButton value={() => (value === null ? 'NULL' : textValue(value))} label="Copy value" />
-          <CopyButton value={() => JSON.stringify(rowToObject(columns, row), null, 2)} label="Row JSON" />
+          <CopyButton value={() => toJsonText(rowToObject(columns, row), 2)} label="Row JSON" />
           <CopyButton value={() => rowToTsv(row)} label="Row TSV" />
           {blob && (
             <Button
               size="sm"
               icon={Download}
-              onClick={() => downloadBlob(new Blob([blob as Uint8Array<ArrayBuffer>], { type: mime ?? 'application/octet-stream' }), `${fileBase}-${column}.bin`)}
+              onClick={() =>
+                downloadBlob(
+                  new Blob([blob as Uint8Array<ArrayBuffer>], { type: mime ?? 'application/octet-stream' }),
+                  `${fileBase}-${column}.${mime ? mime.slice(6).replace('jpeg', 'jpg') : 'bin'}`,
+                )
+              }
             >
               Save BLOB
             </Button>
@@ -311,14 +318,21 @@ function CellInspector({
           <IconButton icon={X} label="Close cell details" size="sm" onClick={onClose} />
         </div>
       </header>
-      <div className="max-h-72 overflow-auto p-3">
+      <div tabIndex={0} role="region" aria-label={`Value of ${column}`} className="max-h-72 overflow-auto p-3">
         {kind === 'null' ? (
           <p className="text-[13px] text-fg-muted italic">This cell is NULL (no value).</p>
         ) : blob ? (
           <div className="flex flex-col gap-3">
             {imageUrl && <img src={imageUrl} alt={`${column} image`} className="lk-checker max-h-40 w-auto self-start rounded border border-line" />}
-            <pre className="overflow-x-auto font-mono text-[12px] leading-relaxed text-fg-secondary">{hexDump(blob, 256)}</pre>
+            <pre className="font-mono text-[12px] leading-relaxed text-fg-secondary">{hexDump(blob, 256)}</pre>
           </div>
+        ) : text !== null && text.length > INSPECT_CHARS ? (
+          <>
+            <p className="mb-2 text-[12.5px] text-fg-muted">
+              Showing the first {formatNumber(INSPECT_CHARS, 0)} of {formatNumber(text.length, 0)} characters. “Copy value” copies all of it.
+            </p>
+            <pre className="font-mono text-[12.5px] leading-relaxed break-words whitespace-pre-wrap text-fg">{text.slice(0, INSPECT_CHARS)}</pre>
+          </>
         ) : (
           <pre className="font-mono text-[12.5px] leading-relaxed break-words whitespace-pre-wrap text-fg">{String(value)}</pre>
         )}

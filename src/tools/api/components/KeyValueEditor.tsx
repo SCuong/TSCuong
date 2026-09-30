@@ -111,7 +111,7 @@ export function KeyValueEditor<T extends KeyValue>({
                   placeholder={keyPlaceholder}
                   aria-label={`${keyLabel}${row.key ? ` ${row.key}` : isGhost ? ' (new row)' : ''}`}
                   list={keyList}
-                  className={cn(!row.enabled && !isGhost && 'opacity-50')}
+                  className={cn(!row.enabled && !isGhost && 'text-fg-muted')}
                 />
               </span>
               <span role="cell" className="min-w-0">
@@ -124,7 +124,7 @@ export function KeyValueEditor<T extends KeyValue>({
                     scope={scope}
                     placeholder={valuePlaceholder}
                     aria-label={`Value${row.key ? ` of ${row.key}` : ''}`}
-                    className={cn(!row.enabled && !isGhost && 'opacity-50')}
+                    className={cn(!row.enabled && !isGhost && 'text-fg-muted')}
                   />
                 )}
               </span>

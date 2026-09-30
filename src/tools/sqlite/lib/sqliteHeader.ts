@@ -4,13 +4,28 @@ export const SQLITE_MAGIC = 'SQLite format 3\u0000';
 
 export interface SqliteHeader {
   pageSize: number;
+  /** 1 = rollback journal, 2 = WAL. */
   writeVersion: number;
   readVersion: number;
+  /** In-header database size in pages (only trustworthy when `sizeValid`). */
   pageCount: number;
+  /** The in-header size is valid when the version-valid-for number equals the change counter (SQLite ≥ 3.7.0). */
+  sizeValid: boolean;
   encoding: 'UTF-8' | 'UTF-16le' | 'UTF-16be' | 'unknown';
   userVersion: number;
   applicationId: number;
   sqliteVersionNumber: number;
+}
+
+/** The database was last written in WAL mode, so recent changes may live in a separate "-wal" file. */
+export function isWalMode(header: SqliteHeader): boolean {
+  return header.writeVersion === 2 || header.readVersion === 2;
+}
+
+/** Bytes missing from the end of the file according to its header (0 when complete or unknown). */
+export function missingBytes(header: SqliteHeader, fileSize: number): number {
+  if (!header.sizeValid || header.pageCount === 0) return 0;
+  return Math.max(0, header.pageCount * header.pageSize - fileSize);
 }
 
 export type HeaderResult = { ok: true; header: SqliteHeader } | { ok: false; error: string };
@@ -53,6 +68,7 @@ export function parseSqliteHeader(bytes: Uint8Array, fileSize = bytes.length): H
       writeVersion: bytes[18],
       readVersion: bytes[19],
       pageCount: view.getUint32(28),
+      sizeValid: view.getUint32(92) === view.getUint32(24),
       encoding: enc === 1 ? 'UTF-8' : enc === 2 ? 'UTF-16le' : enc === 3 ? 'UTF-16be' : enc === 0 ? 'UTF-8' : 'unknown',
       userVersion: view.getInt32(60),
       applicationId: view.getInt32(68),

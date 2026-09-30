@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FunnelX } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Label, NumberInput } from '@/components/ui/Field';
@@ -21,7 +22,9 @@ export function FiltersPanel({
   onChange: (next: SearchFilters) => void;
   extensions: Array<{ ext: string; count: number }>;
 }) {
-  const shown = extensions.slice(0, 30);
+  const [showAll, setShowAll] = useState(false);
+  // Chosen types always stay visible, even when they are beyond the first 30.
+  const shown = showAll ? extensions : extensions.filter((e, i) => i < 30 || filters.exts.includes(e.ext));
   const set = (patch: Partial<SearchFilters>) => onChange({ ...filters, ...patch });
 
   return (
@@ -47,8 +50,10 @@ export function FiltersPanel({
               </button>
             );
           })}
-          {extensions.length > shown.length && (
-            <span className="self-center text-[12px] text-fg-muted">+{extensions.length - shown.length} more types</span>
+          {(extensions.length > shown.length || showAll) && extensions.length > 30 && (
+            <Button size="sm" variant="ghost" className="h-7" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
+              {showAll ? 'Show fewer types' : `Show ${extensions.length - shown.length} more types`}
+            </Button>
           )}
         </div>
       </fieldset>

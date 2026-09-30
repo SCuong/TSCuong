@@ -378,6 +378,47 @@ export function blockedInReadOnly(statements: ClassifiedStatement[]): Classified
   return statements.filter((s) => s.kind === 'write');
 }
 
+/**
+ * Best-effort position of an SQLite error inside the failing statement.
+ * sql.js does not expose sqlite3_error_offset(), so the position is derived
+ * from the message: `near "X"`, `unrecognized token: "X"` and `no such
+ * column/table/function: X` are located when X occurs exactly once (anything
+ * else would be a guess); `incomplete input` points at the end.
+ */
+export function errorLocation(statement: string, message: string): { start: number; length: number } | null {
+  if (/\bincomplete input\b/i.test(message)) return { start: statement.length, length: 0 };
+  const quoted = /(?:near|unrecognized token:)\s+"((?:[^"]|"")*)"/i.exec(message);
+  const named = /no such (?:column|table|function|collation sequence|module):\s*(\S+)/i.exec(message);
+  if (!quoted && !named) return null;
+  const { tokens } = tokenize(statement);
+  if (named) {
+    // "no such column: t.name" → the last part, matched as a whole (unquoted) identifier.
+    const name = named[1].split('.').pop()!.toLowerCase();
+    const hits = tokens.filter((t) => (t.type === 'word' || t.type === 'ident') && unquoteIdentifier(t.value).toLowerCase() === name);
+    return hits.length === 1 ? { start: hits[0].start, length: hits[0].end - hits[0].start } : null;
+  }
+  const needle = quoted![1].replace(/""/g, '"');
+  if (!needle) return null;
+  // Prefer whole tokens so that `near "x"` does not match the x in "max".
+  const hits = tokens.filter((t) => t.value === needle);
+  if (hits.length === 1) return { start: hits[0].start, length: hits[0].end - hits[0].start };
+  if (hits.length > 1) return null;
+  const first = statement.indexOf(needle);
+  if (first === -1 || statement.indexOf(needle, first + 1) !== -1) return null;
+  return { start: first, length: needle.length };
+}
+
+/** 1-based line and column of a character offset. */
+export function lineColumn(text: string, offset: number): { line: number; column: number } {
+  let line = 1;
+  let lineStart = 0;
+  for (let i = text.indexOf('\n'); i !== -1 && i < offset; i = text.indexOf('\n', i + 1)) {
+    line++;
+    lineStart = i + 1;
+  }
+  return { line, column: offset - lineStart + 1 };
+}
+
 export function unquoteIdentifier(raw: string): string {
   if (raw.length >= 2) {
     const a = raw[0];

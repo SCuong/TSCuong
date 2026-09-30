@@ -4,7 +4,8 @@
  * list of File objects), extracts text, builds a MiniSearch full-text index
  * and answers searches. Nothing ever leaves the device.
  */
-import MiniSearch, { type SearchResult } from 'minisearch';
+import type MiniSearch from 'minisearch';
+import type { SearchResult } from 'minisearch';
 import {
   CONTENT_BUDGET_CHARS,
   type IndexOptions,
@@ -22,13 +23,11 @@ import {
 import { extractText } from './lib/extract';
 import { isIgnored, parseIgnoreList } from './lib/ignore';
 import { extensionCounts, makeFilter, scorePathMatch, sortItems, type FileMeta } from './lib/query';
-import { camelParts, compileUserRegex, highlightSegments, matchLines, substringsPattern, termsPattern } from './lib/snippets';
+import { compileUserRegex, foldTerm, highlightSegments, matchLines, substringsPattern, termsPattern } from './lib/snippets';
+import { createSearchIndex, FULLTEXT_OPTIONS } from './lib/searchIndex';
 import { extensionOf } from './lib/textFormats';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
-
-const SPLIT = /[\n\r\p{Z}\p{P}]+/u;
-const CAMEL_HINT = /\p{Ll}\p{Lu}|\p{Lu}\p{Lu}\p{Ll}/u;
 
 let metas: FileMeta[] = [];
 let contents: Array<string | null> = [];
@@ -36,26 +35,7 @@ let index: MiniSearch<FileMeta> | null = null;
 let cancelRequested = false;
 let searchSeq = 0;
 
-function tokenize(text: string): string[] {
-  const tokens = text.split(SPLIT);
-  const out: string[] = [];
-  for (const t of tokens) {
-    if (!t) continue;
-    out.push(t);
-    if (t.length > 3 && CAMEL_HINT.test(t)) for (const p of camelParts(t)) out.push(p);
-  }
-  return out;
-}
-
-function createIndex(): MiniSearch<FileMeta> {
-  return new MiniSearch<FileMeta>({
-    idField: 'id',
-    fields: ['name', 'path', 'content'],
-    storeFields: [],
-    extractField: (doc, field) => (field === 'content' ? (contents[doc.id] ?? '') : String(doc[field as keyof FileMeta] ?? '')),
-    tokenize,
-  });
-}
+const createIndex = () => createSearchIndex((id) => contents[id]);
 
 const yieldToEvents = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -323,7 +303,7 @@ async function search(req: SearchRequest, seq: number, report: (p: IndexProgress
   }
 
   if (req.mode === 'name') {
-    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const words = foldTerm(query).split(/\s+/).filter(Boolean);
     const matched: Array<{ meta: FileMeta; score: number }> = [];
     for (const meta of metas) {
       if (!filter(meta)) continue;
@@ -410,12 +390,7 @@ async function search(req: SearchRequest, seq: number, report: (p: IndexProgress
   }
 
   // Full-text search.
-  const options = {
-    prefix: (term: string) => term.length >= 2,
-    fuzzy: (term: string) => (term.length >= 4 ? 0.2 : false),
-    boost: { name: 4, path: 2, content: 1 },
-    filter: (r: SearchResult) => filter(metas[r.id as number]),
-  };
+  const options = { ...FULLTEXT_OPTIONS, filter: (r: SearchResult) => filter(metas[r.id as number]) };
   let results = index.search(query, { ...options, combineWith: 'AND' });
   let relaxed = false;
   if (!results.length && /\s/.test(query)) {

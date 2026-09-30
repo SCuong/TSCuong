@@ -15,21 +15,115 @@ export function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Letters without a decomposition that people still type without their stroke. */
+const EXTRA_FOLDS: Record<string, string> = {
+  đ: 'd',
+  ð: 'd',
+  ø: 'o',
+  ł: 'l',
+  ħ: 'h',
+  ŧ: 't',
+  ı: 'i',
+  // Cyrillic small io → Cyrillic small ie (written as code points: the two look like Latin letters).
+  [String.fromCharCode(0x451)]: String.fromCharCode(0x435),
+};
+const EXTRA_FOLD_RE = new RegExp(`[${Object.keys(EXTRA_FOLDS).join('')}]`, 'g');
+
 /**
- * A case-insensitive regex that matches whole index terms (as produced by the
- * MiniSearch tokenizer, which splits on whitespace and punctuation).
+ * Lower-case a term and drop the accents of Latin and Greek letters, so that
+ * "cafe" finds "café", "Nguyen" finds "Nguyễn" and "resume" finds "résumé".
+ * Other scripts keep their marks (Japanese dakuten, Cyrillic й, …).
  */
-export function termsPattern(terms: string[]): RegExp | null {
-  const unique = [...new Set(terms.map((t) => t.trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
-  if (!unique.length) return null;
-  return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}])(?:${unique.map(escapeRegExp).join('|')})(?![\\p{L}\\p{N}\\p{M}])`, 'giu');
+export function foldTerm(term: string): string {
+  // Fast path: most paths and code are ASCII, which has nothing to fold.
+  let ascii = true;
+  for (let i = 0; i < term.length && ascii; i++) ascii = term.charCodeAt(i) < 128;
+  if (ascii) return term.toLowerCase();
+  return term
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/(\p{Script=Latin}|\p{Script=Greek})\p{M}+/gu, '$1')
+    .normalize('NFC')
+    .replace(EXTRA_FOLD_RE, (c) => EXTRA_FOLDS[c]);
 }
 
-/** A case-insensitive regex for plain substrings (filename search). */
-export function substringsPattern(words: string[]): RegExp | null {
-  const unique = [...new Set(words.map((t) => t.trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+let foldVariants: Map<string, string> | null = null;
+
+/** For each folded letter, the precomposed letters that fold to it (e.g. "e" → "éèêëēė…"). */
+function variantsOf(ch: string): string {
+  if (!foldVariants) {
+    const sets = new Map<string, Set<string>>();
+    const ranges: Array<[number, number]> = [
+      [0x00c0, 0x024f],
+      [0x1e00, 0x1eff],
+      [0x0370, 0x03ff],
+      [0x1f00, 0x1fff],
+      [0x0400, 0x04ff],
+    ];
+    for (const [from, to] of ranges) {
+      for (let cp = from; cp <= to; cp++) {
+        const c = String.fromCodePoint(cp);
+        const folded = foldTerm(c);
+        if ([...folded].length !== 1 || folded === c || folded === c.toLowerCase()) continue;
+        const set = sets.get(folded) ?? new Set<string>();
+        set.add(c);
+        sets.set(folded, set);
+      }
+    }
+    foldVariants = new Map([...sets].map(([k, v]) => [k, [...v].join('')]));
+  }
+  return foldVariants.get(ch) ?? '';
+}
+
+/** Every single-character case form of `chars` (e.g. "é" → "éÉ"). */
+function withCases(chars: string): string {
+  let out = '';
+  for (const c of chars) {
+    for (const form of [c, c.toLowerCase(), c.toUpperCase()]) {
+      if ([...form].length === 1 && !out.includes(form)) out += form;
+    }
+  }
+  return out;
+}
+
+/**
+ * Regex source matching `folded` (a {@link foldTerm} result) in the original
+ * text in any letter case and with any accents: each letter becomes a class of
+ * its case and accented forms, and combining marks after it (decomposed text)
+ * are allowed. Case is spelled out instead of using the `i` flag, because
+ * under `i` the \p{Lu}/\p{Ll} tests of the term boundaries stop telling cases apart.
+ */
+export function accentInsensitiveSource(folded: string): string {
+  let out = '';
+  for (const ch of folded) {
+    const forms = withCases(ch + variantsOf(ch));
+    out += forms.length > 1 ? `[${forms.replace(/[\\\]^-]/g, '\\$&')}]` : escapeRegExp(ch);
+    if (/\p{L}/u.test(ch)) out += '\\p{M}*';
+  }
+  return out;
+}
+
+// A term boundary: not inside a word, or at a camelCase transition (parse|HTTP|Response),
+// matching how the index splits identifiers into parts.
+const TERM_START = '(?:(?<![\\p{L}\\p{N}\\p{M}])|(?<=\\p{Ll})(?=\\p{Lu})|(?<=\\p{Lu})(?=\\p{Lu}\\p{Ll}))';
+const TERM_END = '(?:(?![\\p{L}\\p{N}\\p{M}])|(?<=\\p{Ll})(?=\\p{Lu})|(?<=\\p{Lu})(?=\\p{Lu}\\p{Ll}))';
+
+/**
+ * A case- and accent-insensitive regex that matches whole index terms (as
+ * produced by the tokenizer, which splits on whitespace, punctuation, symbols
+ * and camelCase boundaries).
+ */
+export function termsPattern(terms: string[]): RegExp | null {
+  const unique = [...new Set(terms.map((t) => foldTerm(t.trim())).filter(Boolean))].sort((a, b) => b.length - a.length);
   if (!unique.length) return null;
-  return new RegExp(unique.map(escapeRegExp).join('|'), 'giu');
+  return new RegExp(`${TERM_START}(?:${unique.map(accentInsensitiveSource).join('|')})${TERM_END}`, 'gu');
+}
+
+/** A case- and accent-insensitive regex for plain substrings (filename search). */
+export function substringsPattern(words: string[]): RegExp | null {
+  const unique = [...new Set(words.map((t) => foldTerm(t.trim())).filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (!unique.length) return null;
+  return new RegExp(unique.map(accentInsensitiveSource).join('|'), 'gu');
 }
 
 export type RegexResult = { ok: true; regex: RegExp } | { ok: false; error: string };
@@ -136,14 +230,6 @@ export function matchLines(
     pos = nl + 1;
   }
   return { matchingLines, snippets };
-}
-
-/** Terms of the query as the default MiniSearch tokenizer sees them. */
-export function queryTerms(query: string): string[] {
-  return query
-    .split(/[\n\r\p{Z}\p{P}]+/u)
-    .map((t) => t.toLowerCase())
-    .filter(Boolean);
 }
 
 /** Split identifiers into their camelCase / PascalCase parts: "parseHTTPResponse" → parse, HTTP, Response. */

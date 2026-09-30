@@ -39,7 +39,7 @@ export function SqlBlock({ sql }: { sql: string }) {
       <div className="absolute top-1.5 right-1.5">
         <CopyButton value={sql} iconOnly />
       </div>
-      <pre className="overflow-x-auto px-3 py-2.5 pr-10 font-mono text-[12.5px] leading-relaxed text-fg">
+      <pre tabIndex={0} role="region" aria-label="SQL definition" className="overflow-x-auto px-3 py-2.5 pr-10 font-mono text-[12.5px] leading-relaxed text-fg">
         {pieces
           ? pieces.map((p, i) =>
               p.cls ? (

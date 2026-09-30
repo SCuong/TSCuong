@@ -1,6 +1,15 @@
 /** Helpers for building safe SQL: identifier quoting, literals and the data browser query. */
 
-export type SqlValue = number | string | Uint8Array | null;
+/**
+ * A SQLite value as the app handles it. Integers outside ±2^53 stay `bigint`
+ * so 64-bit ids and hashes are shown and exported exactly.
+ */
+export type SqlValue = number | bigint | string | Uint8Array | null;
+
+/** Collapse a BigInt read from SQLite into a Number when that is lossless. */
+export function normalizeInteger(value: bigint): number | bigint {
+  return value >= BigInt(Number.MIN_SAFE_INTEGER) && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value;
+}
 
 /** Quote an identifier for SQLite ("name" with embedded quotes doubled). */
 export function quoteIdent(name: string): string {
@@ -20,7 +29,7 @@ export function toHex(bytes: Uint8Array, max = bytes.length): string {
 }
 
 /** A SQL literal for any SQLite value, suitable for INSERT statements in dumps. */
-export function sqlLiteral(value: SqlValue | bigint | boolean | undefined): string {
+export function sqlLiteral(value: SqlValue | boolean | undefined): string {
   if (value === null || value === undefined) return 'NULL';
   if (typeof value === 'number') {
     if (Number.isNaN(value)) return 'NULL';
@@ -74,10 +83,18 @@ export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
-/** Numbers typed into a filter compare numerically; everything else as text. */
-function filterValue(raw: string): SqlValue {
-  const trimmed = raw.trim();
-  if (trimmed !== '' && /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(trimmed)) return Number(trimmed);
+/**
+ * Filter values are bound as text, so the column's affinity decides how they
+ * compare: "007" still matches the TEXT "007", and "9223372036854775807" matches
+ * that INTEGER exactly. Only a number typed in canonical form (as SQLite and JS
+ * print it, e.g. "42" or "1.5") is bound as a number, which is what columns
+ * without a declared type need to match their numeric values.
+ */
+export function filterValue(raw: string): SqlValue {
+  if (raw !== '' && /^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(raw)) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && String(n) === raw) return n;
+  }
   return raw;
 }
 
@@ -118,7 +135,8 @@ export function buildBrowseQuery(q: BrowseQuery): BuiltQuery {
     parts.push(clause.sql);
     params.push(...clause.params);
   }
-  if (q.where && q.where.trim()) parts.push(`(${q.where.trim()})`);
+  // The newline ends a trailing `-- comment` in the expression, so it cannot swallow the rest of the query.
+  if (q.where && q.where.trim()) parts.push(`(${q.where.trim()}\n)`);
   const where = parts.length ? ` WHERE ${parts.join(' AND ')}` : '';
   const from = `FROM ${quoteIdent(q.table)}${where}`;
   const order = q.sort ? ` ORDER BY ${quoteIdent(q.sort.column)} ${q.sort.dir === 'desc' ? 'DESC' : 'ASC'}` : '';

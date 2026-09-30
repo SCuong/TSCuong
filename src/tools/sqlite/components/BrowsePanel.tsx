@@ -8,7 +8,7 @@ import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { useDebouncedValue } from '@/lib/hooks';
 import { errorMessage, formatDuration, formatNumber } from '@/lib/utils';
 import type { BrowseResult, SchemaObject, TableDetails } from '../lib/protocol';
-import { FILTER_OPS, buildBrowseQuery, pageCount, sqlLiteral, type ColumnFilter, type FilterOp } from '../lib/sqlBuild';
+import { FILTER_OPS, buildBrowseQuery, pageCount, sqlLiteral, type ColumnFilter, type FilterOp, type SqlValue } from '../lib/sqlBuild';
 import { validateWhereClause } from '../lib/sqlClassifier';
 import { DataGrid, type GridSort } from './DataGrid';
 import { Menu } from './Menu';
@@ -18,7 +18,7 @@ const PAGE_SIZES = ['50', '100', '500'] as const;
 type PageSize = (typeof PAGE_SIZES)[number];
 
 /** Replace ? placeholders with literals so the query can be pasted into the editor. */
-function inlineParams(sql: string, params: Array<string | number | null | Uint8Array>): string {
+function inlineParams(sql: string, params: SqlValue[]): string {
   let i = 0;
   return sql.replace(/\?/g, () => sqlLiteral(params[i++] ?? null));
 }
@@ -157,8 +157,8 @@ export function BrowsePanel({
             label="Export"
             icon={Download}
             items={[
-              { label: 'CSV', hint: '.csv', onSelect: () => onExportTable(object.name, 'csv') },
-              { label: 'JSON', hint: '.json', onSelect: () => onExportTable(object.name, 'json') },
+              { label: 'CSV', hint: '.csv · BLOBs as 0x hex', onSelect: () => onExportTable(object.name, 'csv') },
+              { label: 'JSON', hint: '.json · BLOBs as Base64', onSelect: () => onExportTable(object.name, 'json') },
               ...(object.type === 'table' ? [{ label: 'SQL dump', hint: '.sql', onSelect: () => onExportTable(object.name, 'sql') }] : []),
             ]}
           />

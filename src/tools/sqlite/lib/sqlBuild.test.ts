@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBrowseQuery, buildFilterClause, escapeLike, pageCount, quoteIdent, quoteString, sqlLiteral } from './sqlBuild';
+import { buildBrowseQuery, buildFilterClause, escapeLike, filterValue, normalizeInteger, pageCount, quoteIdent, quoteString, sqlLiteral } from './sqlBuild';
 
 describe('quoting', () => {
   it('quotes identifiers safely', () => {
@@ -49,6 +49,25 @@ describe('filters', () => {
   it('skips empty value filters', () => {
     expect(buildFilterClause({ column: 'n', op: 'contains', value: '' })).toBeNull();
   });
+
+  it('binds only canonical numbers as numbers, so zero-padded text and 64-bit ids match exactly', () => {
+    expect(filterValue('42')).toBe(42);
+    expect(filterValue('-2.5')).toBe(-2.5);
+    expect(filterValue('007')).toBe('007');
+    expect(filterValue('1.50')).toBe('1.50');
+    expect(filterValue('+5')).toBe('+5');
+    expect(filterValue(' 7')).toBe(' 7');
+    expect(filterValue('9223372036854775807')).toBe('9223372036854775807');
+    expect(filterValue('1e3')).toBe('1e3');
+    expect(filterValue('abc')).toBe('abc');
+  });
+
+  it('collapses BigInts into numbers only when that is lossless', () => {
+    expect(normalizeInteger(42n)).toBe(42);
+    expect(normalizeInteger(9007199254740991n)).toBe(9007199254740991);
+    expect(normalizeInteger(9007199254740993n)).toBe(9007199254740993n);
+    expect(normalizeInteger(-9223372036854775808n)).toBe(-9223372036854775808n);
+  });
 });
 
 describe('buildBrowseQuery', () => {
@@ -74,12 +93,17 @@ describe('buildBrowseQuery', () => {
       where: ' status = 1 OR status = 2 ',
     });
     expect(q.sql).toBe(
-      `SELECT * FROM "my ""table""" WHERE CAST("name" AS TEXT) LIKE ? ESCAPE '\\' AND "age" > ? AND (status = 1 OR status = 2) ORDER BY "created at" DESC LIMIT 100 OFFSET 200`,
+      `SELECT * FROM "my ""table""" WHERE CAST("name" AS TEXT) LIKE ? ESCAPE '\\' AND "age" > ? AND (status = 1 OR status = 2\n) ORDER BY "created at" DESC LIMIT 100 OFFSET 200`,
     );
     expect(q.countSql).toBe(
-      `SELECT count(*) FROM "my ""table""" WHERE CAST("name" AS TEXT) LIKE ? ESCAPE '\\' AND "age" > ? AND (status = 1 OR status = 2)`,
+      `SELECT count(*) FROM "my ""table""" WHERE CAST("name" AS TEXT) LIKE ? ESCAPE '\\' AND "age" > ? AND (status = 1 OR status = 2\n)`,
     );
     expect(q.params).toEqual(['%ann%', 30]);
+  });
+
+  it('ends the custom expression with a newline so a trailing -- comment cannot swallow the query', () => {
+    const q = buildBrowseQuery({ table: 't', page: 0, pageSize: 10, where: 'id > 1 -- recent only' });
+    expect(q.sql).toBe('SELECT * FROM "t" WHERE (id > 1 -- recent only\n) LIMIT 10 OFFSET 0');
   });
 
   it('sanitizes page numbers', () => {

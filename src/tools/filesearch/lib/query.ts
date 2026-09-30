@@ -1,4 +1,5 @@
 /** Filtering and sorting of indexed files (pure, shared by the worker and tests). */
+import { foldTerm } from './snippets';
 
 export type FileStatus = 'text' | 'binary' | 'too-large' | 'not-text' | 'empty' | 'error' | 'budget';
 
@@ -44,14 +45,14 @@ export function hasActiveFilters(f: SearchFilters): boolean {
 /** Build a predicate for the filters (pre-computing sets and lower-cased strings once). */
 export function makeFilter(f: SearchFilters): (m: FileMeta) => boolean {
   const exts = f.exts.length ? new Set(f.exts) : null;
-  const needle = f.pathContains.trim().toLowerCase().replace(/\\/g, '/');
+  const needle = foldTerm(f.pathContains.trim().replace(/\\/g, '/'));
   return (m) => {
     if (exts && !exts.has(m.ext)) return false;
     if (f.minSize !== null && m.size < f.minSize) return false;
     if (f.maxSize !== null && m.size > f.maxSize) return false;
     if (f.modifiedFrom !== null && m.lastModified < f.modifiedFrom) return false;
     if (f.modifiedTo !== null && m.lastModified > f.modifiedTo) return false;
-    if (needle && !m.path.toLowerCase().includes(needle)) return false;
+    if (needle && !foldTerm(m.path).includes(needle)) return false;
     return true;
   };
 }
@@ -71,13 +72,14 @@ export function sortItems<T extends { meta: FileMeta; score: number }>(items: T[
 }
 
 /**
- * Plain filename/path search: every word must occur in the path (case-insensitive).
- * Returns a score (0 = no match) that favours matches in the file name.
+ * Plain filename/path search: every word must occur in the path (case- and
+ * accent-insensitive; pass words through {@link foldTerm}). Returns a score
+ * (0 = no match) that favours matches in the file name.
  */
 export function scorePathMatch(meta: Pick<FileMeta, 'name' | 'path'>, words: string[]): number {
   if (!words.length) return 0;
-  const name = meta.name.toLowerCase();
-  const path = meta.path.toLowerCase();
+  const name = foldTerm(meta.name);
+  const path = foldTerm(meta.path);
   let score = 0;
   for (const w of words) {
     if (!path.includes(w)) return 0;

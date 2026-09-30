@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { groupHistory, historyOverflow, makeHistoryEntry, sanitizeForHistory } from './history';
-import { emptyDraft, findSecrets, kv, stripSecrets, draftsEqual, cloneDraft, normalizeDraft, type RequestDraft } from './model';
+import { groupHistory, historyOverflow, makeHistoryEntry, redactJsonText, sanitizeForHistory } from './history';
+import { emptyDraft, findSecrets, isSensitiveName, kv, stripSecrets, draftsEqual, cloneDraft, normalizeDraft, type RequestDraft } from './model';
 
 function secretDraft(): RequestDraft {
   const d = emptyDraft();
@@ -45,9 +45,46 @@ describe('sanitizeForHistory', () => {
 
   it('blanks literal credential query params but keeps variable references', () => {
     const s = sanitizeForHistory(secretDraft());
-    expect(s.url).toBe('https://api.test/items?page=1&api_key&token={{tok}}');
+    expect(s.url).toBe('https://api.test/items?page=1&api_key=&token={{tok}}');
     expect(s.params.find((p) => p.key === 'api_key')?.value).toBe('');
     expect(s.params.find((p) => p.key === 'token')?.value).toBe('{{tok}}');
+  });
+
+  it('recognises credential names beyond a fixed list', () => {
+    for (const name of ['X-Goog-Api-Key', 'Private-Token', 'X-Amz-Security-Token', 'Ocp-Apim-Subscription-Key', 'accessToken', 'client_secret', 'key', 'X-Amz-Signature', 'sig', 'PHPSESSID', 'password']) {
+      expect(isSensitiveName(name), name).toBe(true);
+    }
+    for (const name of ['Accept', 'Content-Type', 'Keep-Alive', 'X-Request-ID', 'author', 'passenger', 'page', 'client_id', 'monkey', 'User-Agent']) {
+      expect(isSensitiveName(name), name).toBe(false);
+    }
+  });
+
+  it('blanks credential fields in URL-encoded, form-data and JSON bodies without touching other text', () => {
+    const d = emptyDraft();
+    d.method = 'POST';
+    d.url = 'https://api.test/login?X-Amz-Signature=abc&x=1#frag';
+    d.headers = [kv('X-Goog-Api-Key', 'goog'), kv('Private-Token', 'gl'), kv('Accept', '*/*')];
+    d.body.urlencoded = [kv('username', 'alice'), kv('password', 'pw-1'), kv('client_secret', '{{secret}}')];
+    d.body.form = [{ ...kv('clientSecret', 'cs-2'), kind: 'text' }, { ...kv('title', 'Hi'), kind: 'text' }];
+    d.body.raw = '{\n  "user": "alice",\n  "password": "pw-3",\n  "id": 12345678901234567890,\n  "nested": { "api_key": 42, "ok": true, "token": "{{tok}}" },\n  "list": [{ "secret": "s-4" }]\n}';
+    const s = sanitizeForHistory(d);
+    expect(s.url).toBe('https://api.test/login?X-Amz-Signature=&x=1#frag');
+    expect(s.headers.map((h) => h.key)).toEqual(['Accept']);
+    expect(s.body.urlencoded.map((r) => r.value)).toEqual(['alice', '', '{{secret}}']);
+    expect(s.body.form.map((r) => r.value)).toEqual(['', 'Hi']);
+    expect(s.body.raw).toBe(
+      '{\n  "user": "alice",\n  "password": "",\n  "id": 12345678901234567890,\n  "nested": { "api_key": "", "ok": true, "token": "{{tok}}" },\n  "list": [{ "secret": "" }]\n}',
+    );
+    expect(JSON.stringify(s)).not.toMatch(/goog|"gl"|pw-\d|cs-2|s-4|abc/);
+  });
+
+  it('redacts form-style raw bodies and leaves other text alone', () => {
+    const d = emptyDraft();
+    d.body.raw = 'grant_type=password&username=me&password=hunter2';
+    expect(sanitizeForHistory(d).body.raw).toBe('grant_type=password&username=me&password=');
+    d.body.raw = '<login><password>x</password></login>';
+    expect(sanitizeForHistory(d).body.raw).toBe(d.body.raw);
+    expect(redactJsonText('not json')).toBeNull();
   });
 
   it('does not mutate the input', () => {

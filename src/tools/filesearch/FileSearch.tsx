@@ -22,7 +22,7 @@ import {
   resolveFileHandle,
 } from './lib/folders';
 import { fileIndexes, saveIndex, type StoredIndex } from './lib/persist';
-import type { IndexOptions, IndexProgress, IndexSource, IndexSummary, ResultItem, SearchMode, SearchResponse, Snapshot } from './lib/protocol';
+import { CONTENT_BUDGET_CHARS, type IndexOptions, type IndexProgress, type IndexSource, type IndexSummary, type ResultItem, type SearchMode, type SearchResponse, type Snapshot } from './lib/protocol';
 import { EMPTY_FILTERS, hasActiveFilters, type FileMeta, type SearchFilters, type SortKey } from './lib/query';
 import { timeAgo } from './lib/snippets';
 import { FiltersPanel } from './components/FiltersPanel';
@@ -85,6 +85,9 @@ export default function FileSearch() {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const loadedRef = useRef<Loaded | null>(null);
   loadedRef.current = loaded;
+  /** Cancels the walk of a dropped folder (done on the page, before the worker takes over). */
+  const dropAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => dropAbort.current?.abort(), []);
 
   useEffect(() => {
     void getStorageProblem().then(setStorageProblem);
@@ -208,7 +211,9 @@ export default function FileSearch() {
         setPhase('indexing');
         setProgress(null);
         setProgressLabel(`Reading ${entry.name}`);
+        dropAbort.current?.abort();
         const ctrl = new AbortController();
+        dropAbort.current = ctrl;
         const { files, paths, errors } = await filesFromDroppedEntry(
           entry,
           parseIgnoreList(options.ignore),
@@ -217,6 +222,8 @@ export default function FileSearch() {
             setProgress({ phase: 'scanning', files: count, folders: 0, bytes: 0, textFiles: 0, textBytes: 0, ignored: 0, errors: 0, current: '', fraction: null }),
           ctrl.signal,
         );
+        if (ctrl.signal.aborted) return;
+        if (dropAbort.current === ctrl) dropAbort.current = null;
         if (!files.length) {
           setPhase('start');
           setStartError(errors ? 'The dropped folder could not be read.' : 'The dropped folder is empty (or everything in it is ignored).');
@@ -225,10 +232,24 @@ export default function FileSearch() {
         const byPath = new Map(paths.map((p, i) => [p, files[i]]));
         await runIndex({ kind: 'files', files, paths }, entry.name, { kind: 'session', byPath });
       } catch (error) {
+        // Cancelled while listing the dropped folder: cancelIndexing already restored the screen.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         setPhase('start');
         setStartError(errorMessage(error, 'The dropped folder could not be read.'));
       }
     })();
+  }
+
+  function cancelIndexing() {
+    // While a dropped folder is still being listed, the work happens on this page, not in the worker.
+    if (dropAbort.current) {
+      dropAbort.current.abort();
+      dropAbort.current = null;
+      setPhase(loadedRef.current ? 'ready' : 'start');
+      toast('Indexing cancelled.', 'info');
+      return;
+    }
+    getClient().cancel();
   }
 
   async function rescanHandle(handle: FileSystemDirectoryHandle) {
@@ -410,7 +431,7 @@ export default function FileSearch() {
                   ? 'Loading the saved index…'
                   : `${progressLabel}…`
             }
-            onCancel={() => getClient().cancel()}
+            onCancel={cancelIndexing}
           />
           {p && (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -498,7 +519,7 @@ export default function FileSearch() {
         </div>
         <p className="text-[12.5px] text-fg-secondary">
           {formatNumber(s.fileCount, 0)} files in {formatNumber(s.folderCount, 0)} folders · {formatBytes(s.totalBytes)} ·{' '}
-          {formatNumber(s.textFiles, 0)} text files searchable ({formatBytes(s.textChars)} of text) · indexed {timeAgo(s.indexedAt)} in{' '}
+          {formatNumber(s.textFiles, 0)} text files searchable ({formatNumber(s.textChars, 0)} characters) · indexed {timeAgo(s.indexedAt)} in{' '}
           {formatDuration(s.tookMs)}
         </p>
         <IndexNotes summary={s} />
@@ -638,7 +659,7 @@ function IndexNotes({ summary: s }: { summary: IndexSummary }) {
       {notes.length > 0 && <p className="text-[12px] text-fg-muted">{notes.join(' · ')}</p>}
       {s.overBudget > 0 && (
         <Alert tone="warning" title="Content index limit reached">
-          The index holds at most {formatBytes(64 * 1024 * 1024)} of text to keep the browser responsive. The contents of{' '}
+          The index holds at most {formatNumber(CONTENT_BUDGET_CHARS / 1_000_000, 0)} million characters of text to keep the browser responsive. The contents of{' '}
           {pluralize(s.overBudget, 'file')} were not stored; their names and paths are still searchable. Add large folders to the ignore list
           or lower the per-file size limit to include more files.
         </Alert>
@@ -649,15 +670,22 @@ function IndexNotes({ summary: s }: { summary: IndexSummary }) {
             {pluralize(s.errorCount, 'file')} could not be read
           </button>
           {showErrors && (
-            <ul className="mt-1.5 max-h-40 overflow-y-auto rounded-md border border-line bg-surface-sunken p-2 font-mono text-[11.5px]">
-              {s.errors.map((e, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="min-w-0 truncate text-fg">{e.path}</span>
-                  <span className="shrink-0 text-fg-muted">{e.message}</span>
-                </li>
-              ))}
-              {s.errorCount > s.errors.length && <li className="text-fg-muted">… and {s.errorCount - s.errors.length} more</li>}
-            </ul>
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="Files that could not be read"
+              className="mt-1.5 max-h-40 overflow-y-auto rounded-md border border-line bg-surface-sunken p-2 font-mono text-[11.5px]"
+            >
+              <ul>
+                {s.errors.map((e, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="min-w-0 truncate text-fg">{e.path}</span>
+                    <span className="shrink-0 text-fg-muted">{e.message}</span>
+                  </li>
+                ))}
+                {s.errorCount > s.errors.length && <li className="text-fg-muted">… and {s.errorCount - s.errors.length} more</li>}
+              </ul>
+            </div>
           )}
         </div>
       )}

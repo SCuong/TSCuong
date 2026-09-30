@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { base64, cellKind, cellPreview, hexDump, rowToObject, rowToTsv, textValue, toCsv, toJson, toSqlDump, toTsv } from './sqlFormat';
+import { base64, cellKind, cellPreview, hexDump, rowToObject, rowToTsv, textValue, toCsv, toJson, toJsonText, toSqlDump, toTsv } from './sqlFormat';
 import { addToHistory, parseHistory } from './history';
-import { formatSqliteVersionNumber, parseSqliteHeader } from './sqliteHeader';
+import { formatSqliteVersionNumber, isWalMode, missingBytes, parseSqliteHeader } from './sqliteHeader';
 
 describe('export formats', () => {
   const columns = ['id', 'name', 'data'];
@@ -46,6 +46,29 @@ describe('export formats', () => {
   it('encodes large blobs as base64 without stack overflow', () => {
     const big = new Uint8Array(200_000).fill(65);
     expect(base64(big).length).toBe(Math.ceil(200_000 / 3) * 4);
+  });
+
+  it('keeps 64-bit integers exact in CSV, JSON, TSV and SQL dumps', () => {
+    const max = 9223372036854775807n;
+    const min = -9223372036854775808n;
+    const cols = ['id', 'big'];
+    const data = [
+      [1, max],
+      [2, min],
+    ];
+    expect(toCsv(cols, data)).toBe('id,big\r\n1,9223372036854775807\r\n2,-9223372036854775808\r\n');
+    expect(toJson(cols, data)).toBe(
+      '[\n  {\n    "id": 1,\n    "big": 9223372036854775807\n  },\n  {\n    "id": 2,\n    "big": -9223372036854775808\n  }\n]',
+    );
+    expect(rowToTsv([max])).toBe('9223372036854775807');
+    expect(toSqlDump('t', null, cols, data)).toContain('VALUES (1, 9223372036854775807);');
+    expect(cellKind(max)).toBe('integer');
+    expect(cellPreview(max)).toBe('9223372036854775807');
+  });
+
+  it('writes exact JSON for nested BigInts without touching look-alike strings', () => {
+    expect(toJsonText({ a: [1n, 12345678901234567890n], s: '12345678901234567890' })).toBe('{"a":[1,12345678901234567890],"s":"12345678901234567890"}');
+    expect(toJsonText({ a: 'x' }, 2)).toBe('{\n  "a": "x"\n}');
   });
 });
 
@@ -101,6 +124,25 @@ describe('sqlite header', () => {
   it('handles 64 KiB pages (stored as 1)', () => {
     const res = parseSqliteHeader(header((_, v) => v.setUint16(16, 1)));
     expect(res.ok && res.header.pageSize).toBe(65536);
+  });
+
+  it('detects WAL mode and truncated files from the header', () => {
+    const plain = parseSqliteHeader(header((b) => b.set([1, 1], 18)));
+    expect(plain.ok && isWalMode(plain.header)).toBe(false);
+    const wal = parseSqliteHeader(header((b) => b.set([2, 2], 18)));
+    expect(wal.ok && isWalMode(wal.header)).toBe(true);
+    // 7 pages of 4 KiB are described; the in-header size counts once version-valid-for equals the change counter.
+    const valid = header((_, v) => {
+      v.setUint32(24, 5);
+      v.setUint32(92, 5);
+    });
+    const res = parseSqliteHeader(valid, 4096 * 3);
+    expect(res.ok && res.header.sizeValid).toBe(true);
+    expect(res.ok && missingBytes(res.header, 4096 * 3)).toBe(4096 * 4);
+    expect(res.ok && missingBytes(res.header, 4096 * 7)).toBe(0);
+    // A stale in-header size (older writers) is ignored.
+    const stale = parseSqliteHeader(header((_, v) => v.setUint32(24, 9)), 4096);
+    expect(stale.ok && missingBytes(stale.header, 4096)).toBe(0);
   });
 
   it('rejects empty, short, foreign and corrupt files', () => {

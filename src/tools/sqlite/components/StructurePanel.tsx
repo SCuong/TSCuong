@@ -8,10 +8,10 @@ import { SqlBlock } from './SqlBlock';
 function Section({ title, children, count }: { title: string; children: ReactNode; count?: number }) {
   return (
     <section className="min-w-0">
-      <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-fg">
+      <h2 className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-fg">
         {title}
         {count !== undefined && <span className="font-normal text-fg-muted">{count}</span>}
-      </h3>
+      </h2>
       {children}
     </section>
   );
@@ -47,7 +47,7 @@ export function StructurePanel({ object, details }: { object: SchemaObject; deta
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <Section title="Columns" count={details.columns.length}>
-        <div className="overflow-x-auto rounded-lg border border-line">
+        <div tabIndex={0} role="region" aria-label="Columns" className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full border-collapse">
             <thead>
               <tr>
@@ -90,7 +90,7 @@ export function StructurePanel({ object, details }: { object: SchemaObject; deta
           {details.foreignKeys.length === 0 ? (
             <p className="text-[13px] text-fg-muted">No foreign keys.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-line">
+            <div tabIndex={0} role="region" aria-label="Foreign keys" className="overflow-x-auto rounded-lg border border-line">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
@@ -124,7 +124,7 @@ export function StructurePanel({ object, details }: { object: SchemaObject; deta
           {details.indexes.length === 0 ? (
             <p className="text-[13px] text-fg-muted">No indexes.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-line">
+            <div tabIndex={0} role="region" aria-label="Indexes" className="overflow-x-auto rounded-lg border border-line">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>

@@ -9,10 +9,23 @@ export function base64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+/** A cell as JSON sees it: BLOBs become base64 strings; big integers stay exact (see {@link toJsonText}). */
+export type JsonCell = string | number | bigint | null;
+
 /** Convert a cell to a JSON-friendly value (BLOBs become base64 strings). */
-export function jsonValue(value: SqlValue): string | number | null {
+export function jsonValue(value: SqlValue): JsonCell {
   if (value instanceof Uint8Array) return base64(value);
   return value;
+}
+
+/**
+ * `JSON.stringify` that writes BigInt values as exact JSON numbers
+ * (JSON.stringify alone throws on BigInt, and Number() would round them).
+ */
+export function toJsonText(value: unknown, space?: number): string {
+  const marker = `@@lk-bigint-${Math.random().toString(36).slice(2)}:`;
+  const text = JSON.stringify(value, (_key, v: unknown) => (typeof v === 'bigint' ? `${marker}${v.toString()}` : v), space);
+  return text.replace(new RegExp(`"${marker}(-?\\d+)"`, 'g'), '$1');
 }
 
 /** Plain text for a cell, as used in CSV/TSV/clipboard (BLOBs become 0x-prefixed hex). */
@@ -44,8 +57,8 @@ export function toTsv(columns: string[], rows: SqlValue[][]): string {
   return [columns.map(tsvField).join('\t'), ...rows.map(rowToTsv)].join('\n');
 }
 
-export function rowToObject(columns: string[], row: SqlValue[]): Record<string, string | number | null> {
-  const obj: Record<string, string | number | null> = {};
+export function rowToObject(columns: string[], row: SqlValue[]): Record<string, JsonCell> {
+  const obj: Record<string, JsonCell> = {};
   columns.forEach((c, i) => {
     // Duplicate column names (e.g. from joins) get a numeric suffix so no value is lost.
     let key = c;
@@ -57,14 +70,16 @@ export function rowToObject(columns: string[], row: SqlValue[]): Record<string, 
 }
 
 export function toJson(columns: string[], rows: SqlValue[][]): string {
-  return JSON.stringify(
+  return toJsonText(
     rows.map((r) => rowToObject(columns, r)),
-    null,
     2,
   );
 }
 
-/** INSERT statements for a table, preceded by its CREATE statement. */
+/**
+ * INSERT statements for a table, preceded by its CREATE statement.
+ * `columns` must not include generated columns (SQLite refuses to insert into them).
+ */
 export function toSqlDump(table: string, createSql: string | null, columns: string[], rows: SqlValue[][]): string {
   const out: string[] = [];
   if (createSql) out.push(`${createSql.trim().replace(/;?$/, ';')}`);
@@ -84,6 +99,7 @@ export type CellKind = 'null' | 'integer' | 'real' | 'text' | 'blob';
 export function cellKind(value: SqlValue): CellKind {
   if (value === null) return 'null';
   if (value instanceof Uint8Array) return 'blob';
+  if (typeof value === 'bigint') return 'integer';
   if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'real';
   return 'text';
 }

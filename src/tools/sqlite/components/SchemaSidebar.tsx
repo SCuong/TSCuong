@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, Key, Layers, ListTree, Search, Table2, Zap, type LucideIcon } from 'lucide-react';
 import { Input, Switch } from '@/components/ui/Field';
 import { Spinner } from '@/components/ui/Feedback';
 import { cn, errorMessage, formatNumber } from '@/lib/utils';
 import type { SchemaObject, SchemaType, TableDetails } from '../lib/protocol';
+
+type DetailsMap = Record<string, TableDetails | { error: string } | 'loading'>;
+const NO_DETAILS: DetailsMap = {};
 
 const SECTIONS: Array<{ type: SchemaType; label: string; icon: LucideIcon }> = [
   { type: 'table', label: 'Tables', icon: Table2 },
@@ -26,7 +29,10 @@ export function SchemaSidebar({
   const [query, setQuery] = useState('');
   const [showInternal, setShowInternal] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [details, setDetails] = useState<Record<string, TableDetails | { error: string } | 'loading'>>({});
+  // Column lists are cached per schema snapshot: a new `objects` array (after CREATE/ALTER/DROP)
+  // makes them stale, so the open ones are loaded again and answers for an old snapshot are ignored.
+  const [details, setDetails] = useState<{ schema: SchemaObject[]; map: DetailsMap }>({ schema: objects, map: {} });
+  const map = details.schema === objects ? details.map : NO_DETAILS;
   const hasInternal = objects.some((o) => o.internal);
 
   const filtered = useMemo(() => {
@@ -34,18 +40,26 @@ export function SchemaSidebar({
     return objects.filter((o) => (showInternal || !o.internal) && (!q || o.name.toLowerCase().includes(q) || o.tableName.toLowerCase().includes(q)));
   }, [objects, query, showInternal]);
 
-  async function toggle(o: SchemaObject) {
-    const open = !expanded[o.name];
-    setExpanded((e) => ({ ...e, [o.name]: open }));
-    if (open && !details[o.name]) {
-      setDetails((d) => ({ ...d, [o.name]: 'loading' }));
-      try {
-        const result = await loadDetails(o.name);
-        setDetails((d) => ({ ...d, [o.name]: result }));
-      } catch (error) {
-        setDetails((d) => ({ ...d, [o.name]: { error: errorMessage(error) } }));
-      }
+  useEffect(() => {
+    const missing = Object.keys(expanded).filter((name) => expanded[name] && map[name] === undefined && objects.some((o) => o.name === name));
+    if (!missing.length) return;
+    setDetails((d) => {
+      const next: DetailsMap = { ...(d.schema === objects ? d.map : {}) };
+      for (const name of missing) next[name] = 'loading';
+      return { schema: objects, map: next };
+    });
+    const store = (name: string, value: DetailsMap[string]) =>
+      setDetails((d) => (d.schema === objects ? { schema: objects, map: { ...d.map, [name]: value } } : d));
+    for (const name of missing) {
+      loadDetails(name).then(
+        (result) => store(name, result),
+        (error: unknown) => store(name, { error: errorMessage(error) }),
+      );
     }
+  }, [expanded, map, objects, loadDetails]);
+
+  function toggle(o: SchemaObject) {
+    setExpanded((e) => ({ ...e, [o.name]: !e[o.name] }));
   }
 
   return (
@@ -68,10 +82,10 @@ export function SchemaSidebar({
           const items = filtered.filter((o) => o.type === type);
           return (
             <div key={type} className="py-1">
-              <h3 className="flex items-center gap-1.5 px-2 pb-1 text-[11.5px] font-semibold tracking-wide text-fg-muted uppercase">
+              <h2 className="flex items-center gap-1.5 px-2 pb-1 text-[11.5px] font-semibold tracking-wide text-fg-muted uppercase">
                 {label}
                 <span className="font-normal">{items.length}</span>
-              </h3>
+              </h2>
               {items.length === 0 ? (
                 <p className="px-2 text-[12.5px] text-fg-muted">{query ? 'No matches' : `No ${label.toLowerCase()}`}</p>
               ) : (
@@ -79,7 +93,7 @@ export function SchemaSidebar({
                   {items.map((o) => {
                     const expandable = o.type === 'table' || o.type === 'view';
                     const isOpen = expanded[o.name];
-                    const d = details[o.name];
+                    const d = map[o.name];
                     return (
                       <li key={`${o.type}:${o.name}`}>
                         <div

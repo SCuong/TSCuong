@@ -12,6 +12,23 @@ export const TEXT_EXTENSIONS = new Set([
   'sh', 'bash', 'zsh', 'fish', 'ps1', 'psm1', 'bat', 'cmd',
   'sql', 'graphql', 'gql', 'proto', 'prisma', 'tf', 'hcl',
   'log', 'diff', 'patch', 'tex', 'bib', 'srt', 'vtt', 'gitignore', 'gitattributes', 'editorconfig', 'npmrc', 'lock',
+  'jsonl', 'gradle', 'groovy', 'cmake', 'mk', 'jl', 'm', 'mm', 'ejs', 'hbs', 'pug', 'twig', 'liquid', 'njk', 'cshtml', 'razor',
+  'xaml', 'csproj', 'vbproj', 'fsproj', 'sln', 'props', 'targets', 'ipynb', 'sol', 'nix', 'bzl', 'dockerignore', 'htaccess',
+]);
+
+/**
+ * Formats that are never plain text (images, media, archives, Office files,
+ * fonts, executables, databases). They are indexed by name only without being
+ * read; files with any other unknown extension are sniffed for text.
+ */
+const BINARY_EXTENSIONS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'tif', 'tiff', 'heic', 'heif', 'psd', 'ai', 'raw', 'cr2', 'nef', 'dng',
+  'mp3', 'wav', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'wma', 'mp4', 'm4v', 'mkv', 'mov', 'avi', 'webm', 'wmv', 'flv', '3gp',
+  'zip', 'gz', 'tgz', 'bz2', 'xz', 'zst', '7z', 'rar', 'tar', 'jar', 'war', 'apk', 'aab', 'ipa', 'dmg', 'iso', 'img', 'cab', 'deb', 'rpm', 'msi',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'epub',
+  'ttf', 'otf', 'woff', 'woff2', 'eot',
+  'exe', 'dll', 'so', 'dylib', 'bin', 'o', 'obj', 'a', 'lib', 'class', 'pyc', 'pyo', 'wasm', 'node', 'pdb',
+  'sqlite', 'sqlite3', 'db', 'db3', 'mdb', 'accdb', 'parquet', 'avro', 'npy', 'npz', 'pkl', 'h5', 'onnx', 'pt',
 ]);
 
 /** Extension-less file names that are text. */
@@ -38,6 +55,11 @@ export function isTextFile(name: string): boolean {
   const ext = extensionOf(lower);
   if (ext && TEXT_EXTENSIONS.has(ext)) return true;
   return !ext && TEXT_NAMES.has(lower.replace(/\..*$/, ''));
+}
+
+/** A format that is certainly not text (see {@link BINARY_EXTENSIONS}). */
+export function isKnownBinaryFile(name: string): boolean {
+  return BINARY_EXTENSIONS.has(extensionOf(name.toLowerCase()));
 }
 
 export function isImageFile(name: string): boolean {

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { blockedInReadOnly, classifyScript, classifyStatement, splitStatements, tokenize, unquoteIdentifier, validateWhereClause } from './sqlClassifier';
+import {
+  blockedInReadOnly,
+  classifyScript,
+  classifyStatement,
+  errorLocation,
+  lineColumn,
+  splitStatements,
+  tokenize,
+  unquoteIdentifier,
+  validateWhereClause,
+} from './sqlClassifier';
 
 const kinds = (sql: string) => classifyScript(sql).map((s) => s.kind);
 
@@ -193,6 +203,33 @@ describe('validateWhereClause', () => {
     expect(validateWhereClause('1=1 ORDER BY x')).toMatch(/ORDER/);
     expect(validateWhereClause('1=1 UNION SELECT 1')).toMatch(/UNION/);
     expect(validateWhereClause('1 /* x')).toMatch(/comment/);
+  });
+});
+
+describe('errorLocation', () => {
+  it('locates the token named by a syntax error when it is unambiguous', () => {
+    const sql = 'SELECT id,\n  nme FORM big';
+    expect(errorLocation(sql, 'near "big": syntax error')).toEqual({ start: sql.indexOf('big'), length: 3 });
+    // A whole-token match: the x inside "max" is not a hit.
+    expect(errorLocation('SELECT max(a) x x', 'near "x": syntax error')).toBeNull();
+    expect(errorLocation("SELECT 'abc", 'unrecognized token: "\'abc"')).toEqual({ start: 7, length: 4 });
+  });
+
+  it('locates unknown columns, tables and functions by name', () => {
+    expect(errorLocation('SELECT nme FROM big', 'no such column: nme')).toEqual({ start: 7, length: 3 });
+    expect(errorLocation('SELECT b.nme FROM big b', 'no such column: b.nme')).toEqual({ start: 9, length: 3 });
+    expect(errorLocation('SELECT * FROM "Nope"', 'no such table: Nope')).toEqual({ start: 14, length: 6 });
+    expect(errorLocation('SELECT a, a FROM t', 'no such column: a')).toBeNull();
+  });
+
+  it('points at the end for incomplete input and gives up on other messages', () => {
+    expect(errorLocation('SELECT (1', 'incomplete input')).toEqual({ start: 9, length: 0 });
+    expect(errorLocation('DELETE FROM t', 'FOREIGN KEY constraint failed')).toBeNull();
+  });
+
+  it('turns offsets into 1-based line and column', () => {
+    expect(lineColumn('SELECT 1;\nSELECT x FORM t', 20)).toEqual({ line: 2, column: 11 });
+    expect(lineColumn('abc', 0)).toEqual({ line: 1, column: 1 });
   });
 });
 

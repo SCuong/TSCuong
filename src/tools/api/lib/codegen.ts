@@ -29,6 +29,19 @@ export interface CodeRequest {
   timeoutSeconds: number | null;
 }
 
+/**
+ * The URL exactly as the browser sends it: WHATWG-normalized, so spaces and
+ * non-ASCII characters are percent-encoded (curl, for one, rejects a raw space
+ * in a URL). Placeholders such as <apiKey> are kept readable.
+ */
+export function normalizeRequestUrl(url: string): string {
+  try {
+    return new URL(url).href.replace(/%3C([\w.$-]+)%3E/gi, '<$1>');
+  } catch {
+    return url;
+  }
+}
+
 /** Convert a prepared request, replacing credentials with readable placeholders unless `includeSecrets`. */
 export function toCodeRequest(req: PreparedRequest, includeSecrets: boolean): CodeRequest {
   const authNames = new Set(req.authHeaderNames.map((n) => n.toLowerCase()));
@@ -40,11 +53,17 @@ export function toCodeRequest(req: PreparedRequest, includeSecrets: boolean): Co
     if (scheme) return [name, `${scheme[1]} <${scheme[1].toLowerCase() === 'basic' ? 'base64-credentials' : 'token'}>`];
     return [name, lower === 'cookie' ? '<cookies>' : '<secret>'];
   });
-  let url = req.url;
+  let url = normalizeRequestUrl(req.url);
   if (!includeSecrets && req.authQueryParam) {
     const { base, query, hash } = splitUrl(url);
-    const encodedName = encodeURIComponent(req.authQueryParam);
-    const pairs = parseQuery(query).map((p) => (p.key === encodedName ? { key: p.key, value: '<api-key>' } : p));
+    const decode = (s: string) => {
+      try {
+        return decodeURIComponent(s);
+      } catch {
+        return s;
+      }
+    };
+    const pairs = parseQuery(query).map((p) => (decode(p.key) === req.authQueryParam ? { key: p.key, value: '<api-key>' } : p));
     url = `${base}?${stringifyQuery(pairs)}${hash}`;
   }
   let body: CodeBody;
@@ -220,9 +239,19 @@ function mergedHeaders(headers: Array<[string, string]>): Array<[string, string]
 /* cURL                                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A file name for curl's -F syntax: names with `;`, `,`, `"` or `\` must be
+ * double-quoted there, or curl reads `;type=…`-style options out of them.
+ */
+function curlFormFile(fileName: string): string {
+  return /[;,"\\]/.test(fileName) ? `"${fileName.replace(/[\\"]/g, '\\$&')}"` : fileName;
+}
+
 function curlArgs(req: CodeRequest, quote: (v: string) => string): string[] {
   const args: string[] = [];
   const hasBody = req.body.kind !== 'none';
+  // curl treats [] and {} in URLs as glob patterns (e.g. filter[name]=x fails) unless globbing is off.
+  if (/[[\]{}]/.test(req.url)) args.push('--globoff');
   if (req.method === 'HEAD') args.push('--head');
   else if (!(req.method === 'GET' && !hasBody) && !(req.method === 'POST' && hasBody)) args.push(`-X ${req.method}`);
   for (const [name, value] of req.headers) {
@@ -233,7 +262,7 @@ function curlArgs(req: CodeRequest, quote: (v: string) => string): string[] {
   else if (body.kind === 'file') args.push(`--data-binary ${quote(`@${body.fileName}`)}`);
   else if (body.kind === 'form') {
     for (const f of body.fields) {
-      if ('fileName' in f) args.push(`-F ${quote(`${f.name}=@${f.fileName}`)}`);
+      if ('fileName' in f) args.push(`-F ${quote(`${f.name}=@${curlFormFile(f.fileName)}`)}`);
       else args.push(`--form-string ${quote(`${f.name}=${f.value}`)}`);
     }
   }
@@ -376,7 +405,16 @@ function pythonRequests(req: CodeRequest): string {
 
 /** Escape HTTPie request-item separators in a field name. */
 function httpieKey(name: string): string {
-  return name.replace(/([\\=:@])/g, '\\$1');
+  return name.replace(/([\\=:@;])/g, '\\$1');
+}
+
+/**
+ * A value after an item separator: HTTPie takes the longest separator at the
+ * first position, so a value starting with "=" or "@" would turn `a=@x` into a
+ * file embed, `a==x` into a query parameter and `H:=x` into a raw JSON field.
+ */
+function httpieValue(value: string): string {
+  return /^[=@]/.test(value) ? `\\${value}` : value;
 }
 
 function httpie(req: CodeRequest): string {
@@ -387,12 +425,12 @@ function httpie(req: CodeRequest): string {
   parts.push(req.method, bashQuote(req.url));
   const items: string[] = [];
   for (const [name, value] of req.headers) {
-    items.push(bashQuote(value === '' ? `${name};` : `${name}:${value}`));
+    items.push(bashQuote(value === '' ? `${name};` : `${name}:${httpieValue(value)}`));
   }
   if (body.kind === 'form') {
     for (const f of body.fields) {
       if ('fileName' in f) items.push(bashQuote(`${httpieKey(f.name)}@${f.fileName}`));
-      else items.push(bashQuote(`${httpieKey(f.name)}=${f.value}`));
+      else items.push(bashQuote(`${httpieKey(f.name)}=${httpieValue(f.value)}`));
     }
   }
   let cmd = parts.join(' ');
