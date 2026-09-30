@@ -285,7 +285,7 @@ describe('import / export', () => {
     expect(parsed.warnings.join(' ')).toMatch(/duplicate id/);
   });
   it('accepts a single snippet object and a BOM', () => {
-    const parsed = parseImport('﻿{"title":"x","code":"y"}', makeId);
+    const parsed = parseImport('\uFEFF{"title":"x","code":"y"}', makeId);
     expect(parsed.snippets).toHaveLength(1);
   });
   it('plans merges for each conflict strategy', () => {

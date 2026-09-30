@@ -74,7 +74,7 @@ describe('encodeText', () => {
   it('encodes UTF-8 with and without BOM, never doubling it', () => {
     expect(Array.from(encodeText('é', 'utf-8'))).toEqual([0xc3, 0xa9]);
     expect(Array.from(encodeText('A', 'utf-8-bom'))).toEqual([0xef, 0xbb, 0xbf, 0x41]);
-    expect(Array.from(encodeText('﻿A', 'utf-8-bom'))).toEqual([0xef, 0xbb, 0xbf, 0x41]);
+    expect(Array.from(encodeText('\uFEFFA', 'utf-8-bom'))).toEqual([0xef, 0xbb, 0xbf, 0x41]);
   });
   it('encodes UTF-16 including surrogate pairs and round-trips', () => {
     expect(Array.from(encodeText('A', 'utf-16le-bom'))).toEqual([0xff, 0xfe, 0x41, 0]);

@@ -174,7 +174,7 @@ function describeParserError(error: unknown): string {
   return message || 'Could not parse the XML.';
 }
 
-const XML_NAME = /^[A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�][\w.\-·À-ÖØ-öø-ͽͿ-῿‌-‍‿-⁀⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�]*(?::[A-Za-z_][\w.-]*)?$/;
+const XML_NAME = /^[A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-῿\u200C-\u200D⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�][\w.\-·À-ÖØ-öø-ͽͿ-῿\u200C-\u200D‿-⁀⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�]*(?::[A-Za-z_][\w.-]*)?$/;
 
 /** False for characters that may appear inside an XML name but not at its start (·, combining marks, ‿ ⁀, ×, ÷). */
 function isXmlNameStartCode(code: number): boolean {
@@ -185,7 +185,7 @@ function isXmlNameStartCode(code: number): boolean {
 /** Turn an arbitrary JSON key into a valid XML element or attribute name. */
 export function toXmlName(key: string): string {
   if (XML_NAME.test(key)) return key;
-  let name = key.replace(/[^\w.\-·À-ÖØ-öø-ͽͿ-῿‌-‍‿-⁀⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�]/g, '_');
+  let name = key.replace(/[^\w.\-·À-ÖØ-öø-ͽͿ-῿\u200C-\u200D‿-⁀⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�]/g, '_');
   if (!/^[A-Za-z_À-�]/.test(name) || !isXmlNameStartCode(name.charCodeAt(0))) name = `_${name}`;
   return name || '_';
 }

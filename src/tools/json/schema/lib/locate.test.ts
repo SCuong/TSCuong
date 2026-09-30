@@ -76,7 +76,7 @@ describe('locatePointers', () => {
   });
 
   it('handles a byte order mark and empty containers', () => {
-    const bom = '﻿{"a": {}, "b": []}';
+    const bom = '\uFEFF{"a": {}, "b": []}';
     const found = locatePointers(bom, ['/a', '/b']);
     expect(slice(bom, found.get('/a')?.value)).toBe('{}');
     expect(slice(bom, found.get('/b')?.value)).toBe('[]');

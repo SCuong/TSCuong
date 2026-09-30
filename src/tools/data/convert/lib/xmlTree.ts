@@ -47,7 +47,7 @@ export class XmlSyntaxError extends Error {
 }
 
 const NAME_START =
-  /[A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\uD800-\uDBFF]/;
+  /[A-Za-z_:À-ÖØ-öø-˿Ͱ-ͽͿ-῿\u200C-\u200D⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\uD800-\uDBFF]/;
 const NAME_CHAR = /[\w.:\-·‿-⁀\uDC00-\uDFFF]/;
 
 function isNameChar(ch: string): boolean {

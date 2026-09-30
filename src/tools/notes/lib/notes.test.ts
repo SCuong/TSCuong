@@ -60,7 +60,7 @@ describe('deriveTitle', () => {
     expect(long.endsWith('…')).toBe(true);
   });
   it('handles CRLF and BOM', () => {
-    expect(deriveTitle('﻿# Hello\r\nworld')).toBe('Hello');
+    expect(deriveTitle('\uFEFF# Hello\r\nworld')).toBe('Hello');
   });
 });
 
@@ -194,7 +194,7 @@ describe('names', () => {
 
 describe('parseImportedMarkdown', () => {
   it('uses the first heading and normalizes line endings', () => {
-    const r = parseImportedMarkdown('file.md', '﻿# Hello\r\nBody');
+    const r = parseImportedMarkdown('file.md', '\uFEFF# Hello\r\nBody');
     expect(r).toEqual({ title: 'Hello', autoTitle: true, content: '# Hello\nBody', tags: [] });
   });
   it('reads title and tags from front matter', () => {

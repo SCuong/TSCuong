@@ -98,7 +98,7 @@ export function CodeBlock({ code, language, className }: { code: string; languag
               </span>
               <span className="pr-4 pl-3 whitespace-pre">
                 {line.length === 0
-                  ? '​'
+                  ? '\u200B'
                   : line.map((t, j) =>
                       t.cls ? (
                         <span key={j} className={t.cls}>

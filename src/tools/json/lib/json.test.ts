@@ -38,8 +38,8 @@ describe('parseJson', () => {
     }
   });
   it('accepts a UTF-8 BOM', () => {
-    expect(parseJson('﻿{"a":"é"}')).toEqual({ ok: true, value: { a: 'é' } });
-    expect(stripBom('﻿x')).toBe('x');
+    expect(parseJson('\uFEFF{"a":"é"}')).toEqual({ ok: true, value: { a: 'é' } });
+    expect(stripBom('\uFEFFx')).toBe('x');
     expect(stripBom('x')).toBe('x');
   });
   it('keeps Unicode and emoji', () => {

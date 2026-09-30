@@ -73,7 +73,7 @@ describe('inferShape parsing', () => {
   });
 
   it('accepts a byte order mark and surrounding whitespace', () => {
-    expect(inferModel('﻿ \n {"a": 1} \r\n').objects).toHaveLength(1);
+    expect(inferModel('\uFEFF \n {"a": 1} \r\n').objects).toHaveLength(1);
   });
 
   it.each([

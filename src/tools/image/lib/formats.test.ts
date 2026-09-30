@@ -41,7 +41,7 @@ describe('sniffImageFormat', () => {
   });
 
   it('detects SVG text with BOM, XML declaration and comments', () => {
-    const svg = '﻿<?xml version="1.0"?>\n<!-- x -->\n<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+    const svg = '\uFEFF<?xml version="1.0"?>\n<!-- x -->\n<svg xmlns="http://www.w3.org/2000/svg"></svg>';
     expect(sniffImageFormat(new TextEncoder().encode(svg))).toBe('svg');
     expect(sniffImageFormat(new TextEncoder().encode('<html><body>svg</body></html>'))).toBeNull();
   });

@@ -96,7 +96,7 @@ describe('xmlToJson', () => {
   });
 
   it('handles BOM, CRLF and Unicode', () => {
-    expect(json(xmlToJson('﻿<r>\r\n  <名前>😀 café</名前>\r\n</r>', X2J))).toEqual({ r: { 名前: '😀 café' } });
+    expect(json(xmlToJson('\uFEFF<r>\r\n  <名前>😀 café</名前>\r\n</r>', X2J))).toEqual({ r: { 名前: '😀 café' } });
   });
 
   it('validates option values', () => {

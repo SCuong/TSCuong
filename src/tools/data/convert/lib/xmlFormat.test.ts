@@ -87,7 +87,7 @@ describe('formatXml', () => {
   });
 
   it('normalizes CRLF and BOM', () => {
-    const r = formatXml('﻿<a>\r\n<b>1</b>\r\n</a>', { indent: '2' });
+    const r = formatXml('\uFEFF<a>\r\n<b>1</b>\r\n</a>', { indent: '2' });
     expect(r.ok && r.value).toBe('<a>\n  <b>1</b>\n</a>\n');
   });
 

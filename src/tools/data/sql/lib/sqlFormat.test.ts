@@ -78,7 +78,7 @@ describe('formatSql', () => {
   });
 
   it('handles Unicode and a BOM', () => {
-    expect(fmt('﻿select "名前", \'😀\' from t')).toBe('SELECT\n  "名前",\n  \'😀\'\nFROM\n  t\n');
+    expect(fmt('\uFEFFselect "名前", \'😀\' from t')).toBe('SELECT\n  "名前",\n  \'😀\'\nFROM\n  t\n');
   });
 
   it('formats long scripts', () => {

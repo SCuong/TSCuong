@@ -15,11 +15,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run check:contrast && npm run test && npm run build",
+    "check": "npm run typecheck && npm run lint && npm run check:contrast && npm run check:invisible && npm run test && npm run build",
     "companion": "node companion/server.mjs",
     "postinstall": "node scripts/copy-engine-assets.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "docs:tools": "node scripts/generate-tool-catalog.mjs"
+    "docs:tools": "node scripts/generate-tool-catalog.mjs",
+    "check:invisible": "node scripts/check-invisible.mjs"
   },
   "engines": {
     "node": ">=20"
