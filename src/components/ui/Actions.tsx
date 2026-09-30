@@ -8,7 +8,7 @@ import { t } from '@/lib/i18n';
 /** Copies text (or the result of a function) and confirms visually. Disabled when there is nothing to copy. */
 export function CopyButton({
   value,
-  label = 'Copy',
+  label = t('Copy'),
   iconOnly,
   size = 'sm',
   variant = 'secondary',
@@ -63,7 +63,7 @@ export function DownloadButton({
   data,
   filename,
   type,
-  label = 'Download',
+  label = t('Download'),
   size = 'sm',
   variant = 'secondary',
   disabled,

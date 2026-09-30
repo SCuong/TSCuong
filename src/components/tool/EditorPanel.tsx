@@ -84,7 +84,7 @@ export function EditorPanel({
 }: EditorPanelProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const useCode = code || extensions !== undefined || onReady !== undefined || (language !== undefined && language !== 'plain');
-  const label = ariaLabel ?? (typeof title === 'string' ? title : 'Editor');
+  const label = ariaLabel ?? (typeof title === 'string' ? title : t('Editor'));
   const truncated = readOnly && !useCode && value.length > PLAIN_DISPLAY_LIMIT;
   /** Editable panels that offer "Open file" also accept a dropped file. */
   const canDropFile = !readOnly && fileAccept !== undefined;

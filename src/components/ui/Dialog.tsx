@@ -87,7 +87,7 @@ export function ConfirmDialog({
   onConfirm,
   title,
   children,
-  confirmLabel = 'Delete',
+  confirmLabel = t('Delete'),
   danger = true,
 }: {
   open: boolean;

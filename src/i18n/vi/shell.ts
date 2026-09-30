@@ -1,5 +1,8 @@
 /** App shell: navigation, pages, command palette, settings and shared components. */
 const shell: Record<string, string> = {
+  Delete: 'Xóa',
+  Editor: 'Trình chỉnh sửa',
+  Download: 'Tải xuống',
   // Header, navigation and layout
   'Skip to content': 'Chuyển đến nội dung',
   'Open navigation': 'Mở menu điều hướng',
