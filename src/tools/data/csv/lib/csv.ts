@@ -149,13 +149,29 @@ export function isNumeric(value: string): boolean {
   return NUMERIC.test(value);
 }
 
+/**
+ * True for a cell a spreadsheet app would run as a formula when it opens the CSV
+ * (it starts with = + - @, a tab or a carriage return and is not a plain number).
+ */
+export function looksLikeFormula(value: string): boolean {
+  return FORMULA_START.test(value) && !isNumeric(value);
+}
+
+/** Number of cells (and header names, when written) that spreadsheets would treat as formulas. */
+export function countFormulaCells(table: Table, includeHeader = true): number {
+  let n = 0;
+  if (includeHeader) for (const h of table.headers) if (looksLikeFormula(h)) n++;
+  for (const row of table.rows) for (const cell of row) if (cell && looksLikeFormula(cell)) n++;
+  return n;
+}
+
 /** Serialize a single field. */
 export function formatField(
   value: string,
   options: Required<Pick<WriteOptions, 'delimiter' | 'quoteChar' | 'quote' | 'escapeFormulae'>>,
 ): string {
   let v = value;
-  if (options.escapeFormulae && FORMULA_START.test(v) && !isNumeric(v)) v = `'${v}`;
+  if (options.escapeFormulae && looksLikeFormula(v)) v = `'${v}`;
   const q = options.quoteChar;
   const needs = v.includes(options.delimiter) || v.includes(q) || v.includes('\n') || v.includes('\r') || /^\s|\s$/.test(v);
   let quote: boolean;

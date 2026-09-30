@@ -1,18 +1,25 @@
 import { defaultColumnName, type Table } from './csv';
 
-/** Compare two cell strings: numbers numerically, empty cells last, text with natural ordering. */
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 const NUM = /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/;
+/** 1,234,567.89 — thousands separators as spreadsheets and English locales write them. */
+const GROUPED = /^\s*[+-]?\d{1,3}(,\d{3})+(\.\d+)?\s*$/;
 
+/** The numeric value of a cell such as "42", "-1.5e3" or "1,234.50"; NaN for anything else. */
+export function cellNumber(value: string): number {
+  if (NUM.test(value)) return Number(value);
+  if (GROUPED.test(value)) return Number(value.replace(/,/g, ''));
+  return NaN;
+}
+
+/** Compare two cell strings: numbers numerically, empty cells last, text with natural ordering. */
 export function compareCells(a: string, b: string): number {
   const ea = a === '';
   const eb = b === '';
   if (ea || eb) return ea === eb ? 0 : ea ? 1 : -1;
-  if (NUM.test(a) && NUM.test(b)) {
-    const d = Number(a) - Number(b);
-    if (d !== 0) return d < 0 ? -1 : 1;
-    return 0;
-  }
+  const x = cellNumber(a);
+  const y = cellNumber(b);
+  if (!Number.isNaN(x) && !Number.isNaN(y)) return x < y ? -1 : x > y ? 1 : 0;
   return collator.compare(a, b);
 }
 
@@ -52,14 +59,29 @@ export function viewIndices(table: Table, options: ViewOptions = {}): number[] {
   if (sort && sort.column >= 0 && sort.column < table.headers.length) {
     const col = sort.column;
     const sign = sort.dir === 'asc' ? 1 : -1;
-    indices.sort((x, y) => {
-      const a = table.rows[x][col] ?? '';
-      const b = table.rows[y][col] ?? '';
+    // Keys are computed once per row (not on every comparison): large tables sort several times faster.
+    const n = indices.length;
+    const values = new Array<string>(n);
+    const numbers = new Float64Array(n);
+    for (let k = 0; k < n; k++) {
+      const v = table.rows[indices[k]][col] ?? '';
+      values[k] = v;
+      numbers[k] = v === '' ? NaN : cellNumber(v);
+    }
+    const order = Array.from({ length: n }, (_, k) => k);
+    order.sort((p, q) => {
+      const a = values[p];
+      const b = values[q];
       const ea = a === '';
       const eb = b === '';
-      if (ea || eb) return ea === eb ? x - y : ea ? 1 : -1;
-      return compareCells(a, b) * sign || x - y;
+      // Empty cells always sort last, regardless of direction; ties keep row order.
+      if (ea || eb) return ea === eb ? p - q : ea ? 1 : -1;
+      const x = numbers[p];
+      const y = numbers[q];
+      const d = !Number.isNaN(x) && !Number.isNaN(y) ? (x < y ? -1 : x > y ? 1 : 0) : collator.compare(a, b);
+      return d * sign || p - q;
     });
+    indices = order.map((k) => indices[k]);
   }
   return indices;
 }

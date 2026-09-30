@@ -6,21 +6,41 @@ import { defaultColumnName, uniqueHeaders, type Table } from './csv';
 
 const JSON_NUMBER = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/;
 
+/** Sign, significant digits and exponent of a decimal number text ("-12.50e1" → "-", "125", 0). */
+function decimalParts(text: string): { sign: string; digits: string; exponent: number } {
+  const m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(text);
+  if (!m) return { sign: '', digits: '', exponent: 0 };
+  const int = m[2] ?? '';
+  const frac = m[3] ?? '';
+  let digits = (int + frac).replace(/^0+/, '');
+  let exponent = Number(m[4] ?? 0) - frac.length;
+  const trailing = /0+$/.exec(digits)?.[0].length ?? 0;
+  digits = digits.slice(0, digits.length - trailing);
+  exponent += trailing;
+  if (!digits) return { sign: '', digits: '0', exponent: 0 };
+  return { sign: m[1] === '-' ? '-' : '', digits, exponent };
+}
+
+/**
+ * True when reading the number text as a JavaScript number keeps its exact decimal value
+ * ("1.50" and "0.1" do; "12345678901234567890" and "0.12345678901234567890" do not).
+ */
+export function numberRoundTrips(text: string): boolean {
+  const n = Number(text);
+  if (!Number.isFinite(n)) return false;
+  const a = decimalParts(text);
+  const b = decimalParts(String(n));
+  return a.sign === b.sign && a.digits === b.digits && a.exponent === b.exponent;
+}
+
 /**
  * Convert a cell to a JSON value: numbers (only if they round-trip exactly and
- * have no leading zeros, so ZIP codes and IDs stay strings), true/false, null.
- * Empty cells become null.
+ * have no leading zeros, so ZIP codes, long IDs and over-precise decimals stay strings),
+ * true/false, null. Empty cells become null.
  */
 export function inferValue(cell: string): string | number | boolean | null {
   if (cell === '') return null;
-  if (JSON_NUMBER.test(cell)) {
-    const n = Number(cell);
-    if (Number.isFinite(n)) {
-      if (/^-?\d+$/.test(cell)) return Number.isSafeInteger(n) ? n : cell;
-      return n;
-    }
-    return cell;
-  }
+  if (JSON_NUMBER.test(cell)) return numberRoundTrips(cell) ? Number(cell) : cell;
   if (cell === 'true' || cell === 'TRUE' || cell === 'True') return true;
   if (cell === 'false' || cell === 'FALSE' || cell === 'False') return false;
   if (cell === 'null' || cell === 'NULL') return null;
@@ -245,7 +265,9 @@ export function jsonToTable(value: unknown, options: JsonToTableOptions = {}): J
   if (rows.every(Array.isArray)) {
     const arrays = rows as unknown[][];
     const cells = arrays.map((r) => r.map(primitiveToCell));
-    const width = Math.max(0, ...cells.map((r) => r.length));
+    // A loop, not Math.max(...): spreading 100k+ rows as arguments overflows the call stack.
+    let width = 0;
+    for (const r of cells) if (r.length > width) width = r.length;
     const pad = (r: string[]) => (r.length < width ? [...r, ...Array(width - r.length).fill('')] : r);
     if (options.firstRowHeader) {
       const [head, ...rest] = cells;

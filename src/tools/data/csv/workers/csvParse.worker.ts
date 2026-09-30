@@ -9,6 +9,7 @@
  */
 import Papa from 'papaparse';
 import { describePapaError, type ParseIssue } from '../lib/csv';
+import { decodeQuality, ENCODING_NAMES, sniffEncoding } from '../lib/encoding';
 
 export interface CsvParseRequest {
   file: File;
@@ -25,7 +26,7 @@ export type CsvParseMessage =
 
 const post = (msg: CsvParseMessage) => (self as unknown as Worker).postMessage(msg);
 
-async function readText(file: File, encoding: string): Promise<string> {
+async function decodeFile(file: File, encoding: string): Promise<{ text: string; replaced: number; nonAscii: number }> {
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(encoding || 'utf-8');
@@ -48,14 +49,47 @@ async function readText(file: File, encoding: string): Promise<string> {
   }
   parts.push(decoder.decode());
   const text = parts.join('');
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  return { text: text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, ...decodeQuality(text) };
+}
+
+/** Decode a file, trusting a byte order mark over the chosen encoding and rescuing legacy 8-bit files read as UTF-8. */
+async function readText(file: File, encoding: string, notes: ParseIssue[]): Promise<string> {
+  const chosen = (encoding || 'utf-8').toLowerCase();
+  const head = new Uint8Array(await file.slice(0, 4096).arrayBuffer());
+  const sniffed = sniffEncoding(head);
+  let used = chosen;
+  if (sniffed && sniffed.encoding !== chosen) {
+    used = sniffed.encoding;
+    notes.push({
+      row: null,
+      message: sniffed.bom
+        ? `The file starts with a ${ENCODING_NAMES[used]} byte order mark, so it was read as ${ENCODING_NAMES[used]} instead of the selected encoding.`
+        : `The file looks like ${ENCODING_NAMES[used]} text without a byte order mark, so it was read as ${ENCODING_NAMES[used]}.`,
+    });
+  }
+  const decoded = await decodeFile(file, used);
+  if (decoded.replaced === 0 || used !== 'utf-8') return decoded.text;
+  if (decoded.nonAscii === 0) {
+    // Not a single valid multi-byte sequence: this is a legacy 8-bit file (e.g. an Excel "CSV" export on Windows).
+    notes.push({
+      row: null,
+      message: 'The file is not valid UTF-8, so it was read as Windows-1252 (Western). If characters look wrong, choose the file’s encoding.',
+    });
+    return (await decodeFile(file, 'windows-1252')).text;
+  }
+  notes.push({
+    row: null,
+    message: `${decoded.replaced.toLocaleString('en-US')} byte${decoded.replaced === 1 ? '' : 's'} could not be read as UTF-8 and show as �. If this is not a UTF-8 file, choose its encoding.`,
+  });
+  return decoded.text;
 }
 
 self.onmessage = async (event: MessageEvent<CsvParseRequest>) => {
   const { file, delimiter, encoding, maxRows } = event.data;
   let text: string;
+  const encodingNotes: ParseIssue[] = [];
   try {
-    text = await readText(file, encoding);
+    text = await readText(file, encoding, encodingNotes);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not read the file.';
     post({
@@ -67,7 +101,7 @@ self.onmessage = async (event: MessageEvent<CsvParseRequest>) => {
 
   let total = 0;
   let truncated = false;
-  const issues: ParseIssue[] = [];
+  const issues: ParseIssue[] = [...encodingNotes];
   let meta = { delimiter: delimiter || ',', linebreak: '\n' };
   const length = text.length || 1;
 

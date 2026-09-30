@@ -179,6 +179,99 @@ function toPlain(value: unknown): unknown {
   return value;
 }
 
+// ---------------------------------------------------------------------------
+// Alias expansion ("billion laughs") guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Characters that aliases may add when a document is expanded into plain data. The yaml
+ * library's own limit only counts how often each anchor is used, so one large anchor aliased a
+ * few hundred times (a 200 KB input) would still expand into hundreds of megabytes of JSON.
+ */
+export const MAX_ALIAS_EXPANSION = 20_000_000;
+
+/** Line width that never folds: the library's "0 = no folding" crashes on !!binary values. */
+const NO_FOLD = Number.MAX_SAFE_INTEGER;
+
+export type AliasProblem =
+  | { kind: 'cycle'; alias: string; line?: number; column?: number }
+  | { kind: 'budget'; extra: number };
+
+/**
+ * Measures, without expanding anything, how many characters the document would have once every
+ * alias (and merge key) is replaced by the node it refers to. Reports an alias that points at a
+ * node containing it (recursive data, which JSON cannot represent) or an expansion that would add
+ * more than `limit` characters. Throws RangeError only for pathologically deep nesting.
+ */
+export function checkAliasExpansion(doc: Document.Parsed, lineCounter?: LineCounter, limit = MAX_ALIAS_EXPANSION): AliasProblem | null {
+  const anchors = new Map<string, unknown>();
+  const weights = new Map<unknown, number>();
+  const open = new Set<unknown>();
+  let direct = 0;
+  let cycle: AliasProblem | null = null;
+
+  const weigh = (node: unknown): number => {
+    if (cycle) return 0;
+    if (node === null || node === undefined) {
+      direct += 1;
+      return 1;
+    }
+    if (isAlias(node)) {
+      const own = node.source.length + 1;
+      direct += own;
+      // An alias refers to the closest preceding node with that anchor; the walk is in document order.
+      const target = anchors.get(node.source);
+      if (target === undefined) return own;
+      if (open.has(target)) {
+        const pos = node.range && lineCounter ? lineCounter.linePos(node.range[0]) : undefined;
+        cycle = { kind: 'cycle', alias: node.source, line: pos?.line, column: pos?.col };
+        return 0;
+      }
+      return weights.get(target) ?? own;
+    }
+    // Registered before the children, so an alias inside the node itself is detected as recursion.
+    if (isNode(node) && node.anchor) anchors.set(node.anchor, node);
+    let total: number;
+    if (isMap(node) || isSeq(node)) {
+      open.add(node);
+      total = 2;
+      direct += 2;
+      for (const item of node.items as unknown[]) {
+        if (isPair(item)) {
+          total += weigh(item.key) + weigh(item.value) + 2;
+          direct += 2;
+        } else {
+          total += weigh(item) + 1;
+          direct += 1;
+        }
+      }
+      open.delete(node);
+    } else if (isPair(node)) {
+      total = weigh(node.key) + weigh(node.value) + 2;
+      direct += 2;
+    } else {
+      const range = isNode(node) ? node.range : undefined;
+      total = Math.max(1, range ? range[1] - range[0] : isScalar(node) ? String(node.value).length : 1);
+      direct += total;
+    }
+    if (isNode(node) && node.anchor) weights.set(node, total);
+    return total;
+  };
+
+  const expanded = weigh(doc.contents);
+  if (cycle) return cycle;
+  const extra = expanded - direct;
+  return extra > limit ? { kind: 'budget', extra } : null;
+}
+
+function describeAliasProblem(problem: AliasProblem, target: string): string {
+  if (problem.kind === 'cycle') {
+    return `The alias *${problem.alias} refers to a node that contains it, so the data is recursive and cannot be written as ${target}.`;
+  }
+  const millions = Math.max(1, Math.round(problem.extra / 1_000_000));
+  return `Expanding the aliases would add about ${millions.toLocaleString('en-US')} million characters of data (a possible "billion laughs" input), so the document was not expanded.`;
+}
+
 /** Number of comments in YAML source (JSON cannot keep them). */
 export function countYamlComments(text: string): number {
   let n = 0;
@@ -321,7 +414,13 @@ export function yamlToJson(input: string, options: YamlToJsonOptions): ConvertRe
   const used = mode === 'first' ? list.slice(0, 1) : list;
   const values: unknown[] = [];
   try {
-    for (const doc of used) values.push(toPlain(doc.toJS({ maxAliasCount: 1000 })));
+    for (const doc of used) {
+      // Check what the aliases expand to before expanding them (toPlain copies every alias).
+      const problem = checkAliasExpansion(doc, lineCounter);
+      if (problem) return fail(describeAliasProblem(problem, 'JSON'), problem.kind === 'cycle' ? problem.line : undefined, problem.kind === 'cycle' ? problem.column : undefined);
+      // The expansion was measured above; the library's per-anchor use count stays as a generous backstop.
+      values.push(toPlain(doc.toJS({ maxAliasCount: 100_000 })));
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/alias/i.test(message)) return fail('The document expands too many aliases (possible "billion laughs" input).');
@@ -403,7 +502,7 @@ function renderDocument(value: unknown, options: JsonToYamlOptions): string {
   return doc.toString({
     indent: Number(options.indent),
     indentSeq: options.indentSeq !== false,
-    lineWidth: options.foldLines ? 80 : 0,
+    lineWidth: options.foldLines ? 80 : NO_FOLD,
     minContentWidth: options.foldLines ? 20 : 0,
     flowCollectionPadding: false,
   });
@@ -530,17 +629,25 @@ export function validateYaml(input: string, options: { version: YamlVersion; clo
     // Only extremely deep documents can overflow the walker; the input itself is still valid.
     stats = null;
   }
-  // Resolving aliases can still fail (alias bombs); report that as an error.
+  // Alias bombs are reported as errors (parsers refuse them); recursive aliases are valid YAML but cannot become JSON.
   for (const doc of docs) {
+    let problem: AliasProblem | null;
     try {
-      doc.toJS({ maxAliasCount: 1000 });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push({
-        severity: 'error',
-        message: /alias/i.test(message) ? 'The document expands too many aliases (possible "billion laughs" input).' : message,
-      });
+      problem = checkAliasExpansion(doc, lineCounter);
+    } catch {
+      break; // Only extremely deep nesting overflows the walk; the syntax itself is valid.
+    }
+    if (problem?.kind === 'budget') {
+      errors.push({ severity: 'error', message: describeAliasProblem(problem, 'JSON') });
       break;
+    }
+    if (problem?.kind === 'cycle') {
+      warnings.push({
+        severity: 'warning',
+        message: `The alias *${problem.alias} refers to a node that contains it (recursive data). This is valid YAML, but it cannot be converted to JSON.`,
+        line: problem.line,
+        column: problem.column,
+      });
     }
   }
   return { documents: docs.length, errors, warnings, differences, stats };
@@ -600,7 +707,7 @@ export function formatYaml(input: string, options: YamlFormatOptions): ConvertRe
         doc.toString({
           indent: Number(options.indent),
           indentSeq: options.indentSeq !== false,
-          lineWidth: options.foldLines ? 80 : 0,
+          lineWidth: options.foldLines ? 80 : NO_FOLD,
           minContentWidth: options.foldLines ? 20 : 0,
           flowCollectionPadding: false,
         }),

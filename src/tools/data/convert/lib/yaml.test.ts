@@ -447,3 +447,61 @@ describe('resolvePlainScalar', () => {
     expect(resolvePlainScalar('2024-01-02', '1.1')).toBeInstanceOf(Date);
   });
 });
+
+describe('alias expansion guard (regressions)', () => {
+  const wideBomb = (items: number, aliases: number) =>
+    `a: &a [${Array(items).fill('x').join(',')}]\nb: [${Array(aliases).fill('*a').join(',')}]\n`;
+
+  it('refuses a wide alias bomb that stays under the per-anchor use limit', () => {
+    // 43 KB of YAML that would expand into ~80 MB of JSON.
+    const started = Date.now();
+    const r = yamlToJson(wideBomb(20_000, 999), Y2J);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.message).toMatch(/billion laughs/);
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  it('refuses a doubling chain and a large anchored string used many times', () => {
+    let chain = `a0: &a0 [${Array(1000).fill('"x"').join(',')}]\n`;
+    for (let i = 1; i <= 20; i++) chain += `a${i}: &a${i} [*a${i - 1}, *a${i - 1}]\n`;
+    expect(yamlToJson(chain, Y2J).ok).toBe(false);
+    const big = `s: &s "${'y'.repeat(1_000_000)}"\nl: [${Array(30).fill('*s').join(', ')}]\n`;
+    expect(yamlToJson(big, Y2J).ok).toBe(false);
+  });
+
+  it('still expands ordinary anchors, merge keys and many references to one anchor', () => {
+    const jobs = Array.from({ length: 1500 }, (_, i) => `job${i}:\n  <<: *defaults\n  id: ${i}`).join('\n');
+    const r = yamlToJson(`defaults: &defaults\n  retries: 2\n  image: node\n${jobs}\n`, Y2J);
+    const out = value(r);
+    expect(out.job1499).toEqual({ retries: 2, image: 'node', id: 1499 });
+    expect(value(yamlToJson(wideBomb(100, 50), Y2J)).b).toHaveLength(50);
+  });
+
+  it('explains recursive aliases instead of reporting deep nesting', () => {
+    const r = yamlToJson('a: &a\n  b: 1\n  c: *a\n', Y2J);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.message).toMatch(/\*a refers to a node that contains it/);
+      expect(r.error.line).toBe(3);
+    }
+    const v = validateYaml('x: &x [1, *x]\n', { version: '1.2' });
+    expect(v.errors).toEqual([]);
+    expect(v.warnings.some((w) => /recursive/.test(w.message))).toBe(true);
+  });
+
+  it('flags the wide bomb in the validator but accepts many merges', () => {
+    expect(validateYaml(wideBomb(20_000, 999), { version: '1.2' }).errors.some((e) => /billion laughs/.test(e.message))).toBe(true);
+    const merges = `d: &d {a: 1}\n${Array.from({ length: 1200 }, (_, i) => `k${i}: {<<: *d}`).join('\n')}\n`;
+    expect(validateYaml(merges, { version: '1.2' }).errors).toEqual([]);
+  });
+});
+
+describe('formatYaml: binary values (regression)', () => {
+  it('formats !!binary without folding and without a bogus nesting error', () => {
+    const src = 'z: !!binary aGVsbG8gd29ybGQgdGhpcyBpcyBhIGxvbmdlciBiaW5hcnkgdmFsdWU=\nw: 1\n';
+    const r = formatYaml(src, { indent: '2', version: '1.2' });
+    expect(r.ok && r.value).toBe(src);
+    const folded = formatYaml(src, { indent: '2', version: '1.2', foldLines: true });
+    expect(folded.ok).toBe(true);
+  });
+});

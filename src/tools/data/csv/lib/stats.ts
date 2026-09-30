@@ -30,7 +30,14 @@ export interface ColumnStats {
   };
   dates?: { min: string; max: string };
   booleans?: { trueCount: number; falseCount: number };
+  /**
+   * How numbers were read when they use separators: 'grouped' = 1,234.56 (comma thousands),
+   * 'decimal-comma' = 1.234,56 or 1 234,56 (comma decimals). Absent for plain numbers.
+   */
+  numberFormat?: NumberStyle;
 }
+
+export type NumberStyle = 'grouped' | 'decimal-comma';
 
 const naturalOrder = new Intl.Collator(undefined, { numeric: true });
 const INTEGER = /^[+-]?\d+$/;
@@ -62,10 +69,53 @@ export function median(sorted: Float64Array | number[]): number {
   return n % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+const US_GROUPED = /^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/;
+const EU_GROUPED = /^[+-]?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/;
+const EU_SPACED = /^[+-]?\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:,\d+)?$/;
+const EU_DECIMAL = /^[+-]?\d+,\d+$/;
+
+/**
+ * The separator convention of a column's numbers: 'grouped' when some value needs comma
+ * thousands separators (1,234.5), 'decimal-comma' when some value needs a decimal comma
+ * (1.234,5 · 1 234,5 · 3,14), null when plain parsing is enough or the values disagree.
+ * "1,234" fits both; `preferDecimalComma` (e.g. for semicolon-separated files) breaks the tie.
+ */
+export function detectNumberStyle(values: string[], preferDecimalComma = false): NumberStyle | null {
+  let grouped = true;
+  let comma = true;
+  let needed = false;
+  for (const v of values) {
+    if (INTEGER.test(v)) continue;
+    const plain = DECIMAL.test(v);
+    const us = US_GROUPED.test(v);
+    const eu = EU_GROUPED.test(v) || EU_SPACED.test(v) || EU_DECIMAL.test(v);
+    if (!plain && !us && !eu) continue; // text, handled by the type counts
+    if (us || (eu && !plain)) needed = true;
+    if (!plain && !us) grouped = false;
+    if (!eu) comma = false;
+    if (!grouped && !comma) return null;
+  }
+  if (!needed) return null;
+  if (grouped && comma) return preferDecimalComma ? 'decimal-comma' : 'grouped';
+  return grouped ? 'grouped' : 'decimal-comma';
+}
+
+/** Parse a number written in the given style; NaN when it does not fit. */
+export function parseStyledNumber(v: string, style: NumberStyle | null): number {
+  if (style === 'grouped') return US_GROUPED.test(v) || DECIMAL.test(v) ? Number(v.replace(/,/g, '')) : NaN;
+  if (style === 'decimal-comma') {
+    if (INTEGER.test(v)) return Number(v);
+    return EU_GROUPED.test(v) || EU_SPACED.test(v) || EU_DECIMAL.test(v) ? Number(v.replace(/[.\s\u00a0\u202f]/g, '').replace(',', '.')) : NaN;
+  }
+  return DECIMAL.test(v) ? Number(v) : NaN;
+}
+
 export interface StatsOptions {
   /** Treat whitespace-only cells as empty (default true). */
   trim?: boolean;
   topN?: number;
+  /** Read ambiguous numbers such as "1,234" as decimals (1.234) rather than thousands. */
+  preferDecimalComma?: boolean;
 }
 
 /** Profile a single column. */
@@ -92,6 +142,21 @@ export function columnStats(table: Table, index: number, options: StatsOptions =
     typeCounts[valueType(v)]++;
   }
   const filled = values.length;
+  // Numbers written with thousands separators or decimal commas: re-count the column in that style.
+  const style = typeCounts.text > 0 ? detectNumberStyle(values, options.preferDecimalComma) : null;
+  if (style) {
+    typeCounts.integer = 0;
+    typeCounts.decimal = 0;
+    typeCounts.boolean = 0;
+    typeCounts.date = 0;
+    typeCounts.text = 0;
+    for (const v of values) {
+      if (Number.isFinite(parseStyledNumber(v, style))) {
+        const fractional = style === 'grouped' ? /[.eE]/.test(v) : v.includes(',');
+        typeCounts[fractional ? 'decimal' : 'integer']++;
+      } else typeCounts[valueType(v)]++;
+    }
+  }
   const numericCount = typeCounts.integer + typeCounts.decimal;
   let type: ColumnType;
   let matching: number;
@@ -141,12 +206,13 @@ export function columnStats(table: Table, index: number, options: StatsOptions =
     let k = 0;
     let sum = 0;
     for (const v of values) {
-      const n = Number(v);
-      if (DECIMAL.test(v) && Number.isFinite(n)) {
+      const n = parseStyledNumber(v, style);
+      if (Number.isFinite(n) && k < numericCount) {
         nums[k++] = n;
         sum += n;
       }
     }
+    if (style) stats.numberFormat = style;
     nums.sort();
     const mean = sum / numericCount;
     let sq = 0;

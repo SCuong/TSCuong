@@ -60,12 +60,14 @@ export default function HtmlTableGenerator() {
 
   const gridTable = useMemo(() => normalizeTable(stored?.headers?.length ? stored : blankTable(3, 3)), [stored]);
   const table = mode === 'grid' ? gridTable : (source.data?.table ?? null);
-  const useThead = mode === 'grid' ? thead : thead && source.header;
+  // CSV read without a header row has generated column names, which are not data.
+  const headerRow = mode === 'grid' || source.header;
 
   const html = useMemo(() => {
     if (!table || !table.headers.length) return '';
     return toHtmlTable(table, {
-      thead: useThead,
+      thead,
+      headerRow,
       rowHeaders,
       className,
       id,
@@ -75,7 +77,7 @@ export default function HtmlTableGenerator() {
       indent,
       align: mode === 'grid' ? align : [],
     });
-  }, [table, useThead, rowHeaders, className, id, caption, escape, lineBreaks, indent, align, mode]);
+  }, [table, thead, headerRow, rowHeaders, className, id, caption, escape, lineBreaks, indent, align, mode]);
 
   const srcDoc =
     view === 'preview' && html.length <= PREVIEW_MAX_CHARS

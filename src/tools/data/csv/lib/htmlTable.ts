@@ -7,6 +7,11 @@ export function escapeHtml(value: string): string {
 export interface HtmlTableOptions {
   /** Put the first row in <thead> with <th> cells. */
   thead?: boolean;
+  /**
+   * Whether `table.headers` is real data (default true). False for CSV read without a
+   * header row: the generated "Column 1…" names are then left out entirely.
+   */
+  headerRow?: boolean;
   /** Use <th scope="row"> for the first cell of each body row. */
   rowHeaders?: boolean;
   className?: string;
@@ -35,7 +40,8 @@ export function sanitizeId(value: string): string {
 }
 
 export function toHtmlTable(table: Table, options: HtmlTableOptions = {}): string {
-  const { thead = true, rowHeaders = false, escape = true, lineBreaks = true, indent = '2', align = [] } = options;
+  const { rowHeaders = false, escape = true, lineBreaks = true, indent = '2', align = [], headerRow = true } = options;
+  const thead = headerRow && (options.thead ?? true);
   const unit = indent === 'none' ? '' : indent === 'tab' ? '\t' : ' '.repeat(Number(indent));
   const nl = indent === 'none' ? '' : '\n';
   const ind = (level: number) => unit.repeat(level);
@@ -59,7 +65,7 @@ export function toHtmlTable(table: Table, options: HtmlTableOptions = {}): strin
   if (options.caption?.trim()) out.push(`${ind(1)}<caption>${escapeHtml(options.caption.trim())}</caption>`);
   const cols = table.headers.length;
 
-  const bodyRows = thead ? table.rows : [table.headers, ...table.rows];
+  const bodyRows = thead || !headerRow ? table.rows : [table.headers, ...table.rows];
   if (thead && cols) {
     out.push(`${ind(1)}<thead>`, `${ind(2)}<tr>`);
     table.headers.forEach((h, i) => out.push(`${ind(3)}<th scope="col"${alignAttr(i)}>${content(h)}</th>`));
