@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/Field';
+import { t } from '@/lib/i18n';
 
 /** Labelled slider with a live value readout. */
 export function RangeField({
@@ -75,7 +76,7 @@ export function ColorField({
       <div className="flex items-center gap-2">
         <input
           type="color"
-          aria-label={`${label} picker`}
+          aria-label={t('{label} picker', { label })}
           value={HEX_RE.test(value) ? value : '#000000'}
           onChange={(e) => onChange(e.target.value)}
           className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-line-strong bg-surface-sunken p-1"

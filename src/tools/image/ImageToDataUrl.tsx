@@ -13,6 +13,7 @@ import { baseName, errorMessage, formatBytes } from '@/lib/utils';
 import { FORMAT_INFO, sniffImageFormat, type ImageFormat } from './lib/formats';
 import { snippets, svgToDataUrl } from './lib/dataurl';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Output = 'dataUrl' | 'css' | 'html' | 'markdown' | 'base64';
 
@@ -29,7 +30,7 @@ function fileBase64(file: Blob): Promise<string> {
       const result = String(reader.result);
       resolve(result.slice(result.indexOf(',') + 1));
     };
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'));
+    reader.onerror = () => reject(reader.error ?? new Error(t('Could not read the file.')));
     reader.readAsDataURL(file);
   });
 }
@@ -52,17 +53,17 @@ export default function ImageToDataUrl() {
   async function open(file: File) {
     setError(null);
     try {
-      if (file.size > MAX_FILE) throw new Error(`This file is ${formatBytes(file.size)}. Data URLs that large are impractical (limit 20 MB).`);
-      if (file.size === 0) throw new Error('The file is empty.');
+      if (file.size > MAX_FILE) throw new Error(t('This file is {size}. Data URLs that large are impractical (limit 20 MB).', { size: formatBytes(file.size) }));
+      if (file.size === 0) throw new Error(t('The file is empty.'));
       const format = sniffImageFormat(new Uint8Array(await file.slice(0, 4096).arrayBuffer()));
-      if (!format) throw new Error('This file is not a recognized image (checked by its contents).');
+      if (!format) throw new Error(t('This file is not a recognized image (checked by its contents).'));
       const svgText = format === 'svg' ? await file.text() : null;
       // FileReader encodes Base64 natively (a pure-JS loop over megabytes would freeze the page).
       setData({ file, format, base64Url: `data:${FORMAT_INFO[format].mime};base64,${await fileBase64(file)}`, svgText });
       setAlt(baseName(file.name));
     } catch (e) {
       setData(null);
-      setError(errorMessage(e, 'Could not read the file.'));
+      setError(errorMessage(e, t('Could not read the file.')));
     }
   }
 
@@ -76,7 +77,7 @@ export default function ImageToDataUrl() {
     const s = snippets(url, snippetAlt);
     return output === 'dataUrl' ? s.dataUrl : s[output];
   }, [url, output, snippetAlt]);
-  const outputTitle = output === 'dataUrl' ? 'Data URL' : output === 'css' ? 'CSS' : output === 'html' ? 'HTML' : output === 'markdown' ? 'Markdown' : 'Base64';
+  const outputTitle = output === 'dataUrl' ? t('Data URL') : output === 'css' ? 'CSS' : output === 'html' ? 'HTML' : output === 'markdown' ? t('Markdown') : t('Base64');
   const outputFile = data ? `${baseName(data.file.name)}.${output === 'css' ? 'css' : output === 'html' ? 'html' : output === 'markdown' ? 'md' : 'txt'}` : 'output.txt';
 
   const size = useMemo(() => new Blob([url]).size, [url]);
@@ -84,62 +85,62 @@ export default function ImageToDataUrl() {
 
   return (
     <ToolStack>
-      <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void open(f[0])} icon={FileCode} compact={Boolean(data)} title="Drop an image to convert to a data URL" />
+      <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void open(f[0])} icon={FileCode} compact={Boolean(data)} title={t('Drop an image to convert to a data URL')} />
       <ErrorMessage error={error} />
       {data && (
         <>
           <ToolBar>
             <div className="min-w-0">
-              <Label>Output</Label>
+              <Label>{t('Output')}</Label>
               <Segmented
-                label="Output"
+                label={t('Output')}
                 value={output}
                 onChange={setOutput}
                 options={[
-                  { value: 'dataUrl', label: 'Data URL' },
+                  { value: 'dataUrl', label: t('Data URL') },
                   { value: 'css', label: 'CSS' },
-                  { value: 'html', label: 'HTML <img>' },
-                  { value: 'markdown', label: 'Markdown' },
-                  { value: 'base64', label: 'Base64 only' },
+                  { value: 'html', label: t('HTML <img>') },
+                  { value: 'markdown', label: t('Markdown') },
+                  { value: 'base64', label: t('Base64 only') },
                 ]}
               />
             </div>
             {data.svgText !== null && (
               <div className="min-w-0">
-                <Label>SVG encoding</Label>
+                <Label>{t('SVG encoding')}</Label>
                 <Segmented
-                  label="SVG encoding"
+                  label={t('SVG encoding')}
                   value={svgEncoding}
                   onChange={setSvgEncoding}
                   options={[
-                    { value: 'url', label: 'URL-encoded (smaller)' },
-                    { value: 'base64', label: 'Base64' },
+                    { value: 'url', label: t('URL-encoded (smaller)') },
+                    { value: 'base64', label: t('Base64') },
                   ]}
                 />
               </div>
             )}
             {(output === 'html' || output === 'markdown') && (
               <div className="w-56">
-                <Label htmlFor="du-alt">Alt text</Label>
+                <Label htmlFor="du-alt">{t('Alt text')}</Label>
                 <Input id="du-alt" value={alt} onChange={(e) => setAlt(e.target.value)} />
               </div>
             )}
           </ToolBar>
           {size > 1024 * 1024 ? (
-            <Alert tone="warning" title="Very large data URL">
-              {formatBytes(size)} of text. Inlining images this big slows down pages and editors; link to the file instead.
+            <Alert tone="warning" title={t('Very large data URL')}>
+              {t('{size} of text. Inlining images this big slows down pages and editors; link to the file instead.', { size: formatBytes(size) })}
             </Alert>
           ) : size > 10 * 1024 ? (
             <Alert tone="info">
-              {formatBytes(size)}: inlining is best for small images (under about 10 KB) like icons, because inlined data can't be cached separately.
+              {t('{size}: inlining is best for small images (under about 10 KB) like icons, because inlined data can\'t be cached separately.', { size: formatBytes(size) })}
             </Alert>
           ) : null}
-          {output === 'base64' && !text && <Alert tone="info">This SVG uses URL encoding. Switch SVG encoding to Base64 to get raw Base64.</Alert>}
+          {output === 'base64' && !text && <Alert tone="info">{t('This SVG uses URL encoding. Switch SVG encoding to Base64 to get raw Base64.')}</Alert>}
           <div className="grid min-w-0 gap-4 lg:grid-cols-[280px_1fr]">
             <Panel
               title={data.file.name}
               description={`${FORMAT_INFO[data.format].label} · ${formatBytes(data.file.size)}`}
-              actions={<Button size="sm" variant="ghost" onClick={() => setData(null)}>Clear</Button>}
+              actions={<Button size="sm" variant="ghost" onClick={() => setData(null)}>{t('Clear')}</Button>}
             >
               {preview && (
                 <div className="lk-checker flex justify-center overflow-hidden rounded-lg border border-line p-2">
@@ -158,11 +159,11 @@ export default function ImageToDataUrl() {
               // Showing megabytes of text in an editor freezes the page: preview the start, copy/download the whole.
               <Panel
                 title={outputTitle}
-                description={`${text.length.toLocaleString()} characters: too long to show in full`}
+                description={t('{count} characters: too long to show in full', { count: text.length.toLocaleString() })}
                 actions={
                   <>
-                    <CopyButton value={text} label="Copy all" />
-                    <DownloadButton data={text} filename={outputFile} label="Download" />
+                    <CopyButton value={text} label={t('Copy all')} />
+                    <DownloadButton data={text} filename={outputFile} label={t('Download')} />
                   </>
                 }
               >
@@ -176,7 +177,7 @@ export default function ImageToDataUrl() {
                 value={text}
                 height="320px"
                 downloadName={outputFile}
-                footer={<span>{text.length.toLocaleString()} characters</span>}
+                footer={<span>{t('{count} characters', { count: text.length.toLocaleString() })}</span>}
               />
             )}
           </div>

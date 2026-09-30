@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { useObjectUrl } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export type PreviewBg = 'checker' | 'light' | 'dark';
 
@@ -40,7 +41,7 @@ export function SvgPreview({
       ) : (
         <div className="flex flex-col items-center gap-1.5 text-center text-[13px] text-fg-muted">
           <ImageOff size={18} aria-hidden />
-          {failed ? 'The browser could not render this SVG.' : 'Nothing to preview'}
+          {failed ? t('The browser could not render this SVG.') : t('Nothing to preview')}
         </div>
       )}
     </div>

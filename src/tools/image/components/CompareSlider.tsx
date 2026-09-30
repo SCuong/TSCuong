@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /**
  * Before/after comparison: the "after" image is revealed from the left up to
@@ -57,7 +58,7 @@ export function CompareSlider({
           step={0.5}
           value={pos}
           onChange={(e) => setPos(Number(e.target.value))}
-          aria-label={`Comparison position: left shows ${afterLabel.toLowerCase()}, right shows ${beforeLabel.toLowerCase()}`}
+          aria-label={t('Comparison position: left shows {afterLabel}, right shows {beforeLabel}', { afterLabel: afterLabel.toLowerCase(), beforeLabel: beforeLabel.toLowerCase() })}
           className="absolute inset-0 size-full cursor-ew-resize opacity-0"
         />
       </div>

@@ -20,6 +20,7 @@ import { supportsCanvasFilter } from './lib/filters';
 import { SOCIAL_PRESETS } from './lib/socialPresets';
 import { zipBlobs } from './lib/zip';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Fit = 'cover' | 'contain';
 type Fill = 'color' | 'blur';
@@ -168,9 +169,9 @@ export default function SocialImageResizer() {
     try {
       const r = await exportOne();
       downloadBlob(r.blob, r.name);
-      toast(`Saved ${preset.width}×${preset.height} (${formatBytes(r.blob.size)})`);
+      toast(t('Saved {width}×{height} ({size})', { width: preset.width, height: preset.height, size: formatBytes(r.blob.size) }));
     } catch (e) {
-      toast(errorMessage(e, 'Could not export the image.'), 'error');
+      toast(errorMessage(e, t('Could not export the image.')), 'error');
     } finally {
       setBusy(false);
     }
@@ -183,7 +184,7 @@ export default function SocialImageResizer() {
       for (const p of SOCIAL_PRESETS) files.push(await exportOne(p));
       downloadBlob(await zipBlobs(files.map((f) => ({ name: f.name, data: f.blob }))), `${baseName(image!.file.name)}-social.zip`);
     } catch (e) {
-      toast(errorMessage(e, 'Could not export the images.'), 'error');
+      toast(errorMessage(e, t('Could not export the images.')), 'error');
     } finally {
       setBusy(false);
     }
@@ -195,7 +196,7 @@ export default function SocialImageResizer() {
     <ToolStack>
       <ToolBar>
         <div className="w-full sm:w-72">
-          <Label htmlFor="soc-preset">Preset</Label>
+          <Label htmlFor="soc-preset">{t('Preset')}</Label>
           <Select id="soc-preset" value={preset.id} onChange={(e) => setPresetId(e.target.value)}>
             {SOCIAL_PRESETS.map((p) => (
               <option key={p.id} value={p.id}>
@@ -205,57 +206,57 @@ export default function SocialImageResizer() {
           </Select>
         </div>
         <div className="min-w-0">
-          <Label>Fit</Label>
+          <Label>{t('Fit')}</Label>
           <Segmented
-            label="Fit"
+            label={t('Fit')}
             value={fit}
             onChange={setFit}
             options={[
-              { value: 'cover', label: 'Fill (crop)' },
-              { value: 'contain', label: 'Fit (no crop)' },
+              { value: 'cover', label: t('Fill (crop)') },
+              { value: 'contain', label: t('Fit (no crop)') },
             ]}
           />
         </div>
         {fit === 'contain' && (
           <>
             <div className="min-w-0">
-              <Label>Background</Label>
+              <Label>{t('Background')}</Label>
               <Segmented
-                label="Background"
+                label={t('Background')}
                 value={fill}
                 onChange={setFill}
                 options={[
-                  { value: 'blur', label: 'Blurred image' },
-                  { value: 'color', label: 'Color' },
+                  { value: 'blur', label: t('Blurred image') },
+                  { value: 'color', label: t('Color') },
                 ]}
               />
             </div>
-            {fill === 'color' && <ColorField label="Color" value={color} onChange={setColor} />}
+            {fill === 'color' && <ColorField label={t('Color')} value={color} onChange={setColor} />}
           </>
         )}
       </ToolBar>
-      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Share2} title="Drop an image to size for social media" />}
-      {loading && <Spinner label="Opening image…" />}
+      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Share2} title={t('Drop an image to size for social media')} />}
+      {loading && <Spinner label={t('Opening image…')} />}
       <ErrorMessage error={error} />
       {image && (
         <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_300px]">
           <Panel
             title={`${preset.label} · ${preset.width}×${preset.height}`}
             description={preset.note}
-            actions={<Button size="sm" variant="ghost" onClick={clear}>Choose another</Button>}
+            actions={<Button size="sm" variant="ghost" onClick={clear}>{t('Choose another')}</Button>}
           >
             <div className="lk-checker flex justify-center rounded-lg border border-line p-2">
-              <canvas ref={previewRef} className="block h-auto max-h-[60vh] max-w-full shadow-card" role="img" aria-label={`Preview of the ${preset.width}×${preset.height} image`} />
+              <canvas ref={previewRef} className="block h-auto max-h-[60vh] max-w-full shadow-card" role="img" aria-label={t('Preview of the {width}×{height} image', { width: preset.width, height: preset.height })} />
             </div>
             {tooSmall && (
               <p className="mt-2 text-[12.5px] text-warning">
-                The source ({image.width}×{image.height}) is smaller than this preset, so it will be upscaled and may look soft.
+                {t('The source ({width}×{height}) is smaller than this preset, so it will be upscaled and may look soft.', { width: image.width, height: image.height })}
               </p>
             )}
           </Panel>
           <div className="flex min-w-0 flex-col gap-4">
             {fit === 'cover' && (
-              <Panel title="Focal point" description="Drag to choose which part stays in frame">
+              <Panel title={t('Focal point')} description={t('Drag to choose which part stays in frame')}>
                 <div
                   className="relative cursor-crosshair touch-none overflow-hidden rounded-lg border border-line"
                   onPointerDown={(e) => {
@@ -274,8 +275,8 @@ export default function SocialImageResizer() {
                   }}
                   tabIndex={0}
                   role="slider"
-                  aria-label="Focal point"
-                  aria-valuetext={`${Math.round(focal.x * 100)}% across, ${Math.round(focal.y * 100)}% down`}
+                  aria-label={t('Focal point')}
+                  aria-valuetext={t('{round}% across, {round2}% down', { round: Math.round(focal.x * 100), round2: Math.round(focal.y * 100) })}
                   aria-valuenow={Math.round(focal.x * 100)}
                 >
                   <img src={image.url} alt="" draggable={false} className="block w-full select-none" />
@@ -286,27 +287,27 @@ export default function SocialImageResizer() {
                 </div>
               </Panel>
             )}
-            <Panel title="Export">
+            <Panel title={t('Export')}>
               <div className="space-y-3">
                 <div className="min-w-0">
-                  <Label>Format</Label>
+                  <Label>{t('Format')}</Label>
                   <Segmented
-                    label="Format"
+                    label={t('Format')}
                     value={format}
                     onChange={setFormat}
                     options={[
                       { value: 'jpeg', label: 'JPEG' },
                       { value: 'png', label: 'PNG' },
-                      { value: 'webp', label: 'WebP' },
+                      { value: 'webp', label: t('WebP') },
                     ]}
                   />
                 </div>
-                {format !== 'png' && <RangeField label="Quality" value={quality} min={40} max={100} onChange={setQuality} format={(v) => `${v}%`} />}
+                {format !== 'png' && <RangeField label={t('Quality')} value={quality} min={40} max={100} onChange={setQuality} format={(v) => `${v}%`} />}
                 <Button variant="primary" icon={Download} className="w-full" loading={busy} onClick={download}>
-                  Download {preset.width}×{preset.height}
+                  {t('Download {width}×{height}', { width: preset.width, height: preset.height })}
                 </Button>
                 <Button icon={FileArchive} className={cn('w-full')} disabled={busy} onClick={downloadAll}>
-                  All {SOCIAL_PRESETS.length} presets (ZIP)
+                  {t('All {count} presets (ZIP)', { count: SOCIAL_PRESETS.length })}
                 </Button>
               </div>
             </Panel>

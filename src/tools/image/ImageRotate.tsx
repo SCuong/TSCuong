@@ -15,6 +15,7 @@ import { useImagePool } from './components/useImagePool';
 import { firstFrameNote, joinNotes, OUTPUT_INFO } from './lib/canvas';
 import { rotateFlipCss } from './lib/geometry';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Format = 'keep' | 'png' | 'jpeg' | 'webp';
 
@@ -72,70 +73,70 @@ export default function ImageRotate() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Rotate</Label>
+          <Label>{t('Rotate')}</Label>
           <div className="flex flex-wrap gap-1.5">
             <Button size="sm" icon={RotateCcw} onClick={() => setAngle(norm(angle - 90))}>
-              Left 90°
+              {t('Left 90°')}
             </Button>
             <Button size="sm" icon={RotateCw} onClick={() => setAngle(norm(angle + 90))}>
-              Right 90°
+              {t('Right 90°')}
             </Button>
             <Button size="sm" onClick={() => setAngle(norm(angle + 180))}>
               180°
             </Button>
           </div>
         </div>
-        <RangeField label="Angle" className="w-full sm:w-64" value={angle} min={-180} max={180} step={0.5} onChange={(v) => setAngle(norm(v))} format={(v) => `${v}°`} />
+        <RangeField label={t('Angle')} className="w-full sm:w-64" value={angle} min={-180} max={180} step={0.5} onChange={(v) => setAngle(norm(v))} format={(v) => `${v}°`} />
         <div className="w-24">
-          <Label htmlFor="rot-angle">Degrees</Label>
+          <Label htmlFor="rot-angle">{t('Degrees')}</Label>
           <NumberInput id="rot-angle" value={angle} onChange={(v) => setAngle(v === '' ? 0 : norm(v))} step={0.5} />
         </div>
         <div>
-          <Label>Flip</Label>
+          <Label>{t('Flip')}</Label>
           <div className="flex gap-1.5">
             <Button size="sm" icon={ArrowLeftRight} aria-pressed={flipH} variant={flipH ? 'primary' : 'secondary'} onClick={() => setFlipH(!flipH)}>
-              Horizontal
+              {t('Horizontal')}
             </Button>
             <Button size="sm" icon={ArrowUpDown} aria-pressed={flipV} variant={flipV ? 'primary' : 'secondary'} onClick={() => setFlipV(!flipV)}>
-              Vertical
+              {t('Vertical')}
             </Button>
           </div>
         </div>
       </ToolBar>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Corner fill (angled rotation)</Label>
+          <Label>{t('Corner fill (angled rotation)')}</Label>
           <Segmented
-            label="Corner fill"
+            label={t('Corner fill')}
             value={fillMode}
             onChange={setFillMode}
             options={[
-              { value: 'transparent', label: 'Transparent' },
-              { value: 'color', label: 'Color' },
+              { value: 'transparent', label: t('Transparent') },
+              { value: 'color', label: t('Color') },
             ]}
           />
         </div>
-        {fillMode === 'color' && <ColorField label="Fill color" value={fill} onChange={setFill} />}
+        {fillMode === 'color' && <ColorField label={t('Fill color')} value={fill} onChange={setFill} />}
         <div className="w-40">
-          <Label htmlFor="rot-fmt">Output format</Label>
+          <Label htmlFor="rot-fmt">{t('Output format')}</Label>
           <Select id="rot-fmt" value={format} onChange={(e) => setFormat(e.target.value as Format)}>
-            <option value="keep">Same as input</option>
+            <option value="keep">{t('Same as input')}</option>
             <option value="png">PNG</option>
             <option value="jpeg">JPEG</option>
-            <option value="webp">WebP</option>
+            <option value="webp">{t('WebP')}</option>
           </Select>
         </div>
         <Button size="sm" variant="ghost" className="mb-0.5" onClick={() => { setAngle(0); setFlipH(false); setFlipV(false); }}>
-          Reset
+          {t('Reset')}
         </Button>
       </ToolBar>
-      <FileDrop multiple accept={IMAGE_ACCEPT} onFiles={batch.addFiles} icon={RotateCw} compact={batch.items.length > 0} title="Drop images to rotate or flip" />
+      <FileDrop multiple accept={IMAGE_ACCEPT} onFiles={batch.addFiles} icon={RotateCw} compact={batch.items.length > 0} title={t('Drop images to rotate or flip')} />
       {preview && (
-        <Panel title="Preview" description={`${preview.file.name} · the same transform is applied to every file`}>
+        <Panel title={t('Preview')} description={t('{name} · the same transform is applied to every file', { name: preview.file.name })}>
           <div className="lk-checker flex h-72 items-center justify-center overflow-hidden rounded-lg border border-line sm:h-80">
             <img
               src={preview.thumbUrl}
-              alt="Preview of the rotation"
+              alt={t('Preview of the rotation')}
               className="max-h-[60%] max-w-[60%] transition-transform duration-200"
               style={{ transform: rotateFlipCss(angle, flipH, flipV) }}
             />

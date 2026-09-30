@@ -13,6 +13,7 @@ import { copyText } from '@/lib/utils';
 import { createCanvas, getContext, type AnyCanvas, type Ctx2D } from './lib/canvas';
 import { formatColor, readableTextOn } from './lib/color';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 interface Pick {
   id: number;
@@ -132,17 +133,17 @@ export default function ImageColorPicker() {
 
   return (
     <ToolStack>
-      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Pipette} title="Drop an image to pick colors from" />}
-      {loading && <Spinner label="Opening image…" />}
+      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Pipette} title={t('Drop an image to pick colors from')} />}
+      {loading && <Spinner label={t('Opening image…')} />}
       <ErrorMessage error={error} />
       {image && (
         <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_300px]">
           <Panel
             title={image.file.name}
-            description={`${image.width} × ${image.height} px`}
+            description={t('{width} × {height} px', { width: image.width, height: image.height })}
             actions={
               <Button size="sm" variant="ghost" onClick={() => { clear(); setPicks([]); }}>
-                Choose another
+                {t('Choose another')}
               </Button>
             }
           >
@@ -151,7 +152,7 @@ export default function ImageColorPicker() {
                 className="lk-checker relative inline-block max-w-full cursor-crosshair touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 tabIndex={0}
                 role="application"
-                aria-label="Image color picker. Arrow keys move the cursor, Enter picks the color."
+                aria-label={t('Image color picker. Arrow keys move the cursor, Enter picks the color.')}
                 onPointerMove={onMove}
                 onPointerDown={(e) => {
                   const p = toImageCoords(e);
@@ -170,7 +171,7 @@ export default function ImageColorPicker() {
                 }}
                 onKeyDown={onKeyDown}
               >
-                <img ref={imgRef} src={image.url} alt="Image to pick colors from" draggable={false} className="block max-h-[65vh] max-w-full select-none" />
+                <img ref={imgRef} src={image.url} alt={t('Image to pick colors from')} draggable={false} className="block max-h-[65vh] max-w-full select-none" />
                 <canvas
                   ref={loupe}
                   width={LOUPE_SIZE}
@@ -189,14 +190,14 @@ export default function ImageColorPicker() {
               </div>
             </div>
             <p className="mt-3 text-center text-[12.5px] text-fg-muted">
-              Hover to preview, click to pick. Keyboard: focus the image, <Kbd>←</Kbd>
+              {t('Hover to preview, click to pick. Keyboard: focus the image,')}{' '}<Kbd>←</Kbd>
               <Kbd>→</Kbd>
               <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd> to move, <Kbd>Enter</Kbd> to pick.
+              <Kbd>↓</Kbd>{' '}{t('to move,')}{' '}<Kbd>Enter</Kbd>{' '}{t('to pick.')}
             </p>
           </Panel>
           <div className="flex min-w-0 flex-col gap-4">
-            <Panel title="Under cursor">
+            <Panel title={t('Under cursor')}>
               {hover && current ? (
                 <div>
                   <div
@@ -211,24 +212,24 @@ export default function ImageColorPicker() {
                         <dt className="w-10 shrink-0 text-fg-muted uppercase">{k}</dt>
                         <dd className="flex min-w-0 flex-1 items-center justify-between gap-2 text-fg">
                           <span className="min-w-0 truncate">{current[k]}</span>
-                          <CopyButton value={current[k]} iconOnly label={`Copy ${k.toUpperCase()}`} />
+                          <CopyButton value={current[k]} iconOnly label={t('Copy {k}', { k: k.toUpperCase() })} />
                         </dd>
                       </div>
                     ))}
                   </dl>
-                  {hover.a < 255 && <p className="mt-2 text-[12px] text-fg-muted">Alpha {hover.a} / 255</p>}
+                  {hover.a < 255 && <p className="mt-2 text-[12px] text-fg-muted">{t('Alpha {a} / 255', { a: hover.a })}</p>}
                 </div>
               ) : (
-                <p className="text-[13px] text-fg-muted">Move over the image to see the color.</p>
+                <p className="text-[13px] text-fg-muted">{t('Move over the image to see the color.')}</p>
               )}
             </Panel>
             <Panel
-              title={`Picked colors${picks.length ? ` (${picks.length})` : ''}`}
-              actions={picks.length > 0 && <Button size="sm" variant="ghost" onClick={() => setPicks([])}>Clear</Button>}
+              title={t('Picked colors{value}', { value: picks.length ? ` (${picks.length})` : '' })}
+              actions={picks.length > 0 && <Button size="sm" variant="ghost" onClick={() => setPicks([])}>{t('Clear')}</Button>}
               bodyClassName="p-0"
             >
               {picks.length === 0 ? (
-                <EmptyState title="No colors yet">Click the image to add colors here.</EmptyState>
+                <EmptyState title={t('No colors yet')}>{t('Click the image to add colors here.')}</EmptyState>
               ) : (
                 <ul className="max-h-96 divide-y divide-line overflow-y-auto">
                   {picks.map((p) => {
@@ -246,7 +247,7 @@ export default function ImageColorPicker() {
                                 key={k}
                                 type="button"
                                 title={f[k]}
-                                onClick={() => void copyText(f[k]).then((ok) => toast(ok ? `Copied ${f[k]}` : 'Copy failed.', ok ? 'success' : 'error'))}
+                                onClick={() => void copyText(f[k]).then((ok) => toast(ok ? t('Copied {f}', { f: f[k] }) : t('Copy failed.'), ok ? 'success' : 'error'))}
                                 className="rounded border border-line bg-surface-sunken px-1.5 py-px text-[11px] font-medium text-fg-secondary uppercase hover:bg-surface-hover hover:text-fg"
                               >
                                 {k}
@@ -254,7 +255,7 @@ export default function ImageColorPicker() {
                             ))}
                           </div>
                         </div>
-                        <IconButton icon={X} size="sm" label="Remove color" onClick={() => setPicks((l) => l.filter((x) => x.id !== p.id))} />
+                        <IconButton icon={X} size="sm" label={t('Remove color')} onClick={() => setPicks((l) => l.filter((x) => x.id !== p.id))} />
                       </li>
                     );
                   })}
@@ -262,7 +263,7 @@ export default function ImageColorPicker() {
               )}
               {picks.length > 1 && (
                 <div className="border-t border-line p-3">
-                  <CopyButton value={picks.map((p) => formatColor(p.r, p.g, p.b, p.a).hex).join('\n')} label="Copy all HEX" />
+                  <CopyButton value={picks.map((p) => formatColor(p.r, p.g, p.b, p.a).hex).join('\n')} label={t('Copy all HEX')} />
                 </div>
               )}
             </Panel>

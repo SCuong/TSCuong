@@ -13,6 +13,7 @@ import { firstFrameNote, readHeader, UNSUPPORTED_MESSAGE } from './lib/canvas';
 import { readMetadata, summarizeMetadata, formatCoord, type MetaSummary } from './lib/exif';
 import { stripGif, stripJpeg, stripPng, stripWebp, type StripResult } from './lib/metadata';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 interface Report {
   before: MetaSummary;
@@ -44,33 +45,33 @@ function ReportView({ item }: { item: BatchItem }) {
   return (
     <div className="mt-1.5 space-y-1 text-[12px]">
       <div className="flex flex-wrap items-center gap-1">
-        <span className="text-fg-muted">Found:</span>
-        {found.length ? found.map((f) => <Badge key={f}>{f}</Badge>) : <span className="text-fg-secondary">no EXIF, GPS, XMP, IPTC or text comments</span>}
+        <span className="text-fg-muted">{t('Found:')}</span>
+        {found.length ? found.map((f) => <Badge key={f}>{f}</Badge>) : <span className="text-fg-secondary">{t('no EXIF, GPS, XMP, IPTC or text comments')}</span>}
       </div>
       {r.before.gps && (
         <p className="flex items-center gap-1 text-warning">
-          <MapPin size={12} aria-hidden /> Location was {formatCoord(r.before.gps.latitude, r.before.gps.longitude)}
+          <MapPin size={12} aria-hidden />{' '}{t('Location was {formatCoord}', { formatCoord: formatCoord(r.before.gps.latitude, r.before.gps.longitude) })}
           {r.before.camera ? ` · ${r.before.camera}` : ''}
         </p>
       )}
       {r.removed.length > 0 && (
         <p className="text-fg-secondary">
-          <span className="text-fg-muted">Removed:</span> {r.removed.join(', ')}
+          <span className="text-fg-muted">{t('Removed:')}</span> {r.removed.join(', ')}
         </p>
       )}
       {r.kept.length > 0 && (
         <p className="text-fg-secondary">
-          <span className="text-fg-muted">Kept:</span> {r.kept.join(', ')}
+          <span className="text-fg-muted">{t('Kept:')}</span> {r.kept.join(', ')}
         </p>
       )}
       {remaining.length === 0 && !r.after.gps ? (
         <p className="flex items-center gap-1 text-success">
-          <CircleCheck size={12} aria-hidden /> Verified: no EXIF, GPS, XMP, IPTC or text comments left
-          {r.method === 'lossless' ? ' · pixels untouched (lossless)' : ' · re-encoded as PNG'}
+          <CircleCheck size={12} aria-hidden />{' '}{t('Verified: no EXIF, GPS, XMP, IPTC or text comments left')}
+          {r.method === 'lossless' ? ' ' + t('· pixels untouched (lossless)') : ' ' + t('· re-encoded as PNG')}
         </p>
       ) : (
         <p className="flex items-center gap-1 text-warning">
-          <TriangleAlert size={12} aria-hidden /> Still present: {remaining.join(', ')}
+          <TriangleAlert size={12} aria-hidden />{' '}{t('Still present: {join}', { join: remaining.join(', ') })}
         </p>
       )}
     </div>
@@ -84,11 +85,11 @@ export default function RemoveMetadata() {
 
   const processor = useCallback(
     async (file: File, signal: AbortSignal) => {
-      if (file.size === 0) throw new Error('The file is empty.');
+      if (file.size === 0) throw new Error(t('The file is empty.'));
       const header = await readHeader(file);
       if (!header) throw new Error(UNSUPPORTED_MESSAGE);
       if (header.format === 'svg') {
-        throw new Error('SVG files are text, not photos: use the SVG Optimizer (it removes metadata, comments and editor data) to keep them as vectors.');
+        throw new Error(t('SVG files are text, not photos: use the SVG Optimizer (it removes metadata, comments and editor data) to keep them as vectors.'));
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
       const before = summarizeMetadata(await readMetadata(bytes));
@@ -125,7 +126,7 @@ export default function RemoveMetadata() {
         width: header.width,
         height: header.height,
         data: report,
-        note: firstFrame ?? (removed.length === 0 && method === 'lossless' ? 'No metadata to remove: the file is already clean.' : undefined),
+        note: firstFrame ?? (removed.length === 0 && method === 'lossless' ? t('No metadata to remove: the file is already clean.') : undefined),
         warning: Boolean(firstFrame),
       };
     },
@@ -138,14 +139,14 @@ export default function RemoveMetadata() {
     <ToolStack>
       <ToolBar>
         <Checkbox
-          label="Keep color profile (ICC)"
-          description="Recommended: removing it can shift colors. It contains no personal data."
+          label={t('Keep color profile (ICC)')}
+          description={t('Recommended: removing it can shift colors. It contains no personal data.')}
           checked={keepIcc}
           onChange={setKeepIcc}
         />
         <Checkbox
-          label="Keep orientation"
-          description="Keeps only the rotation flag so photos don't appear sideways."
+          label={t('Keep orientation')}
+          description={t('Keeps only the rotation flag so photos don\'t appear sideways.')}
           checked={keepOrientation}
           onChange={setKeepOrientation}
         />
@@ -156,8 +157,8 @@ export default function RemoveMetadata() {
         onFiles={batch.addFiles}
         icon={ShieldCheck}
         compact={batch.items.length > 0}
-        title="Drop photos to remove EXIF, GPS and other metadata"
-        hint="JPEG, PNG, WebP and GIF are cleaned losslessly (pixels and animation untouched). BMP, ICO and AVIF are re-encoded as PNG. Nothing is uploaded."
+        title={t('Drop photos to remove EXIF, GPS and other metadata')}
+        hint={t('JPEG, PNG, WebP and GIF are cleaned losslessly (pixels and animation untouched). BMP, ICO and AVIF are re-encoded as PNG. Nothing is uploaded.')}
       />
       <BatchFileList
         items={batch.items}

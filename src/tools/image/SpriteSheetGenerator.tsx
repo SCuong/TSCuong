@@ -15,6 +15,7 @@ import { canvasToBlob, checkDimensions, createCanvas, decodeImage, getContext } 
 import { gridLayout, packLayout, sheetFileName, spriteCss, spriteJson } from './lib/sprite';
 import { zipBlobs } from './lib/zip';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 interface Sprite {
   id: number;
@@ -117,7 +118,7 @@ export default function SpriteSheetGenerator() {
     getContext(copy).drawImage(c, 0, 0);
     canvasToBlob(copy, 'image/png').then(
       (b) => !cancelled && setPng(b),
-      () => !cancelled && setRenderError('Could not encode the sprite sheet.'),
+      () => !cancelled && setRenderError(t('Could not encode the sprite sheet.')),
     );
     return () => {
       cancelled = true;
@@ -142,7 +143,7 @@ export default function SpriteSheetGenerator() {
       );
       downloadBlob(blob, `${sheetBase}.zip`);
     } catch (e) {
-      toast(errorMessage(e, 'Could not create the ZIP.'), 'error');
+      toast(errorMessage(e, t('Could not create the ZIP.')), 'error');
     }
   }
 
@@ -150,40 +151,40 @@ export default function SpriteSheetGenerator() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Layout</Label>
+          <Label>{t('Layout')}</Label>
           <Segmented
-            label="Layout"
+            label={t('Layout')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'packed', label: 'Packed' },
-              { value: 'grid', label: 'Grid' },
+              { value: 'packed', label: t('Packed') },
+              { value: 'grid', label: t('Grid') },
             ]}
           />
         </div>
         {mode === 'grid' && (
           <div className="w-24">
-            <Label htmlFor="sp-cols">Columns</Label>
+            <Label htmlFor="sp-cols">{t('Columns')}</Label>
             <NumberInput id="sp-cols" value={columns} onChange={setColumns} min={1} max={100} />
           </div>
         )}
         <div className="w-24">
-          <Label htmlFor="sp-pad">Padding (px)</Label>
+          <Label htmlFor="sp-pad">{t('Padding (px)')}</Label>
           <NumberInput id="sp-pad" value={padding} onChange={setPadding} min={0} max={256} />
         </div>
         <div className="w-36">
-          <Label htmlFor="sp-prefix">CSS class prefix</Label>
+          <Label htmlFor="sp-prefix">{t('CSS class prefix')}</Label>
           <Input id="sp-prefix" value={prefix} onChange={(e) => setPrefix(e.target.value)} mono />
         </div>
         <div className="w-44">
-          <Label htmlFor="sp-name">Sheet file name</Label>
+          <Label htmlFor="sp-name">{t('Sheet file name')}</Label>
           <Input id="sp-name" value={sheetName} onChange={(e) => setSheetName(e.target.value)} mono />
         </div>
       </ToolBar>
-      <FileDrop multiple accept={IMAGE_ACCEPT} onFiles={(f) => void add(f)} icon={LayoutGrid} compact={sprites.length > 0} title="Drop images (icons, frames) to combine" />
-      {loading && <Spinner label="Reading images…" />}
+      <FileDrop multiple accept={IMAGE_ACCEPT} onFiles={(f) => void add(f)} icon={LayoutGrid} compact={sprites.length > 0} title={t('Drop images (icons, frames) to combine')} />
+      {loading && <Spinner label={t('Reading images…')} />}
       {errors.length > 0 && (
-        <Alert tone="danger" title="Some files were skipped">
+        <Alert tone="danger" title={t('Some files were skipped')}>
           {errors.map((e) => (
             <div key={e}>{e}</div>
           ))}
@@ -192,7 +193,7 @@ export default function SpriteSheetGenerator() {
       <ErrorMessage error={renderError} />
       {sprites.length > 0 && (
         <div className="grid min-w-0 gap-4 lg:grid-cols-[280px_1fr]">
-          <Panel title={pluralize(sprites.length, 'image')} bodyClassName="p-0" actions={<Button size="sm" variant="ghost" onClick={() => sprites.forEach((s) => remove(s.id))}>Clear</Button>}>
+          <Panel title={pluralize(sprites.length, t('image'), t('images'))} bodyClassName="p-0" actions={<Button size="sm" variant="ghost" onClick={() => sprites.forEach((s) => remove(s.id))}>{t('Clear')}</Button>}>
             <ul className="max-h-[480px] divide-y divide-line overflow-y-auto">
               {sprites.map((s, i) => (
                 <li key={s.id} className="flex items-center gap-2 px-3 py-1.5">
@@ -205,17 +206,17 @@ export default function SpriteSheetGenerator() {
                       {s.bitmap.width}×{s.bitmap.height}
                     </p>
                   </div>
-                  <IconButton icon={ArrowUp} size="sm" label={`Move ${s.name} up`} disabled={i === 0} onClick={() => move(i, -1)} />
-                  <IconButton icon={ArrowDown} size="sm" label={`Move ${s.name} down`} disabled={i === sprites.length - 1} onClick={() => move(i, 1)} />
-                  <IconButton icon={X} size="sm" label={`Remove ${s.name}`} onClick={() => remove(s.id)} />
+                  <IconButton icon={ArrowUp} size="sm" label={t('Move {name} up', { name: s.name })} disabled={i === 0} onClick={() => move(i, -1)} />
+                  <IconButton icon={ArrowDown} size="sm" label={t('Move {name} down', { name: s.name })} disabled={i === sprites.length - 1} onClick={() => move(i, 1)} />
+                  <IconButton icon={X} size="sm" label={t('Remove {name}', { name: s.name })} onClick={() => remove(s.id)} />
                 </li>
               ))}
             </ul>
           </Panel>
           <div className="flex min-w-0 flex-col gap-4">
             <Panel
-              title="Sprite sheet"
-              description={`${layout.width} × ${layout.height} px${png ? ` · ${formatBytes(png.size)}` : ''}`}
+              title={t('Sprite sheet')}
+              description={t('{width} × {height} px{value}', { width: layout.width, height: layout.height, value: png ? ` · ${formatBytes(png.size)}` : '' })}
               actions={
                 <>
                   <Button size="sm" icon={Download} disabled={!png} onClick={() => png && downloadBlob(png, sheetFile)}>
@@ -228,12 +229,12 @@ export default function SpriteSheetGenerator() {
               }
             >
               <div className="lk-checker flex max-h-[420px] items-start justify-center overflow-auto rounded-lg border border-line p-2">
-                <canvas ref={canvasRef} className="block h-auto max-w-full" style={{ imageRendering: layout.width < 400 ? 'pixelated' : 'auto', width: layout.width < 160 ? layout.width * 2 : undefined }} role="img" aria-label="Sprite sheet preview" />
+                <canvas ref={canvasRef} className="block h-auto max-w-full" style={{ imageRendering: layout.width < 400 ? 'pixelated' : 'auto', width: layout.width < 160 ? layout.width * 2 : undefined }} role="img" aria-label={t('Sprite sheet preview')} />
               </div>
             </Panel>
             <div className="grid min-w-0 gap-4 xl:grid-cols-2">
               <EditorPanel title="CSS" value={css} language="css" height="260px" downloadName={`${sheetBase}.css`} downloadType="text/css" />
-              <EditorPanel title="JSON map" value={json} language="json" height="260px" downloadName={`${sheetBase}.json`} downloadType="application/json" />
+              <EditorPanel title={t('JSON map')} value={json} language="json" height="260px" downloadName={`${sheetBase}.json`} downloadType="application/json" />
             </div>
           </div>
         </div>

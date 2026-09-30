@@ -14,30 +14,31 @@ import { useImagePool } from './components/useImagePool';
 import { firstFrameNote, OUTPUT_INFO } from './lib/canvas';
 import { DEFAULT_FILTERS, filterString, isIdentity, type FilterSettings } from './lib/filters';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Format = 'keep' | 'png' | 'jpeg' | 'webp';
 
 const PRESETS: Array<{ label: string; value: Partial<FilterSettings> }> = [
-  { label: 'Original', value: {} },
-  { label: 'Grayscale', value: { grayscale: 100 } },
-  { label: 'Sepia', value: { sepia: 100 } },
-  { label: 'Vintage', value: { sepia: 45, contrast: 90, saturate: 80, brightness: 105 } },
-  { label: 'High contrast', value: { contrast: 150, saturate: 110 } },
-  { label: 'Noir', value: { grayscale: 100, contrast: 140, brightness: 95 } },
-  { label: 'Vivid', value: { saturate: 160, contrast: 110 } },
-  { label: 'Invert', value: { invert: 100 } },
-  { label: 'Soft blur', value: { blur: 3 } },
+  { label: t('Original'), value: {} },
+  { label: t('Grayscale'), value: { grayscale: 100 } },
+  { label: t('Sepia'), value: { sepia: 100 } },
+  { label: t('Vintage'), value: { sepia: 45, contrast: 90, saturate: 80, brightness: 105 } },
+  { label: t('High contrast'), value: { contrast: 150, saturate: 110 } },
+  { label: t('Noir'), value: { grayscale: 100, contrast: 140, brightness: 95 } },
+  { label: t('Vivid'), value: { saturate: 160, contrast: 110 } },
+  { label: t('Invert'), value: { invert: 100 } },
+  { label: t('Soft blur'), value: { blur: 3 } },
 ];
 
 const SLIDERS: Array<{ key: keyof FilterSettings; label: string; min: number; max: number; unit: string; step?: number }> = [
-  { key: 'brightness', label: 'Brightness', min: 0, max: 200, unit: '%' },
-  { key: 'contrast', label: 'Contrast', min: 0, max: 200, unit: '%' },
-  { key: 'saturate', label: 'Saturation', min: 0, max: 300, unit: '%' },
-  { key: 'grayscale', label: 'Grayscale', min: 0, max: 100, unit: '%' },
-  { key: 'sepia', label: 'Sepia', min: 0, max: 100, unit: '%' },
-  { key: 'hueRotate', label: 'Hue rotate', min: -180, max: 180, unit: '°' },
-  { key: 'invert', label: 'Invert', min: 0, max: 100, unit: '%' },
-  { key: 'blur', label: 'Blur', min: 0, max: 20, unit: ' px', step: 0.5 },
+  { key: 'brightness', label: t('Brightness'), min: 0, max: 200, unit: '%' },
+  { key: 'contrast', label: t('Contrast'), min: 0, max: 200, unit: '%' },
+  { key: 'saturate', label: t('Saturation'), min: 0, max: 300, unit: '%' },
+  { key: 'grayscale', label: t('Grayscale'), min: 0, max: 100, unit: '%' },
+  { key: 'sepia', label: t('Sepia'), min: 0, max: 100, unit: '%' },
+  { key: 'hueRotate', label: t('Hue rotate'), min: -180, max: 180, unit: '°' },
+  { key: 'invert', label: t('Invert'), min: 0, max: 100, unit: '%' },
+  { key: 'blur', label: t('Blur'), min: 0, max: 20, unit: ' px', step: 0.5 },
 ];
 
 export default function ImageFilters() {
@@ -71,7 +72,7 @@ export default function ImageFilters() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Presets</Label>
+          <Label>{t('Presets')}</Label>
           <div className="flex flex-wrap gap-1">
             {PRESETS.map((p) => (
               <button
@@ -86,17 +87,17 @@ export default function ImageFilters() {
           </div>
         </div>
         <div className="w-40">
-          <Label htmlFor="flt-fmt">Output format</Label>
+          <Label htmlFor="flt-fmt">{t('Output format')}</Label>
           <Select id="flt-fmt" value={format} onChange={(e) => setFormat(e.target.value as Format)}>
-            <option value="keep">Same as input</option>
+            <option value="keep">{t('Same as input')}</option>
             <option value="png">PNG</option>
             <option value="jpeg">JPEG</option>
-            <option value="webp">WebP</option>
+            <option value="webp">{t('WebP')}</option>
           </Select>
         </div>
       </ToolBar>
       <div className="grid min-w-0 gap-4 lg:grid-cols-[300px_1fr]">
-        <Panel title="Adjustments" actions={<Button size="sm" variant="ghost" disabled={isIdentity(filters)} onClick={() => setFilters(DEFAULT_FILTERS)}>Reset</Button>}>
+        <Panel title={t('Adjustments')} actions={<Button size="sm" variant="ghost" disabled={isIdentity(filters)} onClick={() => setFilters(DEFAULT_FILTERS)}>{t('Reset')}</Button>}>
           <div className="space-y-3.5">
             {SLIDERS.map((s) => (
               <RangeField
@@ -115,7 +116,7 @@ export default function ImageFilters() {
         <div className="flex min-w-0 flex-col gap-4">
           {preview ? (
             <Panel
-              title="Preview"
+              title={t('Preview')}
               description={preview.file.name}
               actions={
                 <Button
@@ -127,20 +128,20 @@ export default function ImageFilters() {
                   onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && setShowOriginal(true)}
                   onKeyUp={() => setShowOriginal(false)}
                 >
-                  Hold to compare
+                  {t('Hold to compare')}
                 </Button>
               }
             >
               <div className="lk-checker flex justify-center overflow-hidden rounded-lg border border-line">
                 <img
                   src={preview.thumbUrl}
-                  alt="Filtered preview"
+                  alt={t('Filtered preview')}
                   className={cn('max-h-[55vh] max-w-full object-contain')}
                   style={{ filter: showOriginal ? 'none' : previewFilter }}
                   onLoad={(e) => setPreviewScale(e.currentTarget.clientWidth / (e.currentTarget.naturalWidth || 1))}
                 />
               </div>
-              <p className="mt-2 font-mono text-[12px] break-all text-fg-muted">filter: {filterString(filters)};</p>
+              <p className="mt-2 font-mono text-[12px] break-all text-fg-muted">{t('filter: {filterString};', { filterString: filterString(filters) })}</p>
             </Panel>
           ) : null}
           <FileDrop
@@ -149,8 +150,8 @@ export default function ImageFilters() {
             onFiles={batch.addFiles}
             icon={SlidersHorizontal}
             compact={batch.items.length > 0}
-            title="Drop images to apply filters"
-            hint="The same adjustments are applied to every image. Nothing is uploaded."
+            title={t('Drop images to apply filters')}
+            hint={t('The same adjustments are applied to every image. Nothing is uploaded.')}
           />
           <BatchFileList
             items={batch.items}

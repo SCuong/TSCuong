@@ -1,5 +1,6 @@
 /** SVG analysis and SVGO configuration helpers. */
 import type { Config as SvgoConfig } from 'svgo/browser';
+import { t } from '@/lib/i18n';
 
 export interface SvgInfo {
   ok: boolean;
@@ -118,25 +119,25 @@ export interface SvgoOptions {
 
 /** Plugins exposed as toggles, with whether they are part of preset-default. */
 export const SVGO_TOGGLES: Array<{ name: string; label: string; inPreset: boolean; hint?: string }> = [
-  { name: 'removeComments', label: 'Remove comments', inPreset: true },
-  { name: 'removeMetadata', label: 'Remove <metadata>', inPreset: true },
-  { name: 'removeEditorsNSData', label: 'Remove editor data (Inkscape, Illustrator…)', inPreset: true },
-  { name: 'removeDesc', label: 'Remove <desc>', inPreset: true },
-  { name: 'removeTitle', label: 'Remove <title>', inPreset: false, hint: 'Titles are used by screen readers.' },
-  { name: 'cleanupIds', label: 'Minify / remove unused IDs', inPreset: true, hint: 'Breaks CSS or JS that targets IDs.' },
-  { name: 'convertColors', label: 'Shorten colors', inPreset: true },
-  { name: 'convertPathData', label: 'Optimize path data', inPreset: true },
-  { name: 'convertShapeToPath', label: 'Convert shapes to paths', inPreset: true },
-  { name: 'mergePaths', label: 'Merge paths', inPreset: true },
-  { name: 'collapseGroups', label: 'Collapse useless groups', inPreset: true },
-  { name: 'inlineStyles', label: 'Inline <style> rules', inPreset: true },
-  { name: 'minifyStyles', label: 'Minify styles', inPreset: true },
-  { name: 'removeUnknownsAndDefaults', label: 'Remove default attributes', inPreset: true },
-  { name: 'removeHiddenElems', label: 'Remove hidden elements', inPreset: true },
-  { name: 'sortAttrs', label: 'Sort attributes', inPreset: true },
-  { name: 'removeDimensions', label: 'Remove width/height (keep viewBox)', inPreset: false, hint: 'Makes the SVG responsive.' },
-  { name: 'removeScripts', label: 'Remove scripts and event handlers', inPreset: false },
-  { name: 'removeViewBox', label: 'Remove viewBox', inPreset: false, hint: 'Usually a bad idea: stops the SVG from scaling.' },
+  { name: 'removeComments', label: t('Remove comments'), inPreset: true },
+  { name: 'removeMetadata', label: t('Remove <metadata>'), inPreset: true },
+  { name: 'removeEditorsNSData', label: t('Remove editor data (Inkscape, Illustrator…)'), inPreset: true },
+  { name: 'removeDesc', label: t('Remove <desc>'), inPreset: true },
+  { name: 'removeTitle', label: t('Remove <title>'), inPreset: false, hint: t('Titles are used by screen readers.') },
+  { name: 'cleanupIds', label: t('Minify / remove unused IDs'), inPreset: true, hint: t('Breaks CSS or JS that targets IDs.') },
+  { name: 'convertColors', label: t('Shorten colors'), inPreset: true },
+  { name: 'convertPathData', label: t('Optimize path data'), inPreset: true },
+  { name: 'convertShapeToPath', label: t('Convert shapes to paths'), inPreset: true },
+  { name: 'mergePaths', label: t('Merge paths'), inPreset: true },
+  { name: 'collapseGroups', label: t('Collapse useless groups'), inPreset: true },
+  { name: 'inlineStyles', label: t('Inline <style> rules'), inPreset: true },
+  { name: 'minifyStyles', label: t('Minify styles'), inPreset: true },
+  { name: 'removeUnknownsAndDefaults', label: t('Remove default attributes'), inPreset: true },
+  { name: 'removeHiddenElems', label: t('Remove hidden elements'), inPreset: true },
+  { name: 'sortAttrs', label: t('Sort attributes'), inPreset: true },
+  { name: 'removeDimensions', label: t('Remove width/height (keep viewBox)'), inPreset: false, hint: t('Makes the SVG responsive.') },
+  { name: 'removeScripts', label: t('Remove scripts and event handlers'), inPreset: false },
+  { name: 'removeViewBox', label: t('Remove viewBox'), inPreset: false, hint: t('Usually a bad idea: stops the SVG from scaling.') },
 ];
 
 export function presetToggles(preset: SvgoPreset): Record<string, boolean> {

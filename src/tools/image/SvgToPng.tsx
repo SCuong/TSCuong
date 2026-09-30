@@ -13,6 +13,7 @@ import { useImageBatch } from './components/useImageBatch';
 import { createCanvas, encodeCanvas, getContext, OUTPUT_INFO, rasterizeSvg, svgIntrinsicSize } from './lib/canvas';
 import { analyzeSvg } from './lib/svg';
 import { SVG_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type SizeMode = 'scale' | 'width' | 'height';
 type Format = 'png' | 'jpeg' | 'webp';
@@ -32,7 +33,7 @@ export default function SvgToPng() {
     async (file: File) => {
       const text = await file.text();
       const info = analyzeSvg(text);
-      if (!info.ok) throw new Error(info.error ?? 'This is not a valid SVG.');
+      if (!info.ok) throw new Error(info.error ?? t('This is not a valid SVG.'));
       const intrinsic = svgIntrinsicSize(text);
       const base = info.size ?? { width: intrinsic.width, height: intrinsic.height };
       let w: number;
@@ -65,7 +66,7 @@ export default function SvgToPng() {
           name: withExtension(file.name, OUTPUT_INFO[format].ext),
           width: w,
           height: h,
-          note: info.size ? undefined : 'No width, height or viewBox: the SVG was assumed to be 512 × 512 px before scaling.',
+          note: info.size ? undefined : t('No width, height or viewBox: the SVG was assumed to be 512 × 512 px before scaling.'),
           warning: !info.size,
         };
       } finally {
@@ -81,23 +82,23 @@ export default function SvgToPng() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Size</Label>
+          <Label>{t('Size')}</Label>
           <Segmented
-            label="Size"
+            label={t('Size')}
             value={sizeMode}
             onChange={setSizeMode}
             options={[
-              { value: 'scale', label: 'Scale' },
-              { value: 'width', label: 'Width' },
-              { value: 'height', label: 'Height' },
+              { value: 'scale', label: t('Scale') },
+              { value: 'width', label: t('Width') },
+              { value: 'height', label: t('Height') },
             ]}
           />
         </div>
         {sizeMode === 'scale' ? (
           <div className="min-w-0">
-            <Label>Scale factor</Label>
+            <Label>{t('Scale factor')}</Label>
             <Segmented
-              label="Scale factor"
+              label={t('Scale factor')}
               value={String(scale)}
               onChange={(v) => setScale(Number(v))}
               options={['0.5', '1', '2', '3', '4', '8'].map((v) => ({ value: v, label: `${v}×` }))}
@@ -105,39 +106,39 @@ export default function SvgToPng() {
           </div>
         ) : (
           <div className="w-32">
-            <Label htmlFor="svg-target">{sizeMode === 'width' ? 'Width' : 'Height'} (px)</Label>
+            <Label htmlFor="svg-target">{(sizeMode === 'width') ? t('Width (px)') : t('Height (px)')}</Label>
             <NumberInput id="svg-target" value={target} onChange={setTarget} min={1} max={16384} />
           </div>
         )}
         <div className="min-w-0">
-          <Label>Format</Label>
+          <Label>{t('Format')}</Label>
           <Segmented
-            label="Format"
+            label={t('Format')}
             value={format}
             onChange={setFormat}
             options={[
               { value: 'png', label: 'PNG' },
               { value: 'jpeg', label: 'JPEG' },
-              { value: 'webp', label: 'WebP' },
+              { value: 'webp', label: t('WebP') },
             ]}
           />
         </div>
-        {format !== 'png' && <RangeField label="Quality" className="w-full sm:w-44" value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />}
+        {format !== 'png' && <RangeField label={t('Quality')} className="w-full sm:w-44" value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />}
         {format !== 'jpeg' && (
           <div className="min-w-0">
-            <Label>Background</Label>
+            <Label>{t('Background')}</Label>
             <Segmented
-              label="Background"
+              label={t('Background')}
               value={bgMode}
               onChange={setBgMode}
               options={[
-                { value: 'transparent', label: 'Transparent' },
-                { value: 'color', label: 'Color' },
+                { value: 'transparent', label: t('Transparent') },
+                { value: 'color', label: t('Color') },
               ]}
             />
           </div>
         )}
-        {(bgMode === 'color' || format === 'jpeg') && <ColorField label="Background color" value={bg} onChange={setBg} />}
+        {(bgMode === 'color' || format === 'jpeg') && <ColorField label={t('Background color')} value={bg} onChange={setBg} />}
       </ToolBar>
       <ErrorMessage error={targetError} />
       <FileDrop
@@ -146,8 +147,8 @@ export default function SvgToPng() {
         onFiles={batch.addFiles}
         icon={ImageUp}
         compact={batch.items.length > 0}
-        title="Drop SVG files to convert"
-        hint="Rendered by your browser, never uploaded. External images and fonts referenced by URL are not loaded."
+        title={t('Drop SVG files to convert')}
+        hint={t('Rendered by your browser, never uploaded. External images and fonts referenced by URL are not loaded.')}
       />
       <BatchFileList
         items={batch.items}

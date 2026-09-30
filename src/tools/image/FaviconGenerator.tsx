@@ -18,6 +18,7 @@ import { buildIco, renderSquare } from './lib/favicon';
 import { buildHtml, buildManifest, FAVICON_FILES, letterMarkText, shortNameFor } from './lib/faviconSet';
 import { zipBlobs } from './lib/zip';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Source = 'image' | 'text';
 type Shape = 'square' | 'rounded' | 'circle';
@@ -110,7 +111,7 @@ export default function FaviconGenerator() {
       } catch (e) {
         if (!cancelled) {
           setSrc(null);
-          setError(errorMessage(e, 'This image could not be opened.'));
+          setError(errorMessage(e, t('This image could not be opened.')));
         }
       }
     })();
@@ -142,12 +143,12 @@ export default function FaviconGenerator() {
     (async () => {
       const pad = padding / 100;
       const specs: Array<{ name: string; size: number; label: string; opts: Parameters<typeof renderSquare>[2] }> = [
-        { name: FAVICON_FILES.png16, size: 16, label: 'Browser tab 16', opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
-        { name: FAVICON_FILES.png32, size: 32, label: 'Browser tab 32', opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
-        { name: FAVICON_FILES.apple, size: 180, label: 'Apple touch 180', opts: { padding: source === 'text' ? 0 : Math.max(pad, 0.06), background: touchBg } },
-        { name: FAVICON_FILES.android192, size: 192, label: 'Android 192', opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
-        { name: FAVICON_FILES.android512, size: 512, label: 'Android 512', opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
-        { name: FAVICON_FILES.maskable, size: 512, label: 'Maskable 512', opts: { padding: Math.max(pad, 0.12), background: touchBg } },
+        { name: FAVICON_FILES.png16, size: 16, label: t('Browser tab 16'), opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
+        { name: FAVICON_FILES.png32, size: 32, label: t('Browser tab 32'), opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
+        { name: FAVICON_FILES.apple, size: 180, label: t('Apple touch 180'), opts: { padding: source === 'text' ? 0 : Math.max(pad, 0.06), background: touchBg } },
+        { name: FAVICON_FILES.android192, size: 192, label: t('Android 192'), opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
+        { name: FAVICON_FILES.android512, size: 512, label: t('Android 512'), opts: { padding: pad, background: fillBg && source === 'image' ? imageBg : null } },
+        { name: FAVICON_FILES.maskable, size: 512, label: t('Maskable 512'), opts: { padding: Math.max(pad, 0.12), background: touchBg } },
       ];
       const out: Rendered[] = [];
       for (const s of specs) {
@@ -162,7 +163,7 @@ export default function FaviconGenerator() {
       }
       if (!cancelled) setRendered(out);
     })()
-      .catch((e) => !cancelled && setError(errorMessage(e, 'Could not render the icons.')))
+      .catch((e) => !cancelled && setError(errorMessage(e, t('Could not render the icons.'))))
       .finally(() => !cancelled && setBusy(false));
     return () => {
       cancelled = true;
@@ -190,7 +191,7 @@ export default function FaviconGenerator() {
       if (source === 'image' && src?.svg) entries.push({ name: FAVICON_FILES.svg, data: src.svg });
       downloadBlob(await zipBlobs(entries, 6), 'favicons.zip');
     } catch (e) {
-      toast(errorMessage(e, 'Could not create the ZIP.'), 'error');
+      toast(errorMessage(e, t('Could not create the ZIP.')), 'error');
     } finally {
       setZipping(false);
     }
@@ -201,7 +202,7 @@ export default function FaviconGenerator() {
     try {
       downloadBlob(await buildIco(icoSource(drawable), [16, 32, 48]), FAVICON_FILES.ico);
     } catch (e) {
-      toast(errorMessage(e, 'Could not create the ICO.'), 'error');
+      toast(errorMessage(e, t('Could not create the ICO.')), 'error');
     }
   }
 
@@ -211,59 +212,59 @@ export default function FaviconGenerator() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Source</Label>
+          <Label>{t('Source')}</Label>
           <Segmented
-            label="Source"
+            label={t('Source')}
             value={source}
             onChange={setSource}
             options={[
-              { value: 'image', label: 'Image or SVG' },
-              { value: 'text', label: 'Letters' },
+              { value: 'image', label: t('Image or SVG') },
+              { value: 'text', label: t('Letters') },
             ]}
           />
         </div>
         {source === 'text' ? (
           <>
             <div className="w-28">
-              <Label htmlFor="fav-text">Letters</Label>
+              <Label htmlFor="fav-text">{t('Letters')}</Label>
               <Input id="fav-text" value={text} maxLength={8} onChange={(e) => setText(e.target.value)} />
             </div>
-            <ColorField label="Text" value={fg} onChange={setFg} />
-            <ColorField label="Background" value={bg} onChange={setBg} />
+            <ColorField label={t('Text')} value={fg} onChange={setFg} />
+            <ColorField label={t('Background')} value={bg} onChange={setBg} />
             <div className="min-w-0">
-              <Label>Shape</Label>
+              <Label>{t('Shape')}</Label>
               <Segmented
-                label="Shape"
+                label={t('Shape')}
                 value={shape}
                 onChange={setShape}
                 options={[
-                  { value: 'square', label: 'Square' },
-                  { value: 'rounded', label: 'Rounded' },
-                  { value: 'circle', label: 'Circle' },
+                  { value: 'square', label: t('Square') },
+                  { value: 'rounded', label: t('Rounded') },
+                  { value: 'circle', label: t('Circle') },
                 ]}
               />
             </div>
             <div className="min-w-0">
-              <Label>Weight</Label>
+              <Label>{t('Weight')}</Label>
               <Segmented
-                label="Weight"
+                label={t('Weight')}
                 value={weight}
                 onChange={setWeight}
                 options={[
-                  { value: '500', label: 'Medium' },
-                  { value: '700', label: 'Bold' },
-                  { value: '900', label: 'Black' },
+                  { value: '500', label: t('Medium') },
+                  { value: '700', label: t('Bold') },
+                  { value: '900', label: t('Black') },
                 ]}
               />
             </div>
           </>
         ) : (
           <>
-            <Checkbox label="Solid background" checked={fillBg} onChange={setFillBg} className="pb-1.5" />
-            {fillBg && <ColorField label="Background" value={imageBg} onChange={setImageBg} />}
+            <Checkbox label={t('Solid background')} checked={fillBg} onChange={setFillBg} className="pb-1.5" />
+            {fillBg && <ColorField label={t('Background')} value={imageBg} onChange={setImageBg} />}
           </>
         )}
-        <RangeField label="Padding" className="w-full sm:w-44" value={padding} min={0} max={30} onChange={setPadding} format={(v) => `${v}%`} />
+        <RangeField label={t('Padding')} className="w-full sm:w-44" value={padding} min={0} max={30} onChange={setPadding} format={(v) => `${v}%`} />
       </ToolBar>
 
       {source === 'image' && (
@@ -272,28 +273,28 @@ export default function FaviconGenerator() {
           onFiles={(f) => setFile(f[0])}
           icon={Star}
           compact={Boolean(file)}
-          title={file ? `Replace ${file.name}` : 'Drop a square logo (SVG or PNG, ideally 512 px or larger)'}
+          title={file ? t('Replace {name}', { name: file.name }) : t('Drop a square logo (SVG or PNG, ideally 512 px or larger)')}
         />
       )}
       <ErrorMessage error={error} />
       {source === 'image' && dims && Math.min(dims.w, dims.h) < 512 && !src?.svg && (
-        <Alert tone="warning">The source is {dims.w}×{dims.h}. Use at least 512×512 for sharp Android and maskable icons.</Alert>
+        <Alert tone="warning">{t('The source is {w}×{h}. Use at least 512×512 for sharp Android and maskable icons.', { w: dims.w, h: dims.h })}</Alert>
       )}
-      {source === 'image' && dims && dims.w !== dims.h && <Alert tone="info">The image isn't square, so it is centered with transparent (or solid) margins.</Alert>}
+      {source === 'image' && dims && dims.w !== dims.h && <Alert tone="info">{t('The image isn\'t square, so it is centered with transparent (or solid) margins.')}</Alert>}
 
       {drawable && (
         <>
           <Panel
-            title="Preview"
-            description="favicon.ico contains 16, 32 and 48 px images"
+            title={t('Preview')}
+            description={t('favicon.ico contains 16, 32 and 48 px images')}
             actions={
               <>
                 {busy && <Spinner />}
                 <Button size="sm" onClick={downloadIco}>
-                  favicon.ico
+                  {t('favicon.ico')}
                 </Button>
                 <Button size="sm" variant="primary" icon={FileArchive} loading={zipping} disabled={rendered.length === 0} onClick={downloadZip}>
-                  Download all (ZIP)
+                  {t('Download all (ZIP)')}
                 </Button>
               </>
             }
@@ -316,30 +317,30 @@ export default function FaviconGenerator() {
                 <div className="flex flex-col items-center gap-1.5">
                   <div className="flex h-9 w-56 items-center gap-2 rounded-t-lg border border-b-0 border-line bg-surface-raised px-3 shadow-card">
                     <img src={rendered[1].url} alt="" width={16} height={16} />
-                    <span className="truncate text-[12.5px] text-fg">{name || 'My Website'}</span>
+                    <span className="truncate text-[12.5px] text-fg">{name || t('My Website')}</span>
                   </div>
-                  <span className="text-[11.5px] text-fg-muted">Tab preview</span>
+                  <span className="text-[11.5px] text-fg-muted">{t('Tab preview')}</span>
                 </div>
               )}
             </div>
             {source === 'text' && (
-              <p className="mt-3 text-[12.5px] text-fg-muted">Apple touch and maskable icons use a full square background, because iOS and Android apply their own rounded mask.</p>
+              <p className="mt-3 text-[12.5px] text-fg-muted">{t('Apple touch and maskable icons use a full square background, because iOS and Android apply their own rounded mask.')}</p>
             )}
           </Panel>
           <ToolBar>
             <div className="w-56">
-              <Label htmlFor="fav-name">App name (manifest)</Label>
+              <Label htmlFor="fav-name">{t('App name (manifest)')}</Label>
               <Input id="fav-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <ColorField label="Theme color" value={themeColor} onChange={setThemeColor} />
+            <ColorField label={t('Theme color')} value={themeColor} onChange={setThemeColor} />
             <div className="w-40">
-              <Label htmlFor="fav-path">Icons path</Label>
+              <Label htmlFor="fav-path">{t('Icons path')}</Label>
               <Input id="fav-path" value={path} onChange={(e) => setPath(e.target.value)} mono />
             </div>
           </ToolBar>
           <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-            <EditorPanel title="HTML (put inside <head>)" value={html} height="200px" language="html" />
-            <EditorPanel title="site.webmanifest" value={manifest} height="200px" language="json" downloadName="site.webmanifest" downloadType="application/manifest+json" />
+            <EditorPanel title={t('HTML (put inside <head>)')} value={html} height="200px" language="html" />
+            <EditorPanel title={t('site.webmanifest')} value={manifest} height="200px" language="json" downloadName="site.webmanifest" downloadType="application/manifest+json" />
           </div>
         </>
       )}

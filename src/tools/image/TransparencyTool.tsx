@@ -19,6 +19,7 @@ import { flatten, guessBackground, keyColor } from './lib/chroma';
 import { hexToRgb } from './lib/encoders';
 import { rgbToHex } from './lib/palette';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Mode = 'transparent' | 'replace' | 'flatten';
 type Bg = 'checker' | 'light' | 'dark';
@@ -126,9 +127,9 @@ export default function TransparencyTool() {
       ctx.putImageData(data, 0, 0);
       const blob = await canvasToBlob(c, 'image/png');
       downloadBlob(blob, `${baseName(image.file.name)}-${mode === 'flatten' ? 'flattened' : mode === 'replace' ? 'recolored' : 'transparent'}.png`);
-      toast(`Saved PNG (${formatBytes(blob.size)})`);
+      toast(t('Saved PNG ({size})', { size: formatBytes(blob.size) }));
     } catch (e) {
-      toast(errorMessage(e, 'Could not export the image.'), 'error');
+      toast(errorMessage(e, t('Could not export the image.')), 'error');
     } finally {
       setBusy(false);
     }
@@ -141,34 +142,34 @@ export default function TransparencyTool() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Action</Label>
+          <Label>{t('Action')}</Label>
           <Segmented
-            label="Action"
+            label={t('Action')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'transparent', label: 'Make color transparent' },
-              { value: 'replace', label: 'Replace color' },
-              { value: 'flatten', label: 'Flatten onto color' },
+              { value: 'transparent', label: t('Make color transparent') },
+              { value: 'replace', label: t('Replace color') },
+              { value: 'flatten', label: t('Flatten onto color') },
             ]}
           />
         </div>
         {mode !== 'flatten' ? (
           <>
-            <ColorField label="Color to change" value={target} onChange={setTarget} />
-            {mode === 'replace' && <ColorField label="Replace with" value={replacement} onChange={setReplacement} />}
+            <ColorField label={t('Color to change')} value={target} onChange={setTarget} />
+            {mode === 'replace' && <ColorField label={t('Replace with')} value={replacement} onChange={setReplacement} />}
           </>
         ) : (
-          <ColorField label="Background" value={background} onChange={setBackground} />
+          <ColorField label={t('Background')} value={background} onChange={setBackground} />
         )}
       </ToolBar>
       {mode !== 'flatten' && (
         <ToolBar>
-          <RangeField label="Tolerance" className="w-full sm:w-56" value={tolerance} min={0} max={100} onChange={setTolerance} format={(v) => `${v}%`} />
-          <RangeField label="Feather (soft edge)" className="w-full sm:w-56" value={feather} min={0} max={50} onChange={setFeather} format={(v) => `${v}%`} />
+          <RangeField label={t('Tolerance')} className="w-full sm:w-56" value={tolerance} min={0} max={100} onChange={setTolerance} format={(v) => `${v}%`} />
+          <RangeField label={t('Feather (soft edge)')} className="w-full sm:w-56" value={feather} min={0} max={50} onChange={setFeather} format={(v) => `${v}%`} />
           <Checkbox
-            label="Only connected area"
-            description="Flood-fill from the point you click (default: top-left corner)."
+            label={t('Only connected area')}
+            description={t('Flood-fill from the point you click (default: top-left corner).')}
             checked={contiguous}
             onChange={setContiguous}
           />
@@ -183,33 +184,33 @@ export default function TransparencyTool() {
                 setSeed(null);
               }}
             >
-              Detect background
+              {t('Detect background')}
             </Button>
           )}
         </ToolBar>
       )}
-      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Droplets} title="Drop an image" hint="Remove a solid background, recolor it, or flatten transparency. Nothing is uploaded." />}
-      {loading && <Spinner label="Opening image…" />}
+      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Droplets} title={t('Drop an image')} hint={t('Remove a solid background, recolor it, or flatten transparency. Nothing is uploaded.')} />}
+      {loading && <Spinner label={t('Opening image…')} />}
       <ErrorMessage error={error} />
       {image && (
         <Panel
           title={image.file.name}
-          description={`${image.width} × ${image.height} px${affected !== null && mode !== 'flatten' ? ` · ${(affected * 100).toFixed(1)}% of pixels affected` : ''}`}
+          description={t('{width} × {height} px{value}', { width: image.width, height: image.height, value: affected !== null && mode !== 'flatten' ? ` · ${(affected * 100).toFixed(1)}% of pixels affected` : '' })}
           actions={
             <>
               <Segmented
-                label="Preview background"
+                label={t('Preview background')}
                 size="sm"
                 value={previewBg}
                 onChange={setPreviewBg}
                 options={[
-                  { value: 'checker', label: 'Checker' },
-                  { value: 'light', label: 'White' },
-                  { value: 'dark', label: 'Black' },
+                  { value: 'checker', label: t('Checker') },
+                  { value: 'light', label: t('White') },
+                  { value: 'dark', label: t('Black') },
                 ]}
               />
               <Button size="sm" variant="ghost" onClick={clear}>
-                Choose another
+                {t('Choose another')}
               </Button>
             </>
           }
@@ -220,13 +221,13 @@ export default function TransparencyTool() {
               role="img"
               onPointerDown={onPick}
               className={`block h-auto max-h-[65vh] max-w-full object-contain ${mode === 'flatten' ? '' : 'cursor-crosshair'}`}
-              aria-label={mode === 'flatten' ? 'Preview' : 'Preview. Click to choose the color to change.'}
+              aria-label={mode === 'flatten' ? t('Preview') : t('Preview. Click to choose the color to change.')}
             />
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[12.5px] text-fg-muted">{mode === 'flatten' ? 'Transparent areas are filled with the background color.' : 'Click the image to pick the color (and the starting point for “connected area”).'}</p>
+            <p className="text-[12.5px] text-fg-muted">{mode === 'flatten' ? t('Transparent areas are filled with the background color.') : t('Click the image to pick the color (and the starting point for “connected area”).')}</p>
             <Button variant="primary" icon={Download} loading={busy} onClick={exportPng}>
-              Download PNG
+              {t('Download PNG')}
             </Button>
           </div>
         </Panel>

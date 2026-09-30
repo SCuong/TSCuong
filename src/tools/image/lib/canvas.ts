@@ -6,6 +6,7 @@
 import { DECODABLE, FORMAT_INFO, readImageHeader, svgDimensions, type ImageFormat, type ImageHeader } from './formats';
 import { encodeBmp, hexToRgb } from './encoders';
 import { quantizeRgba } from './quantize';
+import { t } from '@/lib/i18n';
 
 export type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
 export type Ctx2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
@@ -230,9 +231,9 @@ export type OutputFormat = 'png' | 'jpeg' | 'webp' | 'avif' | 'png-lossy' | 'bmp
 
 export const OUTPUT_INFO: Record<OutputFormat, { label: string; mime: string; ext: string; alpha: boolean; lossy: boolean }> = {
   png: { label: 'PNG', mime: 'image/png', ext: 'png', alpha: true, lossy: false },
-  'png-lossy': { label: 'PNG (lossy)', mime: 'image/png', ext: 'png', alpha: true, lossy: true },
+  'png-lossy': { label: t('PNG (lossy)'), mime: 'image/png', ext: 'png', alpha: true, lossy: true },
   jpeg: { label: 'JPEG', mime: 'image/jpeg', ext: 'jpg', alpha: false, lossy: true },
-  webp: { label: 'WebP', mime: 'image/webp', ext: 'webp', alpha: true, lossy: true },
+  webp: { label: t('WebP'), mime: 'image/webp', ext: 'webp', alpha: true, lossy: true },
   avif: { label: 'AVIF', mime: 'image/avif', ext: 'avif', alpha: true, lossy: true },
   bmp: { label: 'BMP', mime: 'image/bmp', ext: 'bmp', alpha: false, lossy: false },
 };

@@ -19,6 +19,7 @@ import { scaledBitmap } from './lib/pipeline';
 import { formatColor, readableTextOn } from './lib/color';
 import { extractPalette, paletteToCss, paletteToJson, srgbToOklab, type PaletteColor } from './lib/palette';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Sort = 'share' | 'lightness' | 'hue';
 
@@ -89,27 +90,27 @@ export default function PaletteExtractor() {
   return (
     <ToolStack>
       <ToolBar>
-        <RangeField label="Colors" className="w-full sm:w-64" value={count} min={3} max={16} onChange={setCount} />
+        <RangeField label={t('Colors')} className="w-full sm:w-64" value={count} min={3} max={16} onChange={setCount} />
         <div className="min-w-0">
-          <Label>Order</Label>
+          <Label>{t('Order')}</Label>
           <Segmented
-            label="Order"
+            label={t('Order')}
             value={sort}
             onChange={setSort}
             options={[
-              { value: 'share', label: 'Most used' },
-              { value: 'lightness', label: 'Lightness' },
-              { value: 'hue', label: 'Hue' },
+              { value: 'share', label: t('Most used') },
+              { value: 'lightness', label: t('Lightness') },
+              { value: 'hue', label: t('Hue') },
             ]}
           />
         </div>
       </ToolBar>
-      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={SwatchBook} title="Drop an image to extract its palette" />}
-      {loading && <Spinner label="Opening image…" />}
+      {!image && <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={SwatchBook} title={t('Drop an image to extract its palette')} />}
+      {loading && <Spinner label={t('Opening image…')} />}
       <ErrorMessage error={error} />
       {image && (
         <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <Panel title={image.file.name} actions={<Button size="sm" variant="ghost" onClick={clear}>Choose another</Button>}>
+          <Panel title={image.file.name} actions={<Button size="sm" variant="ghost" onClick={clear}>{t('Choose another')}</Button>}>
             <div className="lk-checker flex justify-center overflow-hidden rounded-lg border border-line">
               <img src={image.url} alt="" className="max-h-[50vh] object-contain" />
             </div>
@@ -117,12 +118,12 @@ export default function PaletteExtractor() {
           <div className="flex min-w-0 flex-col gap-4">
             {sorted.length === 0 ? (
               <Panel>
-                <p className="text-[13px] text-fg-muted">The image is fully transparent, so there are no colors to extract.</p>
+                <p className="text-[13px] text-fg-muted">{t('The image is fully transparent, so there are no colors to extract.')}</p>
               </Panel>
             ) : (
               <>
-                <Panel title={`Palette · ${sorted.length} colors`} description="k-means clustering in the perceptual OKLab color space">
-                  <div className="flex h-10 overflow-hidden rounded-lg border border-line" role="img" aria-label="Color proportions">
+                <Panel title={t('Palette · {count} colors', { count: sorted.length })} description={t('k-means clustering in the perceptual OKLab color space')}>
+                  <div className="flex h-10 overflow-hidden rounded-lg border border-line" role="img" aria-label={t('Color proportions')}>
                     {sorted.map((c) => (
                       <div key={c.hex} style={{ backgroundColor: c.hex, flexGrow: c.share }} title={`${c.hex} · ${(c.share * 100).toFixed(1)}%`} />
                     ))}
@@ -137,9 +138,9 @@ export default function PaletteExtractor() {
                             className="flex h-16 w-full items-end justify-between p-2 text-left font-mono text-[11.5px]"
                             style={{ backgroundColor: c.hex, color: readableTextOn(...c.rgb) }}
                             onClick={() => {
-                              void copyText(c.hex).then((ok) => toast(ok ? `Copied ${c.hex}` : 'Copy failed.', ok ? 'success' : 'error'));
+                              void copyText(c.hex).then((ok) => toast(ok ? t('Copied {hex}', { hex: c.hex }) : t('Copy failed.'), ok ? 'success' : 'error'));
                             }}
-                            aria-label={`Copy ${c.hex}`}
+                            aria-label={t('Copy {hex}', { hex: c.hex })}
                           >
                             <span>{(c.share * 100).toFixed(1)}%</span>
                           </button>
@@ -148,19 +149,19 @@ export default function PaletteExtractor() {
                               <p className="font-semibold text-fg">{c.hex}</p>
                               <p className="truncate text-fg-muted">{f.rgb.replace('rgb', '')}</p>
                             </div>
-                            <CopyButton value={c.hex} iconOnly label={`Copy ${c.hex}`} />
+                            <CopyButton value={c.hex} iconOnly label={t('Copy {hex}', { hex: c.hex })} />
                           </div>
                         </li>
                       );
                     })}
                   </ul>
                 </Panel>
-                <Panel title="Export" bodyClassName="p-4">
+                <Panel title={t('Export')} bodyClassName="p-4">
                   <pre className="max-h-48 overflow-auto rounded-lg border border-line bg-surface-sunken p-3 font-mono text-[12.5px] text-fg">{css}</pre>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <CopyButton value={css} label="Copy CSS" />
+                    <CopyButton value={css} label={t('Copy CSS')} />
                     <DownloadButton data={css} filename={`${name}-palette.css`} type="text/css" label="CSS" />
-                    <CopyButton value={json} label="Copy JSON" />
+                    <CopyButton value={json} label={t('Copy JSON')} />
                     <DownloadButton data={json} filename={`${name}-palette.json`} type="application/json" label="JSON" />
                     <Button
                       size="sm"
@@ -169,11 +170,11 @@ export default function PaletteExtractor() {
                         try {
                           downloadBlob(await swatchPng(sorted), `${name}-palette.png`);
                         } catch {
-                          toast('Could not render the swatch image.', 'error');
+                          toast(t('Could not render the swatch image.'), 'error');
                         }
                       }}
                     >
-                      PNG swatch
+                      {t('PNG swatch')}
                     </Button>
                   </div>
                 </Panel>

@@ -15,6 +15,7 @@ import { useImagePool } from './components/useImagePool';
 import { firstFrameNote, joinNotes, OUTPUT_INFO, readHeader } from './lib/canvas';
 import { computeResize, type ResizeSpec } from './lib/geometry';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Mode = 'percent' | 'exact' | 'fit' | 'width' | 'height';
 type Format = 'keep' | 'png' | 'jpeg' | 'webp';
@@ -23,11 +24,11 @@ const PRESETS: Array<{ label: string; mode: Mode; w?: number; h?: number; pct?: 
   { label: '50%', mode: 'percent', pct: 50 },
   { label: '25%', mode: 'percent', pct: 25 },
   { label: '4K (3840)', mode: 'fit', w: 3840, h: 3840 },
-  { label: 'Full HD (1920)', mode: 'fit', w: 1920, h: 1920 },
+  { label: t('Full HD (1920)'), mode: 'fit', w: 1920, h: 1920 },
   { label: 'HD (1280)', mode: 'fit', w: 1280, h: 1280 },
-  { label: 'Web (1024)', mode: 'fit', w: 1024, h: 1024 },
-  { label: 'Square 1080', mode: 'exact', w: 1080, h: 1080 },
-  { label: 'Thumbnail (320)', mode: 'fit', w: 320, h: 320 },
+  { label: t('Web (1024)'), mode: 'fit', w: 1024, h: 1024 },
+  { label: t('Square 1080'), mode: 'exact', w: 1080, h: 1080 },
+  { label: t('Thumbnail (320)'), mode: 'fit', w: 320, h: 320 },
 ];
 
 export default function ImageResizer() {
@@ -125,23 +126,23 @@ export default function ImageResizer() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Resize by</Label>
+          <Label>{t('Resize by')}</Label>
           <Segmented
-            label="Resize by"
+            label={t('Resize by')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'fit', label: 'Fit within' },
-              { value: 'exact', label: 'Exact size' },
-              { value: 'percent', label: 'Percent' },
-              { value: 'width', label: 'Width' },
-              { value: 'height', label: 'Height' },
+              { value: 'fit', label: t('Fit within') },
+              { value: 'exact', label: t('Exact size') },
+              { value: 'percent', label: t('Percent') },
+              { value: 'width', label: t('Width') },
+              { value: 'height', label: t('Height') },
             ]}
           />
         </div>
         {mode === 'percent' && (
           <div className="w-28">
-            <Label htmlFor="rs-pct">Percent</Label>
+            <Label htmlFor="rs-pct">{t('Percent')}</Label>
             <NumberInput id="rs-pct" value={percent} onChange={setPercent} min={1} max={1000} />
           </div>
         )}
@@ -149,14 +150,14 @@ export default function ImageResizer() {
           <div className="flex items-end gap-2">
             {showW && (
               <div className="w-28">
-                <Label htmlFor="rs-w">{mode === 'fit' ? 'Max width' : 'Width'} (px)</Label>
+                <Label htmlFor="rs-w">{(mode === 'fit') ? t('Max width (px)') : t('Width (px)')}</Label>
                 <NumberInput id="rs-w" value={width} onChange={changeWidth} min={1} max={32767} />
               </div>
             )}
             {mode === 'exact' && (
               <IconButton
                 icon={lock ? Link2 : Link2Off}
-                label={lock ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
+                label={lock ? t('Aspect ratio locked') : t('Aspect ratio unlocked')}
                 active={lock}
                 variant="secondary"
                 onClick={() => setLock(!lock)}
@@ -166,27 +167,27 @@ export default function ImageResizer() {
             )}
             {showH && (
               <div className="w-28">
-                <Label htmlFor="rs-h">{mode === 'fit' ? 'Max height' : 'Height'} (px)</Label>
+                <Label htmlFor="rs-h">{(mode === 'fit') ? t('Max height (px)') : t('Height (px)')}</Label>
                 <NumberInput id="rs-h" value={height} onChange={changeHeight} min={1} max={32767} />
               </div>
             )}
           </div>
         )}
-        {mode !== 'exact' && <Checkbox label="Don't enlarge" checked={noUpscale} onChange={setNoUpscale} className="pb-1.5" />}
+        {mode !== 'exact' && <Checkbox label={t('Don\'t enlarge')} checked={noUpscale} onChange={setNoUpscale} className="pb-1.5" />}
       </ToolBar>
       <ToolBar>
         <div className="w-40">
-          <Label htmlFor="rs-fmt">Output format</Label>
+          <Label htmlFor="rs-fmt">{t('Output format')}</Label>
           <Select id="rs-fmt" value={format} onChange={(e) => setFormat(e.target.value as Format)}>
-            <option value="keep">Same as input</option>
+            <option value="keep">{t('Same as input')}</option>
             <option value="png">PNG</option>
             <option value="jpeg">JPEG</option>
-            <option value="webp">WebP</option>
+            <option value="webp">{t('WebP')}</option>
           </Select>
         </div>
-        <RangeField label="Quality (JPEG/WebP)" className="w-full sm:w-56" value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />
+        <RangeField label={t('Quality (JPEG/WebP)')} className="w-full sm:w-56" value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />
         <div className="min-w-0">
-          <Label>Presets</Label>
+          <Label>{t('Presets')}</Label>
           <div className="flex flex-wrap gap-1">
             {PRESETS.map((p) => (
               <button
@@ -210,7 +211,7 @@ export default function ImageResizer() {
       <ErrorMessage error={specError} />
       {mode === 'exact' && lock && batch.items.length > 1 && (
         <p className="-mt-1 text-[12.5px] text-fg-muted">
-          The aspect lock follows the first image. Images with a different shape are stretched to the exact size; use “Fit within” to keep every image’s proportions.
+          {t('The aspect lock follows the first image. Images with a different shape are stretched to the exact size; use “Fit within” to keep every image’s proportions.')}
         </p>
       )}
       <FileDrop
@@ -219,8 +220,8 @@ export default function ImageResizer() {
         onFiles={batch.addFiles}
         icon={Scaling}
         compact={batch.items.length > 0}
-        title="Drop images to resize"
-        hint="High-quality downscaling in your browser. Nothing is uploaded."
+        title={t('Drop images to resize')}
+        hint={t('High-quality downscaling in your browser. Nothing is uploaded.')}
       />
       <BatchFileList
         items={batch.items}

@@ -73,7 +73,7 @@ export function t(text: string, params?: Params): string {
 }
 
 // The dictionary is loaded once per page: a hot update would reset it, so reload instead.
-if (import.meta.hot) import.meta.hot.decline();
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());
 
 /** Test hook: switch the dictionary without storage or a reload. */
 export function setMessagesForTests(next: Locale, dictionary: Record<string, string> | null) {

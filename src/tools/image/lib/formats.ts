@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n';
 /**
  * Image format sniffing and header parsing from raw bytes (no decoding).
  * Pure functions: safe to use in workers and unit tests.
@@ -42,7 +43,7 @@ export const FORMAT_INFO: Record<ImageFormat, { mime: string; label: string; ext
   png: { mime: 'image/png', label: 'PNG', ext: 'png' },
   jpeg: { mime: 'image/jpeg', label: 'JPEG', ext: 'jpg' },
   gif: { mime: 'image/gif', label: 'GIF', ext: 'gif' },
-  webp: { mime: 'image/webp', label: 'WebP', ext: 'webp' },
+  webp: { mime: 'image/webp', label: t('WebP'), ext: 'webp' },
   bmp: { mime: 'image/bmp', label: 'BMP', ext: 'bmp' },
   ico: { mime: 'image/x-icon', label: 'ICO', ext: 'ico' },
   avif: { mime: 'image/avif', label: 'AVIF', ext: 'avif' },
@@ -50,7 +51,7 @@ export const FORMAT_INFO: Record<ImageFormat, { mime: string; label: string; ext
   tiff: { mime: 'image/tiff', label: 'TIFF', ext: 'tiff' },
   svg: { mime: 'image/svg+xml', label: 'SVG', ext: 'svg' },
   jxl: { mime: 'image/jxl', label: 'JPEG XL', ext: 'jxl' },
-  psd: { mime: 'image/vnd.adobe.photoshop', label: 'Photoshop PSD', ext: 'psd' },
+  psd: { mime: 'image/vnd.adobe.photoshop', label: t('Photoshop PSD'), ext: 'psd' },
 };
 
 const ascii = (b: Uint8Array, start: number, len: number) => {

@@ -19,6 +19,7 @@ import { centeredAspectRect, type Rect } from './lib/geometry';
 import { moveCrop, resizeCrop, roundCrop, type Handle } from './lib/crop';
 import { runJobOnSource } from './lib/pipeline';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type AspectKey = 'free' | '1:1' | '4:3' | '3:2' | '16:9' | '9:16' | '4:5' | 'custom';
 type Format = 'keep' | 'png' | 'jpeg' | 'webp';
@@ -140,9 +141,9 @@ export default function ImageCropper() {
         output: { format: outFormat, quality: quality / 100, background: '#ffffff' },
       });
       downloadBlob(r.blob, `${baseName(image.file.name)}-cropped.${OUTPUT_INFO[r.format].ext}`);
-      toast(`Saved ${r.width}×${r.height} ${OUTPUT_INFO[r.format].label} (${formatBytes(r.blob.size)})`);
+      toast(t('Saved {width}×{height} {label} ({size})', { width: r.width, height: r.height, label: OUTPUT_INFO[r.format].label, size: formatBytes(r.blob.size) }));
     } catch (e) {
-      toast(errorMessage(e, 'Could not crop the image.'), 'error');
+      toast(errorMessage(e, t('Could not crop the image.')), 'error');
     } finally {
       setBusy(false);
     }
@@ -159,48 +160,48 @@ export default function ImageCropper() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Aspect ratio</Label>
+          <Label>{t('Aspect ratio')}</Label>
           <Segmented
-            label="Aspect ratio"
+            label={t('Aspect ratio')}
             value={aspectKey}
             onChange={setAspectKey}
             options={(['free', '1:1', '4:3', '3:2', '16:9', '9:16', '4:5', 'custom'] as AspectKey[]).map((k) => ({
               value: k,
-              label: k === 'free' ? 'Free' : k === 'custom' ? 'Custom' : k,
+              label: k === 'free' ? t('Free') : k === 'custom' ? t('Custom') : k,
             }))}
           />
         </div>
         {aspectKey === 'custom' && (
           <div className="flex items-end gap-1.5">
             <div className="w-20">
-              <Label htmlFor="crop-cw">Ratio W</Label>
+              <Label htmlFor="crop-cw">{t('Ratio W')}</Label>
               <NumberInput id="crop-cw" value={customW} onChange={setCustomW} min={0.01} step={0.1} />
             </div>
             <span className="pb-2 text-fg-muted">:</span>
             <div className="w-20">
-              <Label htmlFor="crop-ch">Ratio H</Label>
+              <Label htmlFor="crop-ch">{t('Ratio H')}</Label>
               <NumberInput id="crop-ch" value={customH} onChange={setCustomH} min={0.01} step={0.1} />
             </div>
           </div>
         )}
-        <Checkbox label="Circle / ellipse crop (PNG)" checked={circle} onChange={setCircle} className="pb-1.5" />
+        <Checkbox label={t('Circle / ellipse crop (PNG)')} checked={circle} onChange={setCircle} className="pb-1.5" />
       </ToolBar>
 
       {!image && (
-        <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Crop} title="Drop an image to crop" />
+        <FileDrop accept={IMAGE_ACCEPT} onFiles={(f) => void load(f[0])} icon={Crop} title={t('Drop an image to crop')} />
       )}
-      {loading && <Spinner label="Opening image…" />}
+      {loading && <Spinner label={t('Opening image…')} />}
       <ErrorMessage error={error} />
 
       {image && crop && box && (
         <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_280px]">
-          <Panel title={image.file.name} description={`${image.width} × ${image.height} px`} actions={<Button size="sm" variant="ghost" onClick={clear}>Choose another</Button>}>
+          <Panel title={image.file.name} description={t('{width} × {height} px', { width: image.width, height: image.height })} actions={<Button size="sm" variant="ghost" onClick={clear}>{t('Choose another')}</Button>}>
             <div className="flex justify-center">
               <div className="lk-checker relative inline-block max-w-full touch-none select-none" onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
                 <img
                   ref={imgRef}
                   src={image.url}
-                  alt="Image being cropped"
+                  alt={t('Image being cropped')}
                   draggable={false}
                   className="block max-h-[65vh] max-w-full"
                   onLoad={(e) => setDisplayW(e.currentTarget.clientWidth)}
@@ -214,8 +215,8 @@ export default function ImageCropper() {
                   <div
                     role="slider"
                     tabIndex={0}
-                    aria-label="Crop area. Arrow keys move it, Shift moves 10 px, Alt+arrows resize."
-                    aria-valuetext={`${crop.width} by ${crop.height} at ${crop.x}, ${crop.y}`}
+                    aria-label={t('Crop area. Arrow keys move it, Shift moves 10 px, Alt+arrows resize.')}
+                    aria-valuetext={t('{width} by {height} at {x}, {y}', { width: crop.width, height: crop.height, x: crop.x, y: crop.y })}
                     aria-valuenow={crop.x}
                     onKeyDown={onKeyDown}
                     onPointerDown={(e) => onPointerDown(e, 'move')}
@@ -242,43 +243,43 @@ export default function ImageCropper() {
               </div>
             </div>
             <p className="mt-3 text-center text-[12.5px] text-fg-muted">
-              Drag the box or its handles. Focus it and use <Kbd>←</Kbd>
+              {t('Drag the box or its handles. Focus it and use')}{' '}<Kbd>←</Kbd>
               <Kbd>→</Kbd>
               <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd> to nudge, <Kbd>Shift</Kbd> for 10 px, <Kbd>Alt</Kbd> to resize.
+              <Kbd>↓</Kbd>{' '}{t('to nudge,')}{' '}<Kbd>Shift</Kbd>{' '}{t('for 10 px,')}{' '}<Kbd>Alt</Kbd>{' '}{t('to resize.')}
             </p>
           </Panel>
-          <Panel title="Selection">
+          <Panel title={t('Selection')}>
             <div className="grid grid-cols-2 gap-3">
               {(['x', 'y', 'width', 'height'] as const).map((k) => (
                 <div key={k}>
-                  <Label htmlFor={`crop-${k}`}>{k === 'x' ? 'X' : k === 'y' ? 'Y' : k === 'width' ? 'Width' : 'Height'}</Label>
+                  <Label htmlFor={`crop-${k}`}>{k === 'x' ? 'X' : k === 'y' ? 'Y' : k === 'width' ? t('Width') : t('Height')}</Label>
                   <NumberInput id={`crop-${k}`} value={Math.round(crop[k])} onChange={(v) => setField(k, v)} min={k === 'x' || k === 'y' ? 0 : 1} />
                 </div>
               ))}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => setCrop(aspect ? centeredAspectRect(bounds, aspect) : { x: 0, y: 0, ...bounds })}>
-                Reset
+                {t('Reset')}
               </Button>
             </div>
             <div className="mt-4 space-y-3 border-t border-line pt-4">
               <div>
-                <Label htmlFor="crop-fmt">Format</Label>
+                <Label htmlFor="crop-fmt">{t('Format')}</Label>
                 <Select id="crop-fmt" value={circle && format === 'jpeg' ? 'png' : format} onChange={(e) => setFormat(e.target.value as Format)}>
-                  <option value="keep">Same as input{circle && src === 'jpeg' ? ' (PNG for circle)' : ''}</option>
+                  <option value="keep">{t('Same as input')}{circle && src === 'jpeg' ? ' ' + t('(PNG for circle)') : ''}</option>
                   <option value="png">PNG</option>
                   <option value="jpeg" disabled={circle}>
-                    JPEG{circle ? ' (no transparency)' : ''}
+                    JPEG{circle ? ' ' + t('(no transparency)') : ''}
                   </option>
-                  <option value="webp">WebP</option>
+                  <option value="webp">{t('WebP')}</option>
                 </Select>
               </div>
               {outFormat !== 'png' && (
-                <RangeField label="Quality" value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />
+                <RangeField label={t('Quality')} value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />
               )}
               <Button variant="primary" icon={Download} className="w-full" loading={busy} onClick={exportCrop}>
-                Download {Math.round(crop.width)}×{Math.round(crop.height)}
+                {t('Download {round}×{round2}', { round: Math.round(crop.width), round2: Math.round(crop.height) })}
               </Button>
             </div>
           </Panel>

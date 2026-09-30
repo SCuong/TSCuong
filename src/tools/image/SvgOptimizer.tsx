@@ -11,6 +11,7 @@ import { RangeField } from './components/controls';
 import { SvgPreview, type PreviewBg } from './components/SvgPreview';
 import { useSvgo } from './components/useSvgo';
 import { buildSvgoConfig, defaultPrecision, presetToggles, SVGO_TOGGLES, type SvgoPreset } from './lib/svg';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!-- Generator: Some Editor 1.0 -->
@@ -65,24 +66,24 @@ export default function SvgOptimizer() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Preset</Label>
+          <Label>{t('Preset')}</Label>
           <Segmented
-            label="Preset"
+            label={t('Preset')}
             value={preset}
             onChange={setPreset}
             options={[
-              { value: 'safe', label: 'Safe' },
-              { value: 'default', label: 'Default' },
-              { value: 'aggressive', label: 'Aggressive' },
+              { value: 'safe', label: t('Safe') },
+              { value: 'default', label: t('Default') },
+              { value: 'aggressive', label: t('Aggressive') },
             ]}
           />
         </div>
-        <RangeField label="Number precision" className="w-full sm:w-48" value={precision} min={0} max={6} onChange={setPrecision} format={(v) => `${v} decimals`} />
-        <Switch label="Multipass" checked={multipass} onChange={setMultipass} className="h-8" />
-        <Switch label="Pretty print" checked={pretty} onChange={setPretty} className="h-8" />
+        <RangeField label={t('Number precision')} className="w-full sm:w-48" value={precision} min={0} max={6} onChange={setPrecision} format={(v) => `${v} decimals`} />
+        <Switch label={t('Multipass')} checked={multipass} onChange={setMultipass} className="h-8" />
+        <Switch label={t('Pretty print')} checked={pretty} onChange={setPretty} className="h-8" />
       </ToolBar>
       <details className="rounded-xl border border-line bg-surface px-4 py-2.5 shadow-card">
-        <summary className="text-[13px] font-medium text-fg-secondary select-none">Plugins ({Object.values(plugins).filter(Boolean).length} enabled)</summary>
+        <summary className="text-[13px] font-medium text-fg-secondary select-none">{t('Plugins ({count} enabled)', { count: Object.values(plugins).filter(Boolean).length })}</summary>
         <div className="mt-3 grid gap-x-6 gap-y-2 pb-1 sm:grid-cols-2 lg:grid-cols-3">
           {SVGO_TOGGLES.map((p) => (
             <Checkbox
@@ -96,14 +97,14 @@ export default function SvgOptimizer() {
         </div>
       </details>
       <ErrorMessage error={loadError} />
-      <ErrorMessage error={result && !result.ok ? result.error : null} title="Invalid SVG" />
+      <ErrorMessage error={result && !result.ok ? result.error : null} title={t('Invalid SVG')} />
       <SplitPanes>
         <EditorPanel
-          title="Input SVG"
+          title={t('Input SVG')}
           value={input}
           onChange={setInput}
           language="xml"
-          placeholder="Paste SVG markup or open a .svg file…"
+          placeholder={t('Paste SVG markup or open a .svg file…')}
           sample={SAMPLE}
           fileAccept=".svg,image/svg+xml"
           invalid={Boolean(result && !result.ok)}
@@ -111,40 +112,40 @@ export default function SvgOptimizer() {
           footer={input ? <span>{formatBytes(inputSize)}</span> : undefined}
         />
         <EditorPanel
-          title="Optimized SVG"
+          title={t('Optimized SVG')}
           value={output}
           language="xml"
           height="360px"
           downloadName="optimized.svg"
           downloadType="image/svg+xml"
-          placeholder={working ? 'Optimizing…' : 'Optimized output appears here'}
+          placeholder={working ? t('Optimizing…') : t('Optimized output appears here')}
           footer={
             output ? (
               <>
                 <span>{formatBytes(after)}</span>
                 <span className={saved >= 0 ? 'text-success' : 'text-warning'}>
-                  {saved >= 0 ? `${saved.toFixed(1)}% smaller` : `${Math.abs(saved).toFixed(1)}% larger`}
+                  {saved >= 0 ? t('{saved}% smaller', { saved: saved.toFixed(1) }) : t('{abs}% larger', { abs: Math.abs(saved).toFixed(1) })}
                 </span>
               </>
             ) : undefined
           }
         />
       </SplitPanes>
-      {working && <Spinner label={output ? 'Updating the optimized SVG…' : 'Optimizing…'} />}
+      {working && <Spinner label={output ? t('Updating the optimized SVG…') : t('Optimizing…')} />}
       {output && (
         <Panel
-          title="Preview"
-          description="Rendered as images: scripts never run"
+          title={t('Preview')}
+          description={t('Rendered as images: scripts never run')}
           actions={
             <Segmented
-              label="Preview background"
+              label={t('Preview background')}
               size="sm"
               value={bg}
               onChange={setBg}
               options={[
-                { value: 'checker', label: 'Checker' },
-                { value: 'light', label: 'White' },
-                { value: 'dark', label: 'Black' },
+                { value: 'checker', label: t('Checker') },
+                { value: 'light', label: t('White') },
+                { value: 'dark', label: t('Black') },
               ]}
             />
           }
@@ -152,15 +153,15 @@ export default function SvgOptimizer() {
           <div className="grid gap-4 sm:grid-cols-2">
             <figure>
               <figcaption className="mb-1.5 flex items-center gap-2 text-[12.5px] text-fg-muted">
-                Before <Badge>{formatBytes(before)}</Badge>
+                {t('Before')}{' '}<Badge>{formatBytes(before)}</Badge>
               </figcaption>
-              <SvgPreview svg={debounced} background={bg} label="Original SVG" />
+              <SvgPreview svg={debounced} background={bg} label={t('Original SVG')} />
             </figure>
             <figure>
               <figcaption className="mb-1.5 flex items-center gap-2 text-[12.5px] text-fg-muted">
-                After <Badge tone={saved >= 0 ? 'success' : 'warning'}>{formatBytes(after)}</Badge>
+                {t('After')}{' '}<Badge tone={saved >= 0 ? 'success' : 'warning'}>{formatBytes(after)}</Badge>
               </figcaption>
-              <SvgPreview svg={output} background={bg} label="Optimized SVG" />
+              <SvgPreview svg={output} background={bg} label={t('Optimized SVG')} />
             </figure>
           </div>
         </Panel>

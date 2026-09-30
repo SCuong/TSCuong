@@ -14,6 +14,7 @@ import { FORMAT_INFO, readImageHeader, type ImageHeader } from './lib/formats';
 import { aspectRatioLabel } from './lib/geometry';
 import { extractPalette, type PaletteColor } from './lib/palette';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 interface Info {
   file: File;
@@ -37,12 +38,12 @@ export default function ImageInfo() {
     setLoading(true);
     setError(null);
     try {
-      if (file.size === 0) throw new Error('The file is empty.');
+      if (file.size === 0) throw new Error(t('The file is empty.'));
       // Animated GIF/WebP frame counts need the whole file (capped for memory).
       const whole = file.size <= 64 * 1024 * 1024;
       const bytes = new Uint8Array(await (whole ? file : file.slice(0, 1024 * 1024)).arrayBuffer());
       const header = readImageHeader(bytes);
-      if (!header) throw new Error(`${UNSUPPORTED_MESSAGE} No known image signature was found in the first bytes.`);
+      if (!header) throw new Error(t('{UNSUPPORTED_MESSAGE} No known image signature was found in the first bytes.', { UNSUPPORTED_MESSAGE }));
       let width = header.width ?? null;
       let height = header.height ?? null;
       let decodeError: string | null = null;
@@ -74,12 +75,12 @@ export default function ImageInfo() {
           }
         }
       } catch (e) {
-        decodeError = errorMessage(e, 'This browser cannot decode the image.');
+        decodeError = errorMessage(e, t('This browser cannot decode the image.'));
       }
       setInfo({ file, header, width, height, decodeError, palette, transparentPixels });
     } catch (e) {
       setInfo(null);
-      setError(errorMessage(e, 'Could not read the file.'));
+      setError(errorMessage(e, t('Could not read the file.')));
     } finally {
       setLoading(false);
     }
@@ -100,68 +101,83 @@ export default function ImageInfo() {
         onFiles={(f) => void inspect(f[0])}
         icon={Info}
         compact={Boolean(info)}
-        title="Drop an image to inspect"
-        hint="Reads the file header on your device: format, size, bit depth, alpha, color profile, animation."
+        title={t('Drop an image to inspect')}
+        hint={t('Reads the file header on your device: format, size, bit depth, alpha, color profile, animation.')}
       />
-      {loading && <Spinner label="Inspecting…" />}
+      {loading && <Spinner label={t('Inspecting…')} />}
       <ErrorMessage error={error} />
       {info && h && detected && (
         <>
           {(!extOk || !mimeOk) && (
-            <Alert tone="warning" title="The file type doesn't match its name">
-              The contents are {detected.label}
-              {!extOk && `, but the extension is .${ext}`}
-              {!mimeOk && ` (browser reported ${info.file.type})`}. Rename it to .{detected.ext} to avoid problems.
+            <Alert tone="warning" title={t('The file type doesn\'t match its name')}>
+              {!extOk && !mimeOk
+                ? t('The contents are {label}, but the extension is .{ext} (browser reported {type}). Rename it to .{fix} to avoid problems.', {
+                    label: detected.label,
+                    ext,
+                    type: info.file.type,
+                    fix: detected.ext,
+                  })
+                : !extOk
+                  ? t('The contents are {label}, but the extension is .{ext}. Rename it to .{fix} to avoid problems.', {
+                      label: detected.label,
+                      ext,
+                      fix: detected.ext,
+                    })
+                  : t('The contents are {label} (browser reported {type}). Rename it to .{fix} to avoid problems.', {
+                      label: detected.label,
+                      type: info.file.type,
+                      fix: detected.ext,
+                    })}
             </Alert>
           )}
-          {info.decodeError && <Alert tone="warning">{info.decodeError} Header information is still shown below.</Alert>}
+          {info.decodeError && <Alert tone="warning">{t('{decodeError} Header information is still shown below.', { decodeError: info.decodeError })}</Alert>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Dimensions" value={info.width && info.height ? `${info.width} × ${info.height}` : '—'} />
-            <Stat label="Megapixels" value={info.width && info.height ? formatNumber((info.width * info.height) / 1e6, 2) : '—'} />
-            <Stat label="Aspect ratio" value={info.width && info.height ? aspectRatioLabel(info.width, info.height) : '—'} />
-            <Stat label="File size" value={formatBytes(info.file.size)} />
+            <Stat label={t('Dimensions')} value={info.width && info.height ? `${info.width} × ${info.height}` : '—'} />
+            <Stat label={t('Megapixels')} value={info.width && info.height ? formatNumber((info.width * info.height) / 1e6, 2) : '—'} />
+            <Stat label={t('Aspect ratio')} value={info.width && info.height ? aspectRatioLabel(info.width, info.height) : '—'} />
+            <Stat label={t('File size')} value={formatBytes(info.file.size)} />
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-[1fr_320px]">
-            <Panel title="Details" bodyClassName="px-4 py-1">
+            <Panel title={t('Details')} bodyClassName="px-4 py-1">
               <KeyValueList
                 items={[
-                  { label: 'File name', value: info.file.name },
-                  { label: 'Format (from contents)', value: <span className="inline-flex flex-wrap items-center gap-1.5">{detected.label}{h.detail && <Badge>{h.detail}</Badge>}</span> },
-                  { label: 'MIME type', value: detected.mime },
-                  { label: 'Reported by browser', value: info.file.type || '(none)' },
-                  { label: 'Exact size', value: `${info.file.size.toLocaleString()} bytes` },
-                  { label: 'Last modified', value: new Date(info.file.lastModified).toLocaleString() },
-                  { label: 'Bit depth', value: h.bitDepth ? `${h.bitDepth} bits per channel` : h.bitsPerPixel ? `${h.bitsPerPixel} bits per pixel` : 'Unknown' },
-                  { label: 'Color type', value: h.colorType ?? (h.channels ? `${h.channels} channels` : 'Unknown') },
-                  { label: 'Alpha channel', value: yesNo(h.hasAlpha) },
-                  { label: 'Uses transparency', value: yesNo(info.transparentPixels) },
-                  { label: 'Color profile (ICC)', value: yesNo(h.hasIcc ?? false) },
+                  { label: t('File name'), value: info.file.name },
+                  { label: t('Format (from contents)'), value: <span className="inline-flex flex-wrap items-center gap-1.5">{detected.label}{h.detail && <Badge>{h.detail}</Badge>}</span> },
+                  { label: t('MIME type'), value: detected.mime },
+                  { label: t('Reported by browser'), value: info.file.type || '(none)' },
+                  { label: t('Exact size'), value: `${info.file.size.toLocaleString()} bytes` },
+                  { label: t('Last modified'), value: new Date(info.file.lastModified).toLocaleString() },
+                  { label: t('Bit depth'), value: h.bitDepth ? `${h.bitDepth} bits per channel` : h.bitsPerPixel ? `${h.bitsPerPixel} bits per pixel` : 'Unknown' },
+                  { label: t('Color type'), value: h.colorType ?? (h.channels ? `${h.channels} channels` : 'Unknown') },
+                  { label: t('Alpha channel'), value: yesNo(h.hasAlpha) },
+                  { label: t('Uses transparency'), value: yesNo(info.transparentPixels) },
+                  { label: t('Color profile (ICC)'), value: yesNo(h.hasIcc ?? false) },
                   { label: 'EXIF / XMP', value: `${yesNo(h.hasExif ?? false)} / ${yesNo(h.hasXmp ?? false)}` },
-                  { label: 'Animated', value: h.animated === undefined ? 'Unknown' : h.animated ? `Yes${h.frameCount ? ` (${h.frameCount} frames)` : ''}` : 'No' },
-                  ...(h.progressive !== undefined && h.format !== 'png' ? [{ label: 'Progressive', value: yesNo(h.progressive) }] : []),
-                  ...(h.format === 'png' ? [{ label: 'Interlaced', value: yesNo(h.progressive) }] : []),
+                  { label: t('Animated'), value: h.animated === undefined ? 'Unknown' : h.animated ? `Yes${h.frameCount ? ` (${h.frameCount} frames)` : ''}` : 'No' },
+                  ...(h.progressive !== undefined && h.format !== 'png' ? [{ label: t('Progressive'), value: yesNo(h.progressive) }] : []),
+                  ...(h.format === 'png' ? [{ label: t('Interlaced'), value: yesNo(h.progressive) }] : []),
                 ]}
               />
             </Panel>
             <div className="flex min-w-0 flex-col gap-4">
               {url && (
-                <Panel title="Preview">
+                <Panel title={t('Preview')}>
                   <div className="lk-checker flex justify-center overflow-hidden rounded-lg border border-line">
                     <img src={url} alt="" className="max-h-60 object-contain" />
                   </div>
                 </Panel>
               )}
               {dominant && (
-                <Panel title="Dominant colors">
+                <Panel title={t('Dominant colors')}>
                   <div className="flex items-center gap-3">
                     <div className="size-12 shrink-0 rounded-lg border border-line" style={{ backgroundColor: dominant.hex }} />
                     <div className="min-w-0">
                       <p className="font-mono text-[14px] font-semibold text-fg">{dominant.hex}</p>
-                      <p className="text-[12.5px] text-fg-muted">{Math.round(dominant.share * 100)}% of the image</p>
+                      <p className="text-[12.5px] text-fg-muted">{t('{round}% of the image', { round: Math.round(dominant.share * 100) })}</p>
                     </div>
                     <CopyButton value={dominant.hex} iconOnly className="ml-auto" />
                   </div>
-                  <div className="mt-3 flex h-6 overflow-hidden rounded-md border border-line" aria-label="Color proportions">
+                  <div className="mt-3 flex h-6 overflow-hidden rounded-md border border-line" aria-label={t('Color proportions')}>
                     {info.palette.map((c) => (
                       <div key={c.hex} title={`${c.hex} · ${Math.round(c.share * 100)}%`} style={{ backgroundColor: c.hex, flexGrow: c.share }} />
                     ))}

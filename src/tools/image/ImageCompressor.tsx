@@ -16,6 +16,7 @@ import { useImageBatch, type BatchItem } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
 import { firstFrameNote, joinNotes, OUTPUT_INFO, readHeader, type OutputFormat } from './lib/canvas';
 import { IMAGE_ACCEPT } from './lib/accept';
+import { t } from '@/lib/i18n';
 
 type Target = 'keep' | 'jpeg' | 'webp' | 'avif' | 'png-lossy';
 
@@ -40,7 +41,7 @@ export default function ImageCompressor() {
     async (file: File, signal: AbortSignal) => {
       const header = await readHeader(file);
       if (header?.format === 'svg') {
-        throw new Error('SVG is a vector format, so it is not compressed as pixels here. Use the SVG Optimizer to make it smaller.');
+        throw new Error(t('SVG is a vector format, so it is not compressed as pixels here. Use the SVG Optimizer to make it smaller.'));
       }
       if (target === 'keep' && header?.animated) {
         // Re-encoding would keep only the first frame, which is not "the same format".
@@ -49,7 +50,7 @@ export default function ImageCompressor() {
           name: file.name,
           width: header.width,
           height: header.height,
-          note: 'Animated image kept unchanged: only still images are recompressed here. Choose an output format to convert its first frame.',
+          note: t('Animated image kept unchanged: only still images are recompressed here. Choose an output format to convert its first frame.'),
           warning: true,
         };
       }
@@ -71,7 +72,7 @@ export default function ImageCompressor() {
             name: file.name,
             width: r.sourceWidth,
             height: r.sourceHeight,
-            note: `Original kept: the compressed version was ${larger} (${formatBytes(r.blob.size)}).`,
+            note: t('Original kept: the compressed version was {larger} ({size}).', { larger, size: formatBytes(r.blob.size) }),
             warning: true,
           };
         }
@@ -96,22 +97,22 @@ export default function ImageCompressor() {
     <ToolStack>
       <ToolBar>
         <div className="min-w-0">
-          <Label>Output format</Label>
+          <Label>{t('Output format')}</Label>
           <Segmented
-            label="Output format"
+            label={t('Output format')}
             value={target}
             onChange={setTarget}
             options={[
-              { value: 'keep', label: 'Same as input' },
+              { value: 'keep', label: t('Same as input') },
               { value: 'jpeg', label: 'JPEG' },
-              { value: 'webp', label: 'WebP' },
+              { value: 'webp', label: t('WebP') },
               { value: 'avif', label: 'AVIF' },
-              { value: 'png-lossy', label: 'PNG (lossy)' },
+              { value: 'png-lossy', label: t('PNG (lossy)') },
             ]}
           />
         </div>
         <RangeField
-          label="Quality"
+          label={t('Quality')}
           className="w-full sm:w-56"
           value={quality}
           min={10}
@@ -120,26 +121,26 @@ export default function ImageCompressor() {
           format={(v) => `${v}%`}
         />
         <div className="w-40">
-          <Label htmlFor="cmp-max">Max dimension</Label>
+          <Label htmlFor="cmp-max">{t('Max dimension')}</Label>
           <Select id="cmp-max" value={maxDim} onChange={(e) => setMaxDim(e.target.value)}>
             {MAX_DIMS.map((d) => (
               <option key={d} value={d}>
-                {d === '0' ? 'Original size' : `${d} px`}
+                {d === '0' ? t('Original size') : t('{d} px', { d })}
               </option>
             ))}
           </Select>
         </div>
-        <Checkbox label="Keep original when the result is larger" checked={keepOriginal} onChange={setKeepOriginal} className="pb-1.5" />
+        <Checkbox label={t('Keep original when the result is larger')} checked={keepOriginal} onChange={setKeepOriginal} className="pb-1.5" />
       </ToolBar>
       {pngNote && (
         <p className="-mt-1 text-[12.5px] text-fg-muted">
           {target === 'keep'
-            ? 'JPEG, WebP and AVIF are re-encoded at the chosen quality. PNG, GIF and BMP become lossy PNG: fewer colors (quality sets the palette size, 8–256) with transparency kept.'
-            : 'Lossy PNG reduces the number of colors (quality sets the palette size, 8–256) and keeps transparency.'}
+            ? t('JPEG, WebP and AVIF are re-encoded at the chosen quality. PNG, GIF and BMP become lossy PNG: fewer colors (quality sets the palette size, 8–256) with transparency kept.')
+            : t('Lossy PNG reduces the number of colors (quality sets the palette size, 8–256) and keeps transparency.')}
         </p>
       )}
       {target === 'avif' && (
-        <Alert tone="info">AVIF encoding is slow in the browser (a WebAssembly encoder is used when needed). Large photos can take several seconds each.</Alert>
+        <Alert tone="info">{t('AVIF encoding is slow in the browser (a WebAssembly encoder is used when needed). Large photos can take several seconds each.')}</Alert>
       )}
       <FileDrop
         multiple
@@ -147,8 +148,8 @@ export default function ImageCompressor() {
         onFiles={batch.addFiles}
         icon={ImagePlus}
         compact={batch.items.length > 0}
-        title="Drop images to compress"
-        hint="JPEG, PNG, WebP, AVIF, BMP or GIF (animated images keep only their first frame). Processed on this device, never uploaded."
+        title={t('Drop images to compress')}
+        hint={t('JPEG, PNG, WebP, AVIF, BMP or GIF (animated images keep only their first frame). Processed on this device, never uploaded.')}
       />
       <BatchFileList
         items={batch.items}
@@ -166,29 +167,29 @@ export default function ImageCompressor() {
               onClick={() => setCompareId(it.id)}
               className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-accent-text hover:underline"
             >
-              <Columns2 size={12} aria-hidden /> Compare
+              <Columns2 size={12} aria-hidden />{' '}{t('Compare')}
             </button>
           ) : null
         }
       />
       {compareItem?.output && compareUrl && compareItem.output.blob !== compareItem.file && (
         <Panel
-          title="Before / after"
+          title={t('Before / after')}
           description={`${compareItem.file.name}: ${formatBytes(compareItem.file.size)} → ${formatBytes(compareItem.output.blob.size)}`}
           actions={
             <Button size="sm" variant="ghost" onClick={() => setCompareId(null)}>
-              First file
+              {t('First file')}
             </Button>
           }
         >
           <CompareSlider
             before={compareItem.thumbUrl}
             after={compareUrl}
-            afterLabel="Compressed"
+            afterLabel={t('Compressed')}
             width={compareItem.output.width ?? 4}
             height={compareItem.output.height ?? 3}
           />
-          <p className="mt-2 text-center text-[12.5px] text-fg-muted">Drag the handle or use the arrow keys to compare. Zoom in with your browser for detail.</p>
+          <p className="mt-2 text-center text-[12.5px] text-fg-muted">{t('Drag the handle or use the arrow keys to compare. Zoom in with your browser for detail.')}</p>
         </Panel>
       )}
     </ToolStack>

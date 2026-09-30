@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/Toast';
 import { cn, downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { zipBlobs } from '../lib/zip';
 import type { BatchItem } from './useImageBatch';
+import { t } from '@/lib/i18n';
 
 export function savingsPercent(before: number, after: number): number {
   if (!before) return 0;
@@ -69,7 +70,7 @@ export function BatchFileList({
       const blob = await zipBlobs(done.map((it) => ({ name: it.output!.name, data: it.output!.blob })));
       downloadBlob(blob, zipName);
     } catch (error) {
-      toast(errorMessage(error, 'Could not create the ZIP file.'), 'error');
+      toast(errorMessage(error, t('Could not create the ZIP file.')), 'error');
     } finally {
       setZipping(false);
     }
@@ -78,10 +79,10 @@ export function BatchFileList({
   if (items.length === 0) return null;
 
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card" aria-label="Files">
+    <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card" aria-label={t('Files')}>
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
         <div className="min-w-0 text-[13px]">
-          <span className="font-semibold text-fg">{pluralize(items.length, 'file')}</span>
+          <span className="font-semibold text-fg">{pluralize(items.length, t('file'), t('files'))}</span>
           {done.length > 0 && showSavings && (
             <span className="ml-2 text-fg-muted">
               {formatBytes(totalBefore)} → {formatBytes(totalAfter)}{' '}
@@ -96,11 +97,11 @@ export function BatchFileList({
           {actions}
           {failed.length > 0 && onRetry && !running && (
             <Button size="sm" variant="ghost" icon={RotateCcw} onClick={onRetry}>
-              Retry failed
+              {t('Retry failed')}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onClear}>
-            Clear all
+            {t('Clear all')}
           </Button>
           <Button
             size="sm"
@@ -110,13 +111,13 @@ export function BatchFileList({
             loading={zipping}
             onClick={downloadAll}
           >
-            Download all as ZIP
+            {t('Download all as ZIP')}
           </Button>
         </div>
       </header>
       {running && (
         <div className="border-b border-line px-4 py-2.5">
-          <ProgressBar value={progress} label="Processing…" onCancel={onCancel} />
+          <ProgressBar value={progress} label={t('Processing…')} onCancel={onCancel} />
         </div>
       )}
       <ul className="divide-y divide-line">
@@ -153,10 +154,10 @@ export function BatchFileList({
                   )}
                   {it.status === 'working' && (
                     <span className="inline-flex items-center gap-1">
-                      <LoaderCircle size={12} className="animate-spin" aria-hidden /> Processing
+                      <LoaderCircle size={12} className="animate-spin" aria-hidden />{' '}{t('Processing')}
                     </span>
                   )}
-                  {it.status === 'pending' && <span>Queued</span>}
+                  {it.status === 'pending' && <span>{t('Queued')}</span>}
                 </div>
                 {out?.note && (
                   <p className={cn('mt-0.5 text-[12px]', out.warning ? 'text-warning' : 'text-fg-muted')}>{out.note}</p>
@@ -173,13 +174,13 @@ export function BatchFileList({
                 {out && (
                   <IconButton
                     icon={Download}
-                    label={`Download ${out.name}`}
+                    label={t('Download {name}', { name: out.name })}
                     variant="secondary"
                     size="sm"
                     onClick={() => downloadBlob(out.blob, out.name)}
                   />
                 )}
-                <IconButton icon={X} label={`Remove ${it.file.name}`} size="sm" onClick={() => onRemove(it.id)} />
+                <IconButton icon={X} label={t('Remove {name}', { name: it.file.name })} size="sm" onClick={() => onRemove(it.id)} />
               </div>
             </li>
           );
