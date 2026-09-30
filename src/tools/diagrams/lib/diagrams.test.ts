@@ -50,7 +50,7 @@ describe('describeMermaidError', () => {
   }, 30_000);
 
   it('handles plain strings, unknown values and out-of-range lines', () => {
-    expect(describeMermaidError('boom', 'x').message).toBe('Boom');
+    expect(describeMermaidError('boom', 'x').message).toBe('Boom.');
     expect(describeMermaidError(null, 'x').message).toMatch(/could not parse/);
     const e = Object.assign(new Error('Parse error on line 99:\nfoo'), {});
     expect(describeMermaidError(e, 'a\nb').line).toBe(2);

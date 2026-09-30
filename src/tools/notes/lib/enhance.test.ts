@@ -65,7 +65,7 @@ describe('prepareInteractive', () => {
     const root = rendered('- [ ] one\n- [x] two\n\n[ext](https://example.com) [anchor](#top)');
     prepareInteractive(root);
     const boxes = root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    expect([...boxes].map((b) => [b.disabled, b.dataset.task])).toEqual([
+    expect([...boxes].map((b) => [b.disabled, b.dataset.lkTask])).toEqual([
       [false, '0'],
       [false, '1'],
     ]);

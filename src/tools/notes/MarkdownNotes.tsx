@@ -7,19 +7,20 @@ import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { matchesAccept } from '@/components/ui/FileDrop';
 import { toast } from '@/components/ui/Toast';
 import { useDebouncedValue, useMediaQuery, useToolState } from '@/lib/hooks';
-import { collection, kvGet, kvSet, newId, useCollection } from '@/lib/storage/db';
+import { kvGet, kvSet, newId, useCollection } from '@/lib/storage/db';
 import { useTheme } from '@/lib/theme';
 import { cn, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { renderMermaid } from '../diagrams/lib/mermaid';
 import { sizedSvg } from '../diagrams/lib/diagrams';
-import { patchRecord } from '../diagrams/lib/store';
+import { patchRecord, removeRecord } from '../diagrams/lib/store';
 import type { DiagramRenderer } from './lib/enhance';
 import {
   collectTags,
+  conflictTitle,
   copyTitle,
-  createNoteIndex,
   deriveTitle,
   filterNotes,
+  NoteSearchIndex,
   parseImportedMarkdown,
   sortNotes,
   UNTITLED,
@@ -27,13 +28,14 @@ import {
   type NoteFilter,
   type NoteSort,
 } from './lib/notes';
+import { isNewNoteShortcut } from './lib/shortcuts';
+import { notesStore as store } from './lib/store';
 import { WELCOME_NOTE, WELCOME_TAGS } from './lib/welcome';
 import { IMPORT_ACCEPT, NoteList } from './components/NoteList';
 import { NoteEditor, type ViewMode } from './components/NoteEditor';
 import './notes.css';
 
 const TOOL = 'markdown-notes';
-const store = collection<Note>('notes');
 const SEEDED_KEY = 'notes:seeded';
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
@@ -67,6 +69,8 @@ export default function MarkdownNotes() {
   const [focusId, setFocusId] = useState<string | null>(null);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const theme = useTheme().resolved === 'dark' ? 'dark' : 'default';
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   // First run: one welcome note (only once, so deleting it keeps it deleted).
   const seeding = useRef(false);
@@ -89,7 +93,9 @@ export default function MarkdownNotes() {
     [filter, tags],
   );
   const debouncedQuery = useDebouncedValue(query, 120);
-  const index = useMemo(() => createNoteIndex(items), [items]);
+  // Re-indexes only notes that changed, so autosaves in one note stay cheap with a large library.
+  const [searchIndex] = useState(() => new NoteSearchIndex());
+  const index = useMemo(() => ({ search: (q: string) => searchIndex.sync(items).search(q) }), [searchIndex, items]);
   const visible = useMemo(() => {
     const filtered = filterNotes(items, effectiveFilter);
     const hits = index.search(debouncedQuery);
@@ -124,14 +130,29 @@ export default function MarkdownNotes() {
   // Ctrl+Alt+N (Cmd+Option+N) creates a note. Ctrl+K stays with the command palette.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey && (event.key.toLowerCase() === 'n' || event.code === 'KeyN')) {
-        event.preventDefault();
-        createFromFilter();
-      }
+      if (!isNewNoteShortcut(event) || document.querySelector('dialog[open]')) return;
+      event.preventDefault();
+      createFromFilter();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [createFromFilter]);
+
+  /** Another tab saved this note while this tab was editing it: keep that version as a separate note. */
+  const keepConflict = useCallback(async (theirs: Note) => {
+    const now = Date.now();
+    const copy: Note = {
+      ...theirs,
+      id: newId(),
+      title: conflictTitle(theirs.title, itemsRef.current.map((n) => n.title)),
+      autoTitle: false,
+      favorite: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.put(copy);
+    toast(`This note was also changed in another tab. That version was kept as “${copy.title}”.`, 'info', 8000);
+  }, []);
 
   async function importFiles(files: File[]) {
     const accepted = files.filter((f) => matchesAccept(f, IMPORT_ACCEPT) || /\.(md|markdown|mdown|mkd|txt)$/i.test(f.name));
@@ -171,7 +192,8 @@ export default function MarkdownNotes() {
 
   async function toggleFavorite(note: Note) {
     try {
-      await patchRecord(store, note.id, { favorite: !note.favorite });
+      // Starring is not an edit: the note keeps its place in "Last edited".
+      await patchRecord(store, note.id, { favorite: !note.favorite }, Date.now, { touch: false });
     } catch (err) {
       toast(errorMessage(err, 'Could not update the note.'), 'error');
     }
@@ -180,7 +202,7 @@ export default function MarkdownNotes() {
   async function remove(note: Note) {
     setConfirmDelete(null);
     try {
-      await store.remove(note.id);
+      await removeRecord(store, note.id);
       const next = visible.find((n) => n.id !== note.id) ?? items.find((n) => n.id !== note.id);
       setActiveId(next?.id ?? '');
       if (!isDesktop) setMobileView('list');
@@ -257,10 +279,7 @@ export default function MarkdownNotes() {
             }
             onDelete={() => setConfirmDelete(active)}
             onToggleFavorite={() => void toggleFavorite(active)}
-            onSave={async (patch) => {
-              const saved = await patchRecord(store, active.id, patch);
-              if (!saved) throw new Error('This note no longer exists.');
-            }}
+            onConflict={keepConflict}
             tagSuggestions={tags.map((t) => t.tag)}
             autoFocus={focusId === active.id}
           />

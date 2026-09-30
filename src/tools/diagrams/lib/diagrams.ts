@@ -13,19 +13,25 @@ export interface DiagramError {
   message: string;
   /** 1-based source line, when Mermaid reports one. */
   line: number | null;
+  /** 1-based column on that line, when known. */
+  column: number | null;
   /** The offending source line's text, for context. */
   sourceLine: string | null;
 }
 
 interface JisonHash {
   line?: number;
-  loc?: { first_line?: number };
-  token?: string;
+  loc?: { first_line?: number; first_column?: number };
+  token?: string | number;
 }
+
+/** Tokens Jison grammars report when the text ends in the middle of a statement ("1" is Jison's EOF id). */
+const END_TOKENS = new Set(['EOF', '1', '$end', 'EOF_IN_STRUCT']);
 
 /** Plain-language names for common Jison grammar tokens (null when a token has no useful name). */
 const TOKEN_LABELS: Record<string, string> = {
   NEWLINE: 'a line break',
+  NL: 'a line break',
   EOF: 'the end of the diagram',
   SPACE: 'a space',
   PS: '"("',
@@ -58,10 +64,6 @@ function tokenLabel(token: string): string | null {
   return null;
 }
 
-function lineCount(source: string): number {
-  return source.replace(/\r\n?/g, '\n').split('\n').length;
-}
-
 /**
  * Turns an error thrown by `mermaid.parse`/`render` into a short message plus
  * the source line it points at. Handles both the Jison parsers (flowchart,
@@ -71,14 +73,19 @@ function lineCount(source: string): number {
 export function describeMermaidError(error: unknown, source: string): DiagramError {
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   const hash = (error as { hash?: JisonHash } | null)?.hash;
+  const sourceLines = source.replace(/\r\n?/g, '\n').split('\n');
   let line: number | null = null;
-  if (hash?.loc?.first_line) line = hash.loc.first_line;
-  else {
-    const m = /line (\d+)/i.exec(raw);
-    if (m) line = Number(m[1]);
+  let column: number | null = null;
+  if (hash?.loc?.first_line) {
+    line = hash.loc.first_line;
+    if (typeof hash.loc.first_column === 'number') column = hash.loc.first_column + 1;
+  } else {
+    const m = /line (\d+)(?:, column (\d+))?/i.exec(raw);
+    if (m) {
+      line = Number(m[1]);
+      if (m[2]) column = Number(m[2]);
+    }
   }
-  const total = lineCount(source);
-  if (line !== null) line = Math.min(Math.max(1, line), total);
 
   const lines = raw
     .replace(/^Parsing failed:\s*/i, '')
@@ -88,7 +95,7 @@ export function describeMermaidError(error: unknown, source: string): DiagramErr
   // Jison messages: "Parse error on line N:", "<snippet>", "----^", "Expecting …, got …"
   let message = lines.find((l) => /^Expecting /.test(l)) ?? lines[lines.length - 1] ?? '';
   if (/^Expecting /.test(message)) {
-    const got = /got '([^']+)'/.exec(message)?.[1];
+    const got = /got '([^']+)'/.exec(message)?.[1] ?? (hash?.token !== undefined ? String(hash.token) : undefined);
     // Only list expectations we can name in plain words; grammar-internal token names mean nothing to users.
     const expected = [
       ...new Set(
@@ -102,18 +109,36 @@ export function describeMermaidError(error: unknown, source: string): DiagramErr
     const shown = expected.slice(0, 5).join(', ') + (expected.length > 5 ? ', …' : '');
     const hint = expected.length ? ` Expected ${expected.length === 1 ? '' : 'one of: '}${shown}${shown.endsWith('…') ? '' : '.'}` : '';
     const gotLabel = got ? (tokenLabel(got) ?? `"${got.toLowerCase()}"`).replace(/^(a|an|the) /, '') : 'text';
-    message = got === 'EOF' ? `The diagram ends unexpectedly.${hint}` : `Unexpected ${gotLabel}.${hint}`;
+    message = got !== undefined && END_TOKENS.has(got) ? `The diagram ends unexpectedly.${hint}` : `Unexpected ${gotLabel}.${hint}`;
   } else {
     message = message.replace(/^Parse error on line \d+(, column \d+)?:\s*/i, '');
+    const date = /^Invalid date:\s*(.*)$/i.exec(message);
+    if (date) message = `Invalid date "${date[1]}". Use the dateFormat of the chart (for example 2026-03-02).`;
   }
   if (!message) message = 'Mermaid could not parse this diagram.';
   if (/No diagram type detected/i.test(raw)) {
     message = 'No diagram type found. Start with a keyword such as "flowchart TD", "sequenceDiagram" or "pie".';
     line = 1;
+    column = null;
   }
+  // No position reported (e.g. a bad date or branch name): point at the line containing the offending text.
+  if (line === null) {
+    const needle =
+      (typeof hash?.token === 'string' && hash.token.trim().length > 1 ? hash.token.trim() : null) ??
+      /^Invalid date:\s*(\S+)/i.exec(raw)?.[1] ??
+      null;
+    const found = needle ? sourceLines.findIndex((l) => l.includes(needle)) : -1;
+    if (found >= 0) {
+      line = found + 1;
+      column = sourceLines[found].indexOf(needle!) + 1;
+    }
+  }
+  if (line !== null) line = Math.min(Math.max(1, line), sourceLines.length);
   message = message.charAt(0).toUpperCase() + message.slice(1);
-  const sourceLine = line !== null ? (source.replace(/\r\n?/g, '\n').split('\n')[line - 1] ?? null) : null;
-  return { message, line, sourceLine };
+  if (!/[.…!?"]$/.test(message)) message += '.';
+  const sourceLine = line !== null ? (sourceLines[line - 1] ?? null) : null;
+  if (column !== null) column = sourceLine === null ? null : Math.min(Math.max(1, column), sourceLine.length + 1);
+  return { message, line, column, sourceLine };
 }
 
 /** Natural size of a Mermaid SVG from its viewBox (falls back to width/height attributes). */

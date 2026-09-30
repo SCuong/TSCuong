@@ -191,14 +191,15 @@ function SummaryStat({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
+// Only keys the browser leaves to the page (Ctrl+N opens a window, Ctrl+Shift+C opens the developer tools).
 const SHORTCUTS: Array<[string[], string]> = [
-  [[modKey, 'N'], 'New snippet (Alt+N or N if the browser reserves Ctrl+N)'],
+  [['N'], 'New snippet (also Alt+N)'],
   [['/'], 'Focus search'],
   [['↑', '↓'], 'Move through the list'],
   [['Enter'], 'Open the highlighted snippet'],
-  [[modKey, 'S'], 'Save while editing (also Ctrl+Enter)'],
+  [[modKey, 'S'], `Save while editing (also ${modKey}+Enter)`],
   [['Esc'], 'Cancel editing / clear search'],
-  [[modKey, 'Shift', 'C'], 'Copy code of the open snippet (or C)'],
+  [['C'], 'Copy code of the open snippet'],
   [['E'], 'Edit the open snippet'],
   [['F'], 'Toggle favorite'],
   [['?'], 'Show this help'],

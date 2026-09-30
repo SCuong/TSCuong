@@ -19,23 +19,19 @@ import { CodeEditor } from '@/components/editor/CodeEditor';
 import { IconButton } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Segmented';
 import { toast } from '@/components/ui/Toast';
+import { useDebouncedValue } from '@/lib/hooks';
 import { cn, downloadBlob, errorMessage, formatNumber, pluralize } from '@/lib/utils';
+import { AutosaveSession } from '../../diagrams/lib/store';
 import { buildNoteHtml, type DiagramRenderer, type DiagramTheme } from '../lib/enhance';
-import {
-  deriveTitle,
-  exportMarkdown,
-  noteFileName,
-  textStats,
-  toggleInlineMarker,
-  toggleTask,
-  UNTITLED,
-  type Note,
-} from '../lib/notes';
+import { deriveTitle, exportMarkdown, noteFileName, textStats, toggleInlineMarker, UNTITLED, type Note } from '../lib/notes';
+import { toggleTaskAtLine } from '../lib/render';
+import { notesStore } from '../lib/store';
 import { NotePreview } from './NotePreview';
 import { TagEditor } from './TagEditor';
 
 export type ViewMode = 'edit' | 'split' | 'preview';
-type Draft = Pick<Note, 'title' | 'autoTitle' | 'content' | 'tags'>;
+type DraftKey = 'title' | 'autoTitle' | 'content' | 'tags';
+type Draft = Pick<Note, DraftKey>;
 type SaveState = 'saved' | 'pending' | 'saving' | 'error';
 
 const SAVE_DELAY = 500;
@@ -64,6 +60,10 @@ const formattingKeymap = Prec.highest(
 );
 const EDITOR_EXTENSIONS = [formattingKeymap];
 
+function draftOf(note: Note): Draft {
+  return { title: note.title, autoTitle: note.autoTitle, content: note.content, tags: note.tags };
+}
+
 export function NoteEditor({
   note,
   theme,
@@ -75,10 +75,11 @@ export function NoteEditor({
   onDuplicate,
   onDelete,
   onToggleFavorite,
-  onSave,
+  onConflict,
   tagSuggestions,
   autoFocus,
 }: {
+  /** The latest stored version (refreshes when this or another tab saves). */
   note: Note;
   theme: DiagramTheme;
   renderDiagram: DiagramRenderer;
@@ -89,71 +90,95 @@ export function NoteEditor({
   onDuplicate: (draft: Draft) => void;
   onDelete: () => void;
   onToggleFavorite: () => void;
-  /** Persists the changed fields; must merge with the stored record. */
-  onSave: (patch: Partial<Draft>) => Promise<void>;
+  /** Keeps another tab's version that this editor is about to overwrite (e.g. as a copy). */
+  onConflict: (theirs: Note) => Promise<void>;
   tagSuggestions: string[];
   autoFocus?: boolean;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => ({
-    title: note.title,
-    autoTitle: note.autoTitle,
-    content: note.content,
-    tags: note.tags,
-  }));
+  const [draft, setDraft] = useState<Draft>(() => draftOf(note));
   const draftRef = useRef(draft);
-  const dirty = useRef(new Set<keyof Draft>());
+  const onConflictRef = useRef(onConflict);
+  onConflictRef.current = onConflict;
+  const [session] = useState(
+    () =>
+      new AutosaveSession<Note, DraftKey>({
+        coll: notesStore,
+        initial: note,
+        read: () => draftRef.current,
+        conflictField: 'content',
+        onConflict: (theirs) => onConflictRef.current(theirs),
+      }),
+  );
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [save, setSave] = useState<SaveState>('saved');
   const [titleText, setTitleText] = useState(note.autoTitle ? '' : note.title);
-  const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
+  // Remote images stay blocked (in the preview and when printing) until the user loads them for this note.
+  const [allowRemote, setAllowRemote] = useState(false);
 
   const flush = useCallback(async () => {
     clearTimeout(timer.current);
-    if (dirty.current.size === 0) return;
-    const current = draftRef.current;
-    const patch: Partial<Draft> = {};
-    for (const key of dirty.current) (patch as Record<string, unknown>)[key] = current[key];
-    dirty.current.clear();
+    if (!session.pending) return;
     setSave('saving');
     try {
-      await onSaveRef.current(patch);
-      setSave(dirty.current.size === 0 ? 'saved' : 'pending');
+      const saved = await session.save();
+      setSave(saved === null ? 'error' : session.pending ? 'pending' : 'saved');
     } catch {
       setSave('error');
-      for (const key of Object.keys(patch) as Array<keyof Draft>) dirty.current.add(key);
     }
-  }, []);
+  }, [session]);
+
+  /** Starts the write in this task: after pagehide an awaited read would never finish, losing the last edits. */
+  const saveNow = useCallback(() => {
+    clearTimeout(timer.current);
+    const write = session.saveNow();
+    if (!write) return;
+    setSave('saving');
+    write.then(
+      () => setSave(session.pending ? 'pending' : 'saved'),
+      () => setSave('error'),
+    );
+  }, [session]);
 
   const update = useCallback(
     (patch: Partial<Draft>, delay = SAVE_DELAY) => {
       const next = { ...draftRef.current, ...patch };
       if (next.autoTitle) next.title = deriveTitle(next.content);
-      for (const key of Object.keys(patch) as Array<keyof Draft>) dirty.current.add(key);
-      if (next.title !== draftRef.current.title) dirty.current.add('title');
+      const keys = Object.keys(patch) as DraftKey[];
+      if (next.title !== draftRef.current.title) keys.push('title');
+      session.markDirty(keys);
       draftRef.current = next;
       setDraft(next);
       setSave('pending');
       clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), delay);
     },
-    [flush],
+    [flush, session],
   );
 
-  // Save outstanding edits when switching notes, hiding the tab or leaving the page.
+  // A newer version saved elsewhere (another tab): take over the fields this editor has not changed.
+  useEffect(() => {
+    const adopt = session.observe(note);
+    if (!adopt) return;
+    const next = { ...draftRef.current, ...adopt };
+    draftRef.current = next;
+    setDraft(next);
+    if ('title' in adopt || 'autoTitle' in adopt) setTitleText(next.autoTitle ? '' : next.title);
+  }, [note, session]);
+
+  // Save outstanding edits when the tab is hidden or the page unloads, and when switching notes.
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush();
+      if (document.visibilityState === 'hidden') saveNow();
     };
-    const onPageHide = () => void flush();
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('pagehide', saveNow);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('pagehide', saveNow);
+      // The page stays alive (another note or tool opened), so the checked save can finish.
       void flush();
     };
-  }, [flush]);
+  }, [flush, saveNow]);
 
   const [printing, setPrinting] = useState(false);
 
@@ -161,23 +186,24 @@ export function NoteEditor({
     if (printing) return;
     setPrinting(true);
     try {
-      const html = await buildNoteHtml(draftRef.current.title, draftRef.current.content, renderDiagram);
+      const html = await buildNoteHtml(draftRef.current.title, draftRef.current.content, renderDiagram, { blockRemote: !allowRemote });
       await printHtml(html);
     } catch (err) {
       toast(errorMessage(err, 'Could not prepare the note for printing.'), 'error');
     } finally {
       setPrinting(false);
     }
-  }, [printing, renderDiagram]);
+  }, [printing, renderDiagram, allowRemote]);
 
-  // Ctrl/Cmd+S saves immediately, Ctrl/Cmd+P prints just the rendered note.
+  // Ctrl/Cmd+S saves immediately, Ctrl/Cmd+P prints just the rendered note (not while a dialog is open).
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (document.querySelector('dialog[open]')) return;
       const key = event.key.toLowerCase();
       if (key === 's') {
         event.preventDefault();
-        void flush().then(() => setSave((s) => (s === 'error' ? s : 'saved')));
+        void flush().then(() => setSave((s) => (s === 'error' ? s : session.pending ? 'pending' : 'saved')));
       } else if (key === 'p') {
         event.preventDefault();
         void print();
@@ -185,9 +211,11 @@ export function NoteEditor({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [flush, print]);
+  }, [flush, print, session]);
 
-  const stats = useMemo(() => textStats(draft.content), [draft.content]);
+  // Counting words in a multi-megabyte note takes a moment: do it after typing pauses.
+  const statsSource = useDebouncedValue(draft.content, 250);
+  const stats = useMemo(() => textStats(statsSource), [statsSource]);
   const effectiveMode: ViewMode = !isDesktop && mode === 'split' ? 'edit' : mode;
   const showEditor = effectiveMode !== 'preview';
   const showPreview = effectiveMode !== 'edit';
@@ -301,7 +329,9 @@ export function NoteEditor({
             content={draft.content}
             theme={theme}
             renderDiagram={renderDiagram}
-            onToggleTask={(index) => update({ content: toggleTask(draftRef.current.content, index) }, 150)}
+            allowRemote={allowRemote}
+            onAllowRemote={() => setAllowRemote(true)}
+            onToggleTask={(line) => update({ content: toggleTaskAtLine(draftRef.current.content, line) }, 150)}
             className={cn('px-5 py-4 sm:px-6', !isDesktop && 'min-h-[360px]')}
           />
         )}

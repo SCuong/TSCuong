@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   highlightCode,
+  languageVariant,
   loadSnippetLanguage,
   loadedSnippetLanguage,
   previewLines,
@@ -9,21 +10,25 @@ import {
   type LoadedLanguage,
 } from '../lib/highlight';
 
-/** Loaded language support for a snippet language id (undefined while loading). */
-export function useSnippetLanguage(languageId: string): LoadedLanguage | undefined {
+/**
+ * Loaded language support for a snippet language id (undefined while loading).
+ * Pass the code so PHP fragments without `<?php` get the plain-PHP grammar.
+ */
+export function useSnippetLanguage(languageId: string, code = ''): LoadedLanguage | undefined {
+  const variant = languageVariant(languageId, code);
   const [state, setState] = useState<{ id: string; lang: LoadedLanguage } | null>(null);
-  const cached = loadedSnippetLanguage(languageId);
+  const cached = loadedSnippetLanguage(variant);
   useEffect(() => {
     if (cached) return;
     let cancelled = false;
-    void loadSnippetLanguage(languageId).then((lang) => {
-      if (!cancelled) setState({ id: languageId, lang });
+    void loadSnippetLanguage(variant).then((lang) => {
+      if (!cancelled) setState({ id: variant, lang });
     });
     return () => {
       cancelled = true;
     };
-  }, [languageId, cached]);
-  return cached ?? (state?.id === languageId ? state.lang : undefined);
+  }, [variant, cached]);
+  return cached ?? (state?.id === variant ? state.lang : undefined);
 }
 
 /** Compact, non-interactive preview of the first lines of a snippet (used in the list). */
@@ -38,8 +43,8 @@ export const CodePreview = memo(function CodePreview({
   lines?: number;
   className?: string;
 }) {
-  const lang = useSnippetLanguage(language);
   const text = useMemo(() => previewLines(code, lines), [code, lines]);
+  const lang = useSnippetLanguage(language, code);
   const tokens = useMemo(() => highlightCode(text, lang?.parser ?? null), [text, lang]);
   return (
     <pre
@@ -68,7 +73,7 @@ export const CodePreview = memo(function CodePreview({
 
 /** Full read-only code block with line numbers and static syntax highlighting. */
 export function CodeBlock({ code, language, className }: { code: string; language: string; className?: string }) {
-  const lang = useSnippetLanguage(language);
+  const lang = useSnippetLanguage(language, code);
   const lines = useMemo(() => tokensToLines(highlightCode(code, lang?.parser ?? null)), [code, lang]);
   if (!code) {
     return (

@@ -82,12 +82,28 @@ const cache = new Map<string, Promise<LoadedLanguage>>();
 const resolved = new Map<string, LoadedLanguage>();
 const EMPTY: LoadedLanguage = { extension: [], parser: null };
 
-/** Lazily loads editor + static highlighting support for a snippet language. Never rejects. */
+/** PHP snippets without an opening tag, highlighted as PHP code instead of as HTML text. */
+export const PHP_FRAGMENT = 'php:fragment';
+
+/**
+ * The language support to use for a snippet. PHP snippets are usually fragments
+ * without `<?php`; the PHP grammar would treat those as HTML text, so they get
+ * the plain-PHP variant.
+ */
+export function languageVariant(languageId: string, code: string): string {
+  return languageId === 'php' && !/<\?(?:php\b|=)/i.test(code) ? PHP_FRAGMENT : getSnippetLanguage(languageId).id;
+}
+
+/** Lazily loads editor + static highlighting support for a snippet language (or {@link languageVariant}). Never rejects. */
 export function loadSnippetLanguage(languageId: string): Promise<LoadedLanguage> {
-  const lang = getSnippetLanguage(languageId);
+  const lang = languageId === PHP_FRAGMENT ? { id: PHP_FRAGMENT } : getSnippetLanguage(languageId);
   let pending = cache.get(lang.id);
   if (!pending) {
     pending = (async (): Promise<LoadedLanguage> => {
+      if (!('name' in lang)) {
+        const support = (await import('@codemirror/lang-php')).php({ plain: true });
+        return { extension: support, parser: support.language.parser };
+      }
       if (lang.editor) {
         const ext = await loadLanguage(lang.editor);
         return { extension: [], parser: parserOf(ext) };
@@ -110,7 +126,7 @@ export function loadSnippetLanguage(languageId: string): Promise<LoadedLanguage>
 
 /** Synchronous access to an already loaded language (avoids a flash of unhighlighted code). */
 export function loadedSnippetLanguage(languageId: string): LoadedLanguage | undefined {
-  return resolved.get(getSnippetLanguage(languageId).id);
+  return resolved.get(languageId === PHP_FRAGMENT ? PHP_FRAGMENT : getSnippetLanguage(languageId).id);
 }
 
 export interface Token {

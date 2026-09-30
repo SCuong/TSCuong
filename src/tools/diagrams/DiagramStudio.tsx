@@ -32,7 +32,7 @@ import { cn, downloadBlob, errorMessage } from '@/lib/utils';
 import { describeMermaidError, diagramFileName, sizedSvg, standaloneSvg, uniqueName, type DiagramError, type DiagramRecord } from './lib/diagrams';
 import { renderMermaid, THEME_BACKGROUND, type MermaidTheme } from './lib/mermaid';
 import { svgToPng } from './lib/raster';
-import { patchRecord } from './lib/store';
+import { AutosaveSession, patchRecord, removeRecord } from './lib/store';
 import { DEFAULT_TEMPLATE, detectDiagramKind, getTemplate, type DiagramTemplate } from './lib/templates';
 import { ZoomCanvas, type ZoomCanvasHandle } from './components/ZoomCanvas';
 import { RenameDialog, TemplateDialog } from './components/DiagramDialogs';
@@ -75,6 +75,8 @@ export default function DiagramStudio() {
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })), [items]);
   const active = items.find((d) => d.id === activeId) ?? [...items].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   // First visit: create one example diagram (only once, so deleting everything stays deleted).
   const seeding = useRef(false);
@@ -87,8 +89,22 @@ export default function DiagramStudio() {
       const record = makeRecord(DEFAULT_TEMPLATE, []);
       await store.put(record);
       setActiveId(record.id);
-    })();
+    })().catch(() => undefined);
   }, [loading, items.length, setActiveId]);
+
+  /** Another tab saved this diagram while this tab was editing it: keep that version as a separate diagram. */
+  const keepConflict = useCallback(async (theirs: DiagramRecord) => {
+    const now = Date.now();
+    const copy: DiagramRecord = {
+      ...theirs,
+      id: newId(),
+      name: uniqueName(`${theirs.name} (conflicted copy)`, itemsRef.current.map((d) => d.name)),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.put(copy);
+    toast(`This diagram was also changed in another tab. That version was kept as “${copy.name}”.`, 'info', 8000);
+  }, []);
 
   async function create(template: DiagramTemplate) {
     const record = makeRecord(
@@ -119,7 +135,7 @@ export default function DiagramStudio() {
     const id = active.id;
     setDialog(null);
     try {
-      await store.remove(id);
+      await removeRecord(store, id);
       const next = [...items].filter((d) => d.id !== id).sort((a, b) => b.updatedAt - a.updatedAt)[0];
       setActiveId(next?.id ?? '');
       toast(`Deleted "${active.name}".`);
@@ -197,7 +213,7 @@ export default function DiagramStudio() {
       </div>
 
       {active ? (
-        <DiagramWorkspace key={active.id} record={active} theme={theme} mode={mode} />
+        <DiagramWorkspace key={active.id} record={active} theme={theme} mode={mode} onConflict={keepConflict} />
       ) : (
         <div className="rounded-xl border border-line bg-surface shadow-card">
           <EmptyState
@@ -226,12 +242,36 @@ export default function DiagramStudio() {
 
 type SaveState = 'saved' | 'pending' | 'saving' | 'error';
 
-function DiagramWorkspace({ record, theme, mode }: { record: DiagramRecord; theme: MermaidTheme; mode: ViewMode }) {
+function DiagramWorkspace({
+  record,
+  theme,
+  mode,
+  onConflict,
+}: {
+  /** The latest stored version (refreshes when this or another tab saves). */
+  record: DiagramRecord;
+  theme: MermaidTheme;
+  mode: ViewMode;
+  /** Keeps another tab's version that this editor is about to overwrite. */
+  onConflict: (theirs: DiagramRecord) => Promise<void>;
+}) {
   const [code, setCode] = useState(record.code);
+  const codeRef = useRef(code);
+  const onConflictRef = useRef(onConflict);
+  onConflictRef.current = onConflict;
+  const [session] = useState(
+    () =>
+      new AutosaveSession<DiagramRecord, 'code'>({
+        coll: store,
+        initial: record,
+        read: () => ({ code: codeRef.current }),
+        conflictField: 'code',
+        onConflict: (theirs) => onConflictRef.current(theirs),
+      }),
+  );
   const [save, setSave] = useState<SaveState>('saved');
   const [confirmReset, setConfirmReset] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const editorView = useRef<EditorView | null>(null);
   const canvas = useRef<ZoomCanvasHandle>(null);
@@ -239,39 +279,58 @@ function DiagramWorkspace({ record, theme, mode }: { record: DiagramRecord; them
 
   const flush = useCallback(async () => {
     clearTimeout(timer.current);
-    const next = pending.current;
-    if (next === null) return;
-    pending.current = null;
+    if (!session.pending) return;
     setSave('saving');
     try {
-      await patchRecord(store, record.id, { code: next });
-      setSave((s) => (pending.current === null && s === 'saving' ? 'saved' : s));
+      const saved = await session.save();
+      setSave(saved === null ? 'error' : session.pending ? 'pending' : 'saved');
     } catch {
       setSave('error');
     }
-  }, [record.id]);
+  }, [session]);
+
+  /** Starts the write in this task: after pagehide an awaited read would never finish, losing the last edits. */
+  const saveNow = useCallback(() => {
+    clearTimeout(timer.current);
+    const write = session.saveNow();
+    if (!write) return;
+    setSave('saving');
+    write.then(
+      () => setSave(session.pending ? 'pending' : 'saved'),
+      () => setSave('error'),
+    );
+  }, [session]);
 
   function onChange(value: string) {
     setCode(value);
-    pending.current = value;
+    codeRef.current = value;
+    session.markDirty(['code']);
     setSave('pending');
     clearTimeout(timer.current);
     timer.current = setTimeout(() => void flush(), 600);
   }
 
+  // A newer version saved in another tab: show it unless this tab has unsaved changes (those win, theirs is kept as a copy).
+  useEffect(() => {
+    const adopt = session.observe(record);
+    if (adopt?.code === undefined) return;
+    codeRef.current = adopt.code;
+    setCode(adopt.code);
+  }, [record, session]);
+
   // Save outstanding edits when switching diagrams, leaving the page or hiding the tab.
   useEffect(() => {
     const onHide = () => {
-      if (document.visibilityState === 'hidden') void flush();
+      if (document.visibilityState === 'hidden') saveNow();
     };
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flush);
+    window.addEventListener('pagehide', saveNow);
     return () => {
       document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pagehide', saveNow);
       void flush();
     };
-  }, [flush]);
+  }, [flush, saveNow]);
 
   // --- Rendering -----------------------------------------------------------
   const debounced = useDebouncedValue(code, 250);
@@ -322,11 +381,15 @@ function DiagramWorkspace({ record, theme, mode }: { record: DiagramRecord; them
   const template = getTemplate(record.templateId);
   const fileBase = diagramFileName(record.name);
 
-  function goToLine(line: number) {
+  function goToLine(line: number, column: number | null) {
     const view = editorView.current;
     if (!view) return;
     const target = view.state.doc.line(Math.min(Math.max(1, line), view.state.doc.lines));
-    view.dispatch({ selection: { anchor: target.from, head: target.to }, scrollIntoView: true });
+    const selection =
+      column === null
+        ? { anchor: target.from, head: target.to }
+        : { anchor: Math.min(target.from + column - 1, target.to) };
+    view.dispatch({ selection, scrollIntoView: true });
     view.focus();
   }
 
@@ -392,7 +455,9 @@ function DiagramWorkspace({ record, theme, mode }: { record: DiagramRecord; them
                 <TriangleAlert size={15} className="mt-px shrink-0" aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">
-                    {renderError.line !== null ? `Line ${renderError.line}: ` : ''}
+                    {renderError.line !== null
+                      ? `Line ${renderError.line}${renderError.column !== null ? `, column ${renderError.column}` : ''}: `
+                      : ''}
                     {renderError.message}
                   </p>
                   {renderError.sourceLine !== null && renderError.sourceLine.trim() && (
@@ -402,7 +467,7 @@ function DiagramWorkspace({ record, theme, mode }: { record: DiagramRecord; them
                   )}
                 </div>
                 {renderError.line !== null && (
-                  <Button size="sm" variant="ghost" className="h-7 text-danger" onClick={() => goToLine(renderError.line!)}>
+                  <Button size="sm" variant="ghost" className="h-7 text-danger" onClick={() => goToLine(renderError.line!, renderError.column)}>
                     Go to line
                   </Button>
                 )}

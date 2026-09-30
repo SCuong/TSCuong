@@ -1,6 +1,7 @@
+import { blockRemoteContent } from '@/lib/remoteContent';
 import { describeMermaidError } from '../../diagrams/lib/diagrams';
 import { cachedHighlight, highlightCode } from './highlight';
-import { mermaidSource, renderMarkdown, standaloneHtml } from './render';
+import { htmlDocument, mermaidSource, prepareSource, referenceDefinitions, renderChunk, sanitizeExportBody, splitChunks } from './render';
 
 export type DiagramTheme = 'default' | 'dark';
 export type DiagramRenderer = (source: string, theme: DiagramTheme) => Promise<string>;
@@ -44,8 +45,14 @@ function showDiagramError(el: HTMLElement, message: string) {
 }
 
 function describeError(error: unknown, source: string): string {
-  const { line, message } = describeMermaidError(error, source);
-  return line !== null ? `line ${line}: ${message}` : message;
+  const { line, column, message } = describeMermaidError(error, source);
+  if (line === null) return message;
+  return `line ${line}${column !== null ? `, column ${column}` : ''}: ${message}`;
+}
+
+/** True when {@link enhancePreview} still has work to do in `root` (e.g. an earlier run was cancelled). */
+export function needsEnhancement(root: ParentNode): boolean {
+  return root.querySelector('.lk-note-mermaid[data-mermaid="pending"], .lk-note-mermaid[data-mermaid="rendering"], pre > code[class*="language-"]:not([data-lk-hl])') !== null;
 }
 
 /**
@@ -57,24 +64,27 @@ export async function enhancePreview(root: HTMLElement, options: EnhanceOptions)
   const { theme, renderDiagram, token } = options;
   const jobs: Array<Promise<void>> = [];
 
-  for (const code of root.querySelectorAll<HTMLElement>('pre > code[class*="language-"]')) {
+  for (const code of root.querySelectorAll<HTMLElement>('pre > code[class*="language-"]:not([data-lk-hl])')) {
     const lang = languageOf(code);
     const source = code.textContent ?? '';
     const cached = cachedHighlight(source, lang);
     if (cached !== undefined) {
       code.innerHTML = cached;
+      code.dataset.lkHl = '';
       continue;
     }
     jobs.push(
       highlightCode(source, lang)
         .then((html) => {
-          if (html !== null && !token?.cancelled && code.textContent === source) code.innerHTML = html;
+          if (token?.cancelled || code.textContent !== source) return;
+          if (html !== null) code.innerHTML = html;
+          code.dataset.lkHl = '';
         })
         .catch(() => undefined),
     );
   }
 
-  for (const el of root.querySelectorAll<HTMLElement>('.lk-note-mermaid[data-mermaid="pending"]')) {
+  for (const el of root.querySelectorAll<HTMLElement>('.lk-note-mermaid[data-mermaid="pending"], .lk-note-mermaid[data-mermaid="rendering"]')) {
     const source = mermaidSource(el).trim();
     if (!source) continue;
     const key = `${theme}\u0000${source}`;
@@ -106,13 +116,24 @@ export async function enhancePreview(root: HTMLElement, options: EnhanceOptions)
   await Promise.all(jobs);
 }
 
-/** Makes the live preview interactive: numbered, clickable task checkboxes and external links in a new tab. */
+/** The text of a task list item without its nested lists, for the checkbox's accessible name. */
+function taskText(item: Element | null): string {
+  if (!item) return '';
+  let text = '';
+  for (const node of item.childNodes) {
+    if (node instanceof Element && (node.tagName === 'UL' || node.tagName === 'OL')) break;
+    text += node.textContent ?? '';
+  }
+  return text.replace(/\s+/g, ' ').trim().slice(0, 100);
+}
+
+/** Makes the live preview interactive: clickable task checkboxes and external links in a new tab. */
 export function prepareInteractive(root: HTMLElement) {
-  root.querySelectorAll<HTMLInputElement>('li > input[type="checkbox"]').forEach((box, index) => {
+  for (const box of root.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-lk-task]')) {
     box.disabled = false;
-    box.dataset.task = String(index);
-    box.setAttribute('aria-label', `Toggle task ${index + 1}`);
-  });
+    const text = taskText(box.closest('li'));
+    box.setAttribute('aria-label', text ? `Task: ${text}` : 'Task');
+  }
   for (const a of root.querySelectorAll<HTMLAnchorElement>('a[href]')) {
     const href = a.getAttribute('href') ?? '';
     if (/^(https?:|mailto:)/i.test(href)) {
@@ -127,12 +148,46 @@ export function prepareInteractive(root: HTMLElement) {
   }
 }
 
-/** A complete, sanitized, styled HTML document for a note (diagrams rendered with the light theme). */
-export async function buildNoteHtml(title: string, markdown: string, renderDiagram: DiagramRenderer): Promise<string> {
-  const container = document.createElement('div');
-  container.innerHTML = renderMarkdown(markdown);
-  await enhancePreview(container, { theme: 'default', renderDiagram });
-  // Diagrams that failed keep their source; drop the placeholder attribute noise.
-  for (const el of container.querySelectorAll<HTMLElement>('[data-mermaid]')) el.removeAttribute('data-mermaid');
-  return standaloneHtml(title, container.innerHTML);
+/** Lets the browser paint and handle input between slices of long work. */
+export function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Printing with remote content still blocked: nothing may be fetched except inline data. */
+const OFFLINE_CSP = "default-src 'none'; img-src data: blob:; media-src data: blob:; font-src data:; style-src 'unsafe-inline'";
+
+/**
+ * A complete, sanitized, styled HTML document for a note (diagrams rendered with the light theme).
+ * `blockRemote` keeps remote images out (placeholders plus a Content-Security-Policy), for printing
+ * a note whose remote images the user has not chosen to load.
+ */
+export async function buildNoteHtml(
+  title: string,
+  markdown: string,
+  renderDiagram: DiagramRenderer,
+  options: { blockRemote?: boolean } = {},
+): Promise<string> {
+  const src = prepareSource(markdown);
+  const chunks = splitChunks(src);
+  const definitions = chunks.length > 1 ? referenceDefinitions(src) : '';
+  const parts: string[] = [];
+  let slice = performance.now();
+  for (const chunk of chunks) {
+    const container = document.createElement('div');
+    container.innerHTML = renderChunk(chunk.text, definitions, 'export');
+    await enhancePreview(container, { theme: 'default', renderDiagram });
+    // Diagrams that failed keep their source; drop the placeholder attribute noise.
+    for (const el of container.querySelectorAll<HTMLElement>('[data-mermaid], [data-lk-task], [data-lk-hl]')) {
+      el.removeAttribute('data-mermaid');
+      el.removeAttribute('data-lk-task');
+      el.removeAttribute('data-lk-hl');
+    }
+    const body = sanitizeExportBody(container.innerHTML);
+    parts.push(options.blockRemote ? blockRemoteContent(body).html : body);
+    if (performance.now() - slice > 30) {
+      await yieldToBrowser();
+      slice = performance.now();
+    }
+  }
+  return htmlDocument(title, parts.join('\n'), options.blockRemote ? { csp: OFFLINE_CSP } : {});
 }

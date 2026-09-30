@@ -1,5 +1,29 @@
 /* Markdown Notes: preview extras and print rules. Uses the global design tokens. */
 
+/* The preview is rendered in chunks; the wrappers must not affect layout. */
+.lk-note-prose .lk-note-chunk {
+  display: contents;
+}
+.lk-note-prose > .lk-note-chunk:first-child > :first-child {
+  margin-top: 0;
+}
+.lk-note-prose > .lk-note-chunk:last-child > :last-child {
+  margin-bottom: 0;
+}
+/* Task items in loose lists (items separated by blank lines) keep the checkbox inside the paragraph. */
+.lk-note-prose li:has(> p:first-child > input[type='checkbox']) {
+  list-style: none;
+  margin-left: -1.4em;
+}
+.lk-note-prose li > p:first-child > input[type='checkbox'] {
+  margin-right: 0.5em;
+  vertical-align: -1px;
+  accent-color: var(--lk-accent);
+}
+.lk-note-prose .lk-note-frontmatter {
+  font-size: 12.5px;
+}
+
 .lk-note-prose .lk-note-mermaid {
   flex-direction: column;
   align-items: center;
@@ -24,7 +48,7 @@
   line-height: 1.5;
   color: var(--lk-danger);
 }
-.lk-note-prose li > input[type='checkbox']:not(:disabled) {
+.lk-note-prose input[data-lk-task]:not(:disabled) {
   cursor: pointer;
 }
 

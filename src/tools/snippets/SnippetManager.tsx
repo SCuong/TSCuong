@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useBlocker } from 'react-router';
 import {
   ArrowLeft,
   Copy,
@@ -22,7 +23,7 @@ import { Input, Label, Select, Textarea } from '@/components/ui/Field';
 import { Badge, Kbd } from '@/components/ui/Panel';
 import { ErrorMessage, Alert } from '@/components/ui/Alert';
 import { EmptyState, Spinner } from '@/components/ui/Feedback';
-import { ConfirmDialog } from '@/components/ui/Dialog';
+import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { toast } from '@/components/ui/Toast';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { collection, getStorageProblem, newId, useCollection } from '@/lib/storage/db';
@@ -35,7 +36,9 @@ import {
   draftFromSnippet,
   draftsEqual,
   duplicateSnippet,
+  duplicateTitle,
   emptyDraft,
+  fallbackTitle,
   relativeTime,
   validateDraft,
   type Snippet,
@@ -45,6 +48,7 @@ import { SORT_LABELS, buildSearchIndex, languageCounts, searchSnippets, tagCount
 import { exportSnippets, parseImport, planImport, type ConflictStrategy } from './lib/io';
 import { SNIPPET_TEMPLATES, type SnippetTemplate } from './lib/templates';
 import { CodeBlock, useSnippetLanguage } from './components/HighlightedCode';
+import { languageVariant, PHP_FRAGMENT } from './lib/highlight';
 import { SnippetList, type SnippetListHandle } from './components/SnippetList';
 import { TagInput } from './components/TagInput';
 import { ImportDialog, ShortcutsDialog, TemplatesDialog, type PendingImport } from './components/Dialogs';
@@ -57,7 +61,15 @@ interface EditState {
   mode: 'new' | 'edit';
   id: string | null;
   base: SnippetDraft;
+  /** `updatedAt` of the stored snippet when editing started, to notice saves from another tab. */
+  baseUpdatedAt: number | null;
   draft: SnippetDraft;
+}
+
+/** A save that would overwrite changes made in another tab (or a snippet deleted there). */
+interface SaveConflict {
+  title: string;
+  deleted: boolean;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -86,6 +98,7 @@ export default function SnippetManager() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<SaveConflict | null>(null);
   const [storageProblem, setStorageProblem] = useState<string | null>(null);
 
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -137,6 +150,9 @@ export default function SnippetManager() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
 
+  // Leaving the tool inside the app (sidebar, command palette, Back) would silently drop the editor: ask first.
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname);
+
   /** Run an action, asking first when it would discard unsaved edits. */
   const guard = useCallback(
     (action: () => void) => {
@@ -164,7 +180,7 @@ export default function SnippetManager() {
     (draft?: SnippetDraft) => {
       guard(() => {
         const base = draft ?? emptyDraft(lastLanguage);
-        setEditing({ mode: 'new', id: null, base: emptyDraft(base.language), draft: base });
+        setEditing({ mode: 'new', id: null, base: emptyDraft(base.language), baseUpdatedAt: null, draft: base });
         setSaveError(null);
         setMobileDetail(true);
       });
@@ -174,7 +190,7 @@ export default function SnippetManager() {
 
   const startEdit = useCallback((s: Snippet) => {
     const base = draftFromSnippet(s);
-    setEditing({ mode: 'edit', id: s.id, base, draft: base });
+    setEditing({ mode: 'edit', id: s.id, base, baseUpdatedAt: s.updatedAt, draft: base });
     setOpenId(s.id);
     setSaveError(null);
     setMobileDetail(true);
@@ -188,36 +204,53 @@ export default function SnippetManager() {
     });
   }, [guard, openId]);
 
-  const save = useCallback(async () => {
-    if (!editing) return;
-    const problem = validateDraft(editing.draft);
-    if (problem) {
-      setSaveError(problem);
-      return;
-    }
-    try {
-      if (editing.mode === 'new') {
-        const created = createSnippet(editing.draft, newId());
-        await snippets.put(created);
-        setOpenId(created.id);
-        setActiveId(created.id);
-        setLastLanguage(created.language);
-        toast('Snippet created');
-      } else {
-        const current = editing.id ? byId.get(editing.id) : undefined;
-        if (!current) {
-          setSaveError('This snippet no longer exists (it may have been deleted in another tab).');
-          return;
-        }
-        await snippets.put(applyDraft(current, editing.draft));
-        toast('Snippet saved');
+  /**
+   * Saves the editor. When the stored snippet changed in another tab since editing
+   * started (or was deleted there), nothing is overwritten until the user picks
+   * `overwrite` or `copy` in the conflict dialog.
+   */
+  const save = useCallback(
+    async (resolution?: 'overwrite' | 'copy') => {
+      if (!editing) return;
+      const problem = validateDraft(editing.draft);
+      if (problem) {
+        setSaveError(problem);
+        return;
       }
-      setEditing(null);
-      setSaveError(null);
-    } catch (err) {
-      setSaveError(errorMessage(err, 'Could not save the snippet.'));
-    }
-  }, [editing, byId, setLastLanguage]);
+      try {
+        const latest = editing.mode === 'edit' && editing.id ? await snippets.get(editing.id) : undefined;
+        if (editing.mode === 'edit' && !resolution) {
+          const changedElsewhere =
+            !latest || (latest.updatedAt !== editing.baseUpdatedAt && !draftsEqual(draftFromSnippet(latest), editing.base));
+          if (changedElsewhere) {
+            setConflict({ title: latest?.title ?? editing.base.title, deleted: !latest });
+            return;
+          }
+        }
+        if (editing.mode === 'new' || resolution === 'copy' || !latest) {
+          // Keeping both versions: the copy gets its own title so the two are easy to tell apart.
+          const asCopy = editing.mode === 'edit' && latest !== undefined;
+          const title = editing.draft.title.trim() || fallbackTitle(editing.draft.code);
+          const draft = asCopy ? { ...editing.draft, title: duplicateTitle(title, items.map((s) => s.title)) } : editing.draft;
+          const created = createSnippet(draft, newId());
+          await snippets.put(created);
+          setOpenId(created.id);
+          setActiveId(created.id);
+          setLastLanguage(created.language);
+          toast(asCopy ? `Saved as “${created.title}”` : 'Snippet created');
+        } else {
+          // Start from the stored record so favorites and copy counts changed meanwhile are kept.
+          await snippets.put(applyDraft(latest, editing.draft));
+          toast('Snippet saved');
+        }
+        setEditing(null);
+        setSaveError(null);
+      } catch (err) {
+        setSaveError(errorMessage(err, 'Could not save the snippet.'));
+      }
+    },
+    [editing, items, setLastLanguage],
+  );
 
   const copySnippet = useCallback(async (s: Snippet) => {
     if (!s.code) {
@@ -234,7 +267,13 @@ export default function SnippetManager() {
   }, []);
 
   const toggleFavorite = useCallback(async (s: Snippet) => {
-    await snippets.put({ ...s, favorite: !s.favorite }).catch((err: unknown) => toast(errorMessage(err), 'error'));
+    try {
+      // Start from the stored record: another tab may have saved newer content since this one rendered.
+      const latest = (await snippets.get(s.id)) ?? s;
+      await snippets.put({ ...latest, favorite: !s.favorite });
+    } catch (err) {
+      toast(errorMessage(err, 'Could not update the snippet.'), 'error');
+    }
   }, []);
 
   const duplicate = useCallback(
@@ -356,20 +395,11 @@ export default function SnippetManager() {
         h.startNew();
         return;
       }
-      if (mod && e.shiftKey && key === 'c' && !ed && shown) {
-        e.preventDefault();
-        void h.copySnippet(shown);
-        return;
-      }
       if (isTypingTarget(e.target) || mod || e.altKey) return;
 
       if (e.key === 'Escape' && ed) {
         e.preventDefault();
         h.cancelEdit();
-      } else if (e.key === '/') {
-        e.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
       } else if (e.key === '?') {
         e.preventDefault();
         setShortcutsOpen(true);
@@ -400,6 +430,22 @@ export default function SnippetManager() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // "/" focuses the snippet search. It runs in the capture phase and stops the event, because the app shell
+  // uses "/" to open the command palette (still available with Ctrl+K).
+  useEffect(() => {
+    function onSlash(e: KeyboardEvent) {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+      const search = searchRef.current;
+      if (!search || !search.isConnected || document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      search.focus();
+      search.select();
+    }
+    window.addEventListener('keydown', onSlash, true);
+    return () => window.removeEventListener('keydown', onSlash, true);
+  }, []);
+
   function onSearchKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
@@ -418,7 +464,7 @@ export default function SnippetManager() {
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="primary" icon={Plus} onClick={() => startNew()} title={`New snippet (${modKey}+N)`}>
+      <Button variant="primary" icon={Plus} onClick={() => startNew()} title="New snippet (N or Alt+N)">
         New snippet
       </Button>
       <Button icon={LayoutTemplate} onClick={() => setTemplatesOpen(true)}>
@@ -633,11 +679,19 @@ export default function SnippetManager() {
       )}
 
       <ConfirmDialog
-        open={pendingAction !== null}
+        open={pendingAction !== null || blocker.state === 'blocked'}
         title="Discard unsaved changes?"
         confirmLabel="Discard changes"
-        onCancel={() => setPendingAction(null)}
+        onCancel={() => {
+          if (blocker.state === 'blocked') blocker.reset();
+          setPendingAction(null);
+        }}
         onConfirm={() => {
+          if (blocker.state === 'blocked') {
+            setEditing(null);
+            blocker.proceed();
+            return;
+          }
           const action = pendingAction;
           setPendingAction(null);
           setEditing(null);
@@ -646,6 +700,45 @@ export default function SnippetManager() {
       >
         You have edits that are not saved yet. They will be lost.
       </ConfirmDialog>
+      <Dialog
+        open={conflict !== null}
+        onClose={() => setConflict(null)}
+        title={conflict?.deleted ? 'Snippet deleted in another tab' : 'Snippet changed in another tab'}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConflict(null)}>
+              Keep editing
+            </Button>
+            <Button
+              variant={conflict?.deleted ? 'primary' : undefined}
+              onClick={() => {
+                setConflict(null);
+                void save('copy');
+              }}
+            >
+              {conflict?.deleted ? 'Save as new snippet' : 'Save as a copy'}
+            </Button>
+            {!conflict?.deleted && (
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setConflict(null);
+                  void save('overwrite');
+                }}
+              >
+                Overwrite
+              </Button>
+            )}
+          </>
+        }
+      >
+        <p className="text-sm text-fg-secondary">
+          {conflict?.deleted
+            ? `“${conflict.title}” was deleted in another tab while you were editing it. Save your version as a new snippet?`
+            : `“${conflict?.title}” was changed in another tab after you started editing. Overwrite those changes with yours, or keep both by saving yours as a copy?`}
+        </p>
+      </Dialog>
       <ConfirmDialog
         open={deleteTarget !== null}
         title="Delete snippet?"
@@ -722,7 +815,7 @@ function SnippetDetailPane({
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button variant="primary" size="sm" icon={Copy} onClick={onCopy} disabled={!snippet.code} title={`Copy code (${modKey}+Shift+C)`}>
+          <Button variant="primary" size="sm" icon={Copy} onClick={onCopy} disabled={!snippet.code} title="Copy code (C)">
             Copy code
           </Button>
           <Button size="sm" icon={Pencil} onClick={onEdit} title="Edit (E)">
@@ -787,9 +880,10 @@ function SnippetEditorPane({
   dirty: boolean;
 }) {
   const { draft } = editing;
-  const lang = useSnippetLanguage(draft.language);
+  const lang = useSnippetLanguage(draft.language, draft.code);
   const extensions = useMemo(() => (lang ? [lang.extension] : []), [lang]);
-  const editorLanguage = getSnippetLanguage(draft.language).editor ?? 'plain';
+  // PHP fragments without "<?php" use the plain-PHP grammar passed through `extensions`.
+  const editorLanguage = languageVariant(draft.language, draft.code) === PHP_FRAGMENT ? 'plain' : (getSnippetLanguage(draft.language).editor ?? 'plain');
   const set = (patch: Partial<SnippetDraft>) => onChange({ ...draft, ...patch });
 
   return (
