@@ -8,6 +8,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { TEXT_FILE_ACCEPT } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'punycode-converter';
 const SAMPLE_UNICODE = 'bücher.example\nmünchen.de\nhttps://日本語.jp/path?q=1\n例え.テスト\nаpple.com';
@@ -42,61 +43,61 @@ export default function PunycodeConverter() {
           labels={{ encode: 'Unicode → Punycode', decode: 'Punycode → Unicode' }}
         />
         <p className="pb-2 text-[12.5px] text-fg-muted">
-          One domain or URL per line.{' '}
+          {t('One domain or URL per line.')}{' '}
           {direction === 'encode'
-            ? 'Uses the browser’s IDNA rules (lowercasing and full-width folding included).'
-            : 'Decodes every xn-- label (RFC 3492) and checks it the way browsers do.'}
+            ? t('Uses the browser’s IDNA rules (lowercasing and full-width folding included).')
+            : t('Decodes every xn-- label (RFC 3492) and checks it the way browsers do.')}
         </p>
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not convert these domains" />
+      <ErrorMessage error={task.error} title={t('Could not convert these domains')} />
       {errors.length > 0 && (
-        <Alert tone="danger" title={`${pluralize(errors.length, 'line')} could not be converted`}>
+        <Alert tone="danger" title={t('{count} could not be converted', { count: pluralize(errors.length, t('line'), t('lines')) })}>
           <ul className="list-disc pl-4">
             {errors.slice(0, 5).map((r) => (
               <li key={r.line}>
-                Line {r.line}: {r.error}
+                {t('Line {line}: {error}', { line: r.line, error: r.error })}
               </li>
             ))}
           </ul>
-          {errors.length > 5 && <p className="mt-1">…and {pluralize(errors.length - 5, 'more line')}.</p>}
+          {errors.length > 5 && <p className="mt-1">{t('…and {count}.', { count: pluralize(errors.length - 5, t('more line'), t('more lines')) })}</p>}
         </Alert>
       )}
       {warned.length > 0 && (
-        <Alert tone="warning" title="Check these domains">
+        <Alert tone="warning" title={t('Check these domains')}>
           <ul className="list-disc pl-4">
             {warned.slice(0, 5).flatMap((r) =>
               r.warnings.map((w) => (
                 <li key={`${r.line}-${w}`}>
-                  Line {r.line}: {w}
+                  {t('Line {line}: {w}', { line: r.line, w })}
                 </li>
               )),
             )}
           </ul>
-          {warned.length > 5 && <p className="mt-1">…and {pluralize(warned.length - 5, 'more line')}.</p>}
+          {warned.length > 5 && <p className="mt-1">{t('…and {count}.', { count: pluralize(warned.length - 5, t('more line'), t('more lines')) })}</p>}
         </Alert>
       )}
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Unicode domains' : 'Punycode (xn--) domains'}
+          title={direction === 'encode' ? t('Unicode domains') : t('Punycode (xn--) domains')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'bücher.example' : 'xn--bcher-kva.example'}
+          placeholder={direction === 'encode' ? t('bücher.example') : t('xn--bcher-kva.example')}
           sample={direction === 'encode' ? SAMPLE_UNICODE : SAMPLE_ASCII}
           fileAccept={TEXT_FILE_ACCEPT}
           height="300px"
           lineWrapping={false}
           invalid={errors.length > 0}
-          footer={deferred ? <span>{pluralize(rows.filter((r) => r.input.trim()).length, 'line')}</span> : undefined}
+          footer={deferred ? <span>{pluralize(rows.filter((r) => r.input.trim()).length, t('line'), t('lines'))}</span> : undefined}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Punycode (ASCII)' : 'Unicode'}
+          title={direction === 'encode' ? t('Punycode (ASCII)') : t('Unicode')}
           value={deferred ? output : ''}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName="domains.txt"
           height="300px"
           lineWrapping={false}
           busy={task.pending}
-          footer={deferred && task.value ? <span>{pluralize(converted, 'domain')} converted</span> : undefined}
+          footer={deferred && task.value ? <span>{t('{count} converted', { count: pluralize(converted, t('domain'), t('domains')) })}</span> : undefined}
         />
       </SplitPanes>
     </ToolStack>

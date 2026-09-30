@@ -1,13 +1,14 @@
 import { utf8DecodeStrict, utf8Encode } from './bytes';
+import { t } from '@/lib/i18n';
 
 export type HexSeparator = 'none' | 'space' | 'colon' | 'dash' | 'comma0x' | 'backslashX' | 'percent';
 
 export const HEX_SEPARATORS: Array<{ value: HexSeparator; label: string; example: string }> = [
   { value: 'space', label: 'Space', example: '48 65 6c' },
-  { value: 'none', label: 'None', example: '48656c' },
-  { value: 'colon', label: 'Colon', example: '48:65:6c' },
-  { value: 'dash', label: 'Dash', example: '48-65-6c' },
-  { value: 'comma0x', label: '0x, list', example: '0x48, 0x65' },
+  { value: 'none', label: t('None'), example: '48656c' },
+  { value: 'colon', label: t('Colon'), example: '48:65:6c' },
+  { value: 'dash', label: t('Dash'), example: '48-65-6c' },
+  { value: 'comma0x', label: t('0x, list'), example: '0x48, 0x65' },
   { value: 'backslashX', label: '\\x', example: '\\x48\\x65' },
   { value: 'percent', label: '%XX', example: '%48%65' },
 ];

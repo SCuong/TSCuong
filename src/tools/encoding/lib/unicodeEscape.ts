@@ -1,11 +1,12 @@
+import { t } from '@/lib/i18n';
 export type EscapeFormat = 'js' | 'es6' | 'python32' | 'utf8hex' | 'html' | 'htmlDec' | 'uplus' | 'css';
 
 export const ESCAPE_FORMATS: Array<{ value: EscapeFormat; label: string; example: string }> = [
-  { value: 'js', label: '\\uXXXX', example: '\\u00e9 \\ud83d\\ude00' },
+  { value: 'js', label: t('\\uXXXX'), example: '\\u00e9 \\ud83d\\ude00' },
   { value: 'es6', label: '\\u{X}', example: '\\u{e9} \\u{1f600}' },
   { value: 'python32', label: '\\UXXXXXXXX', example: '\\u00e9 \\U0001f600' },
-  { value: 'utf8hex', label: '\\xXX (UTF-8)', example: '\\xc3\\xa9' },
-  { value: 'html', label: '&#xX;', example: '&#xE9; &#x1F600;' },
+  { value: 'utf8hex', label: t('\\xXX (UTF-8)'), example: '\\xc3\\xa9' },
+  { value: 'html', label: t('&#xX;'), example: '&#xE9; &#x1F600;' },
   { value: 'htmlDec', label: '&#N;', example: '&#233; &#128512;' },
   { value: 'uplus', label: 'U+XXXX', example: 'U+00E9 U+1F600' },
   { value: 'css', label: 'CSS \\XX', example: '\\e9 \\1f600' },

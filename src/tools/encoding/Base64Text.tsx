@@ -13,6 +13,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'base64-text';
 const SAMPLE_TEXT = 'Hello, World! Ünïcødé and emoji work too 😀';
@@ -33,7 +34,7 @@ export default function Base64Text() {
   const deferred = useDeferredValue(input);
   const task = useTask('convertBase64', convertBase64, deferred ? [deferred, direction, s] : null, { size: deferred.length });
   const result = task.value;
-  const note = result?.ok && direction === 'decode' && result.urlSafe ? 'URL-safe alphabet detected' : null;
+  const note = result?.ok && direction === 'decode' && result.urlSafe ? t('URL-safe alphabet detected') : null;
   const output = result?.ok ? result.text : '';
   const inputBytes = useMemo(() => utf8Length(deferred), [deferred]);
   const outputBytes = useMemo(() => utf8Length(output), [output]);
@@ -49,32 +50,32 @@ export default function Base64Text() {
         <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !task.pending} />
         {direction === 'encode' ? (
           <>
-            <Opt label="Line wrapping">
-              <Select value={String(s.wrap)} onChange={(e) => set('wrap', Number(e.target.value))} aria-label="Line wrapping" className="w-48">
-                <option value="0">No wrapping</option>
-                <option value="76">76 chars (MIME)</option>
-                <option value="64">64 chars (PEM)</option>
+            <Opt label={t('Line wrapping')}>
+              <Select value={String(s.wrap)} onChange={(e) => set('wrap', Number(e.target.value))} aria-label={t('Line wrapping')} className="w-48">
+                <option value="0">{t('No wrapping')}</option>
+                <option value="76">{t('76 chars (MIME)')}</option>
+                <option value="64">{t('64 chars (PEM)')}</option>
               </Select>
             </Opt>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
-              <Switch label="URL-safe (- _)" checked={s.urlSafe} onChange={(v) => set('urlSafe', v)} />
-              <Switch label="Padding (=)" checked={s.padding} onChange={(v) => set('padding', v)} />
+              <Switch label={t('URL-safe (- _)')} checked={s.urlSafe} onChange={(v) => set('urlSafe', v)} />
+              <Switch label={t('Padding (=)')} checked={s.padding} onChange={(v) => set('padding', v)} />
             </div>
           </>
         ) : (
           <p className="pb-2 text-[12.5px] text-fg-muted">
-            Accepts standard and URL-safe Base64, with or without padding, line breaks or a data: URL prefix.
+            {t('Accepts standard and URL-safe Base64, with or without padding, line breaks or a data: URL prefix.')}
           </p>
         )}
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not convert this text" />
+      <ErrorMessage error={task.error} title={t('Could not convert this text')} />
       {result && !result.ok && (
         <Alert
           tone="danger"
-          title={result.bytes ? 'Not text' : 'Invalid Base64'}
+          title={result.bytes ? t('Not text') : t('Invalid Base64')}
           action={
             result.bytes ? (
-              <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="decoded.bin" label="Download bytes" />
+              <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="decoded.bin" label={t('Download bytes')} />
             ) : undefined
           }
         >
@@ -89,10 +90,10 @@ export default function Base64Text() {
 
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Text' : 'Base64'}
+          title={direction === 'encode' ? t('Text') : t('Base64')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Type or paste text to encode…' : 'Paste Base64 to decode…'}
+          placeholder={direction === 'encode' ? t('Type or paste text to encode…') : t('Paste Base64 to decode…')}
           sample={direction === 'encode' ? SAMPLE_TEXT : SAMPLE_B64}
           fileAccept={TEXT_FILE_ACCEPT}
           invalid={Boolean(result && !result.ok)}
@@ -100,9 +101,9 @@ export default function Base64Text() {
           footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Base64' : 'Decoded text'}
+          title={direction === 'encode' ? t('Base64') : t('Decoded text')}
           value={output}
-          placeholder={direction === 'encode' ? 'Base64 appears here' : 'Decoded text appears here'}
+          placeholder={direction === 'encode' ? t('Base64 appears here') : t('Decoded text appears here')}
           downloadName={direction === 'encode' ? 'encoded.b64.txt' : 'decoded.txt'}
           height="360px"
           busy={task.pending}
@@ -110,7 +111,7 @@ export default function Base64Text() {
             output ? (
               <>
                 <span>{formatBytes(outputBytes)}</span>
-                {direction === 'encode' && inputBytes > 0 && <span>{`${Math.round((outputBytes / inputBytes) * 100)}% of input size`}</span>}
+                {direction === 'encode' && inputBytes > 0 && <span>{t('{round}% of input size', { round: Math.round((outputBytes / inputBytes) * 100) })}</span>}
                 {note && <Badge tone="accent">{note}</Badge>}
               </>
             ) : undefined

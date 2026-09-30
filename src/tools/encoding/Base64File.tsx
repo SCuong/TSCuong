@@ -15,6 +15,7 @@ import { baseName, downloadBlob, errorMessage, formatBytes, formatNumber } from 
 import { base64ToBytes, blobToBase64, parseBase64Payload, toDataUrl } from './lib/base64File';
 import { canonicalMime, detectFileType, extensionForMime, type DetectedType } from './lib/magic';
 import { Opt } from '../text/components/shared';
+import { t } from '@/lib/i18n';
 
 const ID = 'base64-file';
 const MAX_FILE = 100 * 1024 * 1024;
@@ -32,18 +33,18 @@ export default function Base64File() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Direction">
+        <Opt label={t('Direction')}>
           <Segmented
-            label="Direction"
+            label={t('Direction')}
             value={tab}
             onChange={setTab}
             options={[
-              { value: 'encode', label: 'File → Base64', icon: FileUp },
-              { value: 'decode', label: 'Base64 → File', icon: FileDown },
+              { value: 'encode', label: t('File → Base64'), icon: FileUp },
+              { value: 'decode', label: t('Base64 → File'), icon: FileDown },
             ]}
           />
         </Opt>
-        <p className="pb-2 text-[12.5px] text-fg-muted">Files are read in chunks on this device and never uploaded.</p>
+        <p className="pb-2 text-[12.5px] text-fg-muted">{t('Files are read in chunks on this device and never uploaded.')}</p>
       </ToolBar>
       {tab === 'encode' ? <EncodeFile /> : <DecodeToFile />}
     </ToolStack>
@@ -85,7 +86,7 @@ function EncodeFile() {
         setFile(null);
         return;
       }
-      setError(errorMessage(e, 'Could not read the file.'));
+      setError(errorMessage(e, t('Could not read the file.')));
     }
   }
 
@@ -107,67 +108,66 @@ function EncodeFile() {
         <FileDrop
           onFiles={(files) => void onFile(files[0])}
           maxSize={MAX_FILE}
-          title="Drop any file to encode"
-          hint={`Images, PDFs, fonts, anything up to ${formatBytes(MAX_FILE)}. Processed locally.`}
+          title={t('Drop any file to encode')}
+          hint={t('Images, PDFs, fonts, anything up to {size}. Processed locally.', { size: formatBytes(MAX_FILE) })}
           onReject={(reason) => setError(reason)}
         />
       ) : (
         <Panel
           title={<span className="break-all">{file.name}</span>}
           description={`${formatBytes(file.size)} · ${detected?.label ?? (file.type || 'Unknown type')}`}
-          actions={<IconButton icon={X} label="Choose another file" size="sm" onClick={reset} />}
+          actions={<IconButton icon={X} label={t('Choose another file')} size="sm" onClick={reset} />}
         >
           <div className="flex flex-col gap-4 sm:flex-row">
             {previewUrl && (
               <div className="lk-checker flex h-28 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line sm:w-40">
-                <img src={previewUrl} alt={`Preview of ${file.name}`} className="max-h-full max-w-full object-contain" />
+                <img src={previewUrl} alt={t('Preview of {name}', { name: file.name })} className="max-h-full max-w-full object-contain" />
               </div>
             )}
             <KeyValueList
               className="min-w-0 flex-1"
               items={[
-                { label: 'MIME type', value: mime },
-                { label: 'Detected from content', value: detected ? `${detected.label} (${detected.mime})` : 'Unknown' },
-                { label: 'Base64 length', value: base64 ? `${formatNumber(base64.length, 0)} characters (${formatBytes(output.length)})` : '—' },
+                { label: t('MIME type'), value: mime },
+                { label: t('Detected from content'), value: detected ? `${detected.label} (${detected.mime})` : 'Unknown' },
+                { label: t('Base64 length'), value: base64 ? `${formatNumber(base64.length, 0)} characters (${formatBytes(output.length)})` : '—' },
               ]}
             />
           </div>
         </Panel>
       )}
-      {job.running && <ProgressBar value={job.progress} label={job.label || 'Reading file…'} onCancel={job.cancel} />}
+      {job.running && <ProgressBar value={job.progress} label={job.label || t('Reading file…')} onCancel={job.cancel} />}
       <ErrorMessage error={error} />
       {file && file.size > WARN_FILE && (
-        <Alert tone="warning" title="Large file">
-          Base64 is about 33% larger than the file. Very long strings can make pasting and copying slow; downloading the result as a
-          file is the most reliable option.
+        <Alert tone="warning" title={t('Large file')}>
+          {t('Base64 is about 33% larger than the file. Very long strings can make pasting and copying slow; downloading the result as a file is the most reliable option.')}
         </Alert>
       )}
       {output && (
         <Panel
-          title={format === 'dataUrl' ? 'Data URL' : 'Base64'}
-          description={`${formatNumber(output.length, 0)} characters`}
+          title={format === 'dataUrl' ? t('Data URL') : t('Base64')}
+          description={t('{count} characters', { count: formatNumber(output.length, 0) })}
           actions={
             <>
               <Segmented
-                label="Output format"
+                label={t('Output format')}
                 size="sm"
                 value={format}
                 onChange={setFormat}
                 options={[
-                  { value: 'dataUrl', label: 'Data URL' },
-                  { value: 'base64', label: 'Base64' },
+                  { value: 'dataUrl', label: t('Data URL') },
+                  { value: 'base64', label: t('Base64') },
                 ]}
               />
               <CopyButton value={() => output} />
-              <DownloadButton data={() => output} filename={`${baseName(file?.name ?? 'file')}.b64.txt`} label="Save" />
+              <DownloadButton data={() => output} filename={`${baseName(file?.name ?? 'file')}.b64.txt`} label={t('Save')} />
             </>
           }
           bodyClassName="p-2"
         >
-          <Textarea value={preview} readOnly aria-label="Encoded output" className="h-64 resize-none break-all" />
+          <Textarea value={preview} readOnly aria-label={t('Encoded output')} className="h-64 resize-none break-all" />
           {output.length > PREVIEW_CHARS && (
             <p className="px-2 pt-2 text-[12.5px] text-fg-muted">
-              Showing the first {formatNumber(PREVIEW_CHARS, 0)} characters. Copy and Save include the full output.
+              {t('Showing the first {PREVIEW_CHARS} characters. Copy and Save include the full output.', { PREVIEW_CHARS: formatNumber(PREVIEW_CHARS, 0) })}
             </p>
           )}
         </Panel>
@@ -223,57 +223,57 @@ function DecodeToFile() {
         base64ToBytes(parsed.base64, { signal, progress: (f) => progress(f, 'Decoding…'), yieldFn: nextFrame }),
       );
       downloadBlob(new Blob([bytes.slice()], { type: mime }), filename);
-      toast(`Saved ${filename}`);
+      toast(t('Saved {filename}', { filename }));
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return;
-      setError(errorMessage(e, 'Could not decode the data.'));
+      setError(errorMessage(e, t('Could not decode the data.')));
     }
   }
 
   return (
     <>
       <EditorPanel
-        title="Base64 or data URL"
+        title={t('Base64 or data URL')}
         value={input}
         onChange={setInput}
-        placeholder="Paste Base64 text or a data:…;base64,… URL"
+        placeholder={t('Paste Base64 text or a data:…;base64,… URL')}
         sample={SAMPLE_DATA_URL}
         fileAccept=".txt,.b64,.base64,text/plain"
         invalid={Boolean(parsed && !parsed.ok)}
         height="220px"
-        footer={input ? <span>{formatNumber(input.length, 0)} characters</span> : undefined}
+        footer={input ? <span>{t('{count} characters', { count: formatNumber(input.length, 0) })}</span> : undefined}
       />
-      <ErrorMessage error={parsed && !parsed.ok ? parsed.error : error} title={parsed && !parsed.ok ? 'Invalid Base64' : undefined} />
+      <ErrorMessage error={parsed && !parsed.ok ? parsed.error : error} title={parsed && !parsed.ok ? t('Invalid Base64') : undefined} />
       {parsed?.ok && (
-        <Panel title="Decoded file" description={`${formatBytes(size)} · ${head?.label ?? 'Unknown binary data'}`}>
+        <Panel title={t('Decoded file')} description={`${formatBytes(size)} · ${head?.label ?? 'Unknown binary data'}`}>
           <div className="flex flex-col gap-4 sm:flex-row">
             {previewUrl && (
               <div className="lk-checker flex h-28 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line sm:w-40">
-                <img src={previewUrl} alt="Decoded image preview" className="max-h-full max-w-full object-contain" />
+                <img src={previewUrl} alt={t('Decoded image preview')} className="max-h-full max-w-full object-contain" />
               </div>
             )}
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               <KeyValueList
                 items={[
                   {
-                    label: 'Detected type',
+                    label: t('Detected type'),
                     value: head ? `${head.label} (${head.mime})` : declared ? 'Not recognized from the content' : 'Not recognized, saved as binary',
                   },
-                  ...(declared ? [{ label: 'Declared in data URL', value: declared }] : []),
-                  { label: 'Saved as', value: mime },
+                  ...(declared ? [{ label: t('Declared in data URL'), value: declared }] : []),
+                  { label: t('Saved as'), value: mime },
                 ]}
               />
               {mismatch && (
                 <Badge tone="warning" className="self-start">
-                  The data URL says {declared}, but the content looks like {head?.mime}
+                  {t('The data URL says {declared}, but the content looks like {mime}', { declared, mime: head?.mime })}
                 </Badge>
               )}
               <div className="flex flex-wrap items-end gap-3">
-                <Opt label="File name" className="min-w-48 flex-1">
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={filename} aria-label="File name" />
+                <Opt label={t('File name')} className="min-w-48 flex-1">
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={filename} aria-label={t('File name')} />
                 </Opt>
                 <Button variant="primary" icon={Download} onClick={() => void download()} loading={job.running}>
-                  Download file
+                  {t('Download file')}
                 </Button>
               </div>
             </div>

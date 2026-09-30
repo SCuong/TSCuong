@@ -3,6 +3,7 @@ import { ArrowDownUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Segmented';
 import { Opt } from '../../text/components/shared';
+import { t } from '@/lib/i18n';
 
 export type Direction = 'encode' | 'decode';
 
@@ -22,9 +23,9 @@ export function DirectionControls({
 }) {
   return (
     <>
-      <Opt label="Mode">
+      <Opt label={t('Mode')}>
         <Segmented
-          label="Mode"
+          label={t('Mode')}
           value={direction}
           onChange={onDirection}
           options={[
@@ -37,10 +38,10 @@ export function DirectionControls({
         icon={ArrowDownUp}
         onClick={onSwap}
         disabled={!canSwap}
-        title="Use the output as the new input and switch direction"
+        title={t('Use the output as the new input and switch direction')}
         className="mb-px self-end"
       >
-        Swap
+        {t('Swap')}
       </Button>
     </>
   );

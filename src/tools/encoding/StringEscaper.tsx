@@ -9,6 +9,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { Opt, SampleButton, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'string-escaper';
 const SAMPLE = `He said "it's done"\n\tPath: C:\\Users\\me — ok? 😀`;
@@ -52,8 +53,8 @@ export default function StringEscaper() {
           canSwap={Boolean(output) && !task.pending}
           labels={{ encode: 'Escape', decode: 'Unescape' }}
         />
-        <Opt label="Language / format">
-          <Select value={s.lang} onChange={(e) => set('lang', e.target.value as EscapeLanguage)} aria-label="Language or format" className="w-56">
+        <Opt label={t('Language / format')}>
+          <Select value={s.lang} onChange={(e) => set('lang', e.target.value as EscapeLanguage)} aria-label={t('Language or format')} className="w-56">
             {ESCAPE_LANGUAGES.map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}
@@ -62,9 +63,9 @@ export default function StringEscaper() {
           </Select>
         </Opt>
         {direction === 'encode' && s.lang === 'js' && (
-          <Opt label="Quote">
+          <Opt label={t('Quote')}>
             <Segmented
-              label="Quote character"
+              label={t('Quote character')}
               value={s.quote}
               onChange={(v) => set('quote', v)}
               options={[
@@ -77,19 +78,19 @@ export default function StringEscaper() {
         )}
         {direction === 'encode' && (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
-            {WRAPPABLE.includes(s.lang) && <Switch label="Wrap in quotes" checked={s.wrap} onChange={(v) => set('wrap', v)} />}
-            {ASCII_ONLY.includes(s.lang) && <Switch label="Escape non-ASCII (\uXXXX)" checked={s.asciiOnly} onChange={(v) => set('asciiOnly', v)} />}
+            {WRAPPABLE.includes(s.lang) && <Switch label={t('Wrap in quotes')} checked={s.wrap} onChange={(v) => set('wrap', v)} />}
+            {ASCII_ONLY.includes(s.lang) && <Switch label={t('Escape non-ASCII (\\uXXXX)')} checked={s.asciiOnly} onChange={(v) => set('asciiOnly', v)} />}
           </div>
         )}
         {info && <p className="w-full text-[12.5px] text-fg-muted">{info.hint}</p>}
       </ToolBar>
-      <ErrorMessage error={result && !result.ok ? result.error : task.error} title={direction === 'encode' ? 'Cannot escape' : 'Cannot unescape'} />
+      <ErrorMessage error={result && !result.ok ? result.error : task.error} title={direction === 'encode' ? t('Cannot escape') : t('Cannot unescape')} />
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Raw text' : 'Escaped string'}
+          title={direction === 'encode' ? t('Raw text') : t('Escaped string')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Text to turn into a string literal…' : 'Escaped string to decode (surrounding quotes are optional)…'}
+          placeholder={direction === 'encode' ? t('Text to turn into a string literal…') : t('Escaped string to decode (surrounding quotes are optional)…')}
           actions={<SampleButton onClick={loadSample} />}
           fileAccept={TEXT_FILE_ACCEPT}
           invalid={Boolean(result && !result.ok)}
@@ -97,9 +98,9 @@ export default function StringEscaper() {
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Escaped' : 'Unescaped'}
+          title={direction === 'encode' ? t('Escaped') : t('Unescaped')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName={direction === 'encode' ? 'escaped.txt' : 'unescaped.txt'}
           height="320px"
           busy={task.pending}

@@ -10,6 +10,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'html-entities';
 const SAMPLE_ENCODE = `<p class="note">Tom & Jerry's "café" — €5 © 2025 😀</p>`;
@@ -42,48 +43,48 @@ export default function HtmlEntities() {
         <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !(direction === 'encode' && encoded.pending)} />
         {direction === 'encode' ? (
           <>
-            <Opt label="Encode">
-              <Select value={scope} onChange={(e) => setScope(e.target.value as EntityScope)} aria-label="Characters to encode" className="w-64">
-                <option value="special">Only &amp; &lt; &gt; &quot; &#39;</option>
-                <option value="nonAscii">Special + all non-ASCII</option>
-                <option value="all">All but letters, digits, spaces</option>
+            <Opt label={t('Encode')}>
+              <Select value={scope} onChange={(e) => setScope(e.target.value as EntityScope)} aria-label={t('Characters to encode')} className="w-64">
+                <option value="special">{t('Only & < > " \'')}</option>
+                <option value="nonAscii">{t('Special + all non-ASCII')}</option>
+                <option value="all">{t('All but letters, digits, spaces')}</option>
               </Select>
             </Opt>
-            <Opt label="Format">
+            <Opt label={t('Format')}>
               <Segmented
-                label="Entity format"
+                label={t('Entity format')}
                 value={format}
                 onChange={setFormat}
                 options={[
-                  { value: 'named', label: 'Named' },
-                  { value: 'decimal', label: 'Decimal' },
-                  { value: 'hex', label: 'Hex' },
+                  { value: 'named', label: t('Named') },
+                  { value: 'decimal', label: t('Decimal') },
+                  { value: 'hex', label: t('Hex') },
                 ]}
               />
             </Opt>
           </>
         ) : (
           <p className="pb-2 text-[12.5px] text-fg-muted">
-            Decodes all 2,231 named HTML5 references plus decimal and hex forms, exactly like a browser. No markup is rendered.
+            {t('Decodes all 2,231 named HTML5 references plus decimal and hex forms, exactly like a browser. No markup is rendered.')}
           </p>
         )}
       </ToolBar>
-      <ErrorMessage error={direction === 'encode' ? encoded.error : null} title="Could not encode this text" />
+      <ErrorMessage error={direction === 'encode' ? encoded.error : null} title={t('Could not encode this text')} />
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Text or HTML' : 'Encoded HTML'}
+          title={direction === 'encode' ? t('Text or HTML') : t('Encoded HTML')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Text to escape for HTML…' : 'Text with &amp;entities; to decode…'}
+          placeholder={direction === 'encode' ? t('Text to escape for HTML…') : t('Text with &amp;entities; to decode…')}
           sample={direction === 'encode' ? SAMPLE_ENCODE : SAMPLE_DECODE}
           fileAccept={`${TEXT_FILE_ACCEPT},.html,.htm,.xml,.svg`}
           height="320px"
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Encoded' : 'Decoded'}
+          title={direction === 'encode' ? t('Encoded') : t('Decoded')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName={direction === 'encode' ? 'encoded.html' : 'decoded.txt'}
           downloadType={direction === 'encode' ? 'text/html;charset=utf-8' : undefined}
           height="320px"
@@ -91,7 +92,7 @@ export default function HtmlEntities() {
           footer={
             input && result ? (
               <span>
-                {direction === 'encode' ? `${pluralize(refs, 'entity', 'entities')} created` : `${pluralize(refs, 'entity', 'entities')} decoded`}
+                {direction === 'encode' ? t('{count} created', { count: pluralize(refs, t('entity'), t('entities')) }) : t('{count} decoded', { count: pluralize(refs, t('entity'), t('entities')) })}
               </span>
             ) : undefined
           }

@@ -10,6 +10,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'binary-text';
 const SAMPLE_TEXT = 'Hi! é';
@@ -35,39 +36,39 @@ export default function BinaryText() {
       <ToolBar>
         <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !task.pending} labels={{ encode: 'Text → Binary', decode: 'Binary → Text' }} />
         {direction === 'encode' ? (
-          <Opt label="Separate bytes with">
+          <Opt label={t('Separate bytes with')}>
             <Segmented
-              label="Byte separator"
+              label={t('Byte separator')}
               value={separator}
               onChange={setSeparator}
               options={[
                 { value: 'space', label: 'Space' },
-                { value: 'newline', label: 'New line' },
-                { value: 'none', label: 'Nothing' },
+                { value: 'newline', label: t('New line') },
+                { value: 'none', label: t('Nothing') },
               ]}
             />
           </Opt>
         ) : (
-          <p className="pb-2 text-[12.5px] text-fg-muted">Reads 8-bit groups (spaces optional) and decodes the bytes as UTF-8, so accented letters and emoji work.</p>
+          <p className="pb-2 text-[12.5px] text-fg-muted">{t('Reads 8-bit groups (spaces optional) and decodes the bytes as UTF-8, so accented letters and emoji work.')}</p>
         )}
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not convert this text" />
+      <ErrorMessage error={task.error} title={t('Could not convert this text')} />
       {result && !result.ok && (
         <Alert
           tone="danger"
-          title={result.bytes ? 'Not valid UTF-8 text' : 'Cannot decode'}
-          action={result.bytes ? <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="bytes.bin" label="Download bytes" /> : undefined}
+          title={result.bytes ? t('Not valid UTF-8 text') : t('Cannot decode')}
+          action={result.bytes ? <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="bytes.bin" label={t('Download bytes')} /> : undefined}
         >
           {result.error}
-          {result.lossy !== undefined && <span className="mt-1 block text-fg-secondary">With replacement characters: {result.lossy.slice(0, 200)}</span>}
+          {result.lossy !== undefined && <span className="mt-1 block text-fg-secondary">{t('With replacement characters: {slice}', { slice: result.lossy.slice(0, 200) })}</span>}
         </Alert>
       )}
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Text' : 'Binary'}
+          title={direction === 'encode' ? t('Text') : t('Binary')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Text to convert to binary…' : '8-bit binary groups, e.g. 01001000 01101001'}
+          placeholder={direction === 'encode' ? t('Text to convert to binary…') : t('8-bit binary groups, e.g. 01001000 01101001')}
           sample={direction === 'encode' ? SAMPLE_TEXT : SAMPLE_BINARY}
           fileAccept={TEXT_FILE_ACCEPT}
           invalid={Boolean(result && !result.ok)}
@@ -75,13 +76,13 @@ export default function BinaryText() {
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Binary (UTF-8 bytes)' : 'Text'}
+          title={direction === 'encode' ? t('Binary (UTF-8 bytes)') : t('Text')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName={direction === 'encode' ? 'binary.txt' : 'decoded.txt'}
           height="320px"
           busy={task.pending}
-          footer={result?.ok ? <span>{pluralize(result.bytes, 'byte')}</span> : undefined}
+          footer={result?.ok ? <span>{pluralize(result.bytes, t('byte'), t('bytes'))}</span> : undefined}
         />
       </SplitPanes>
     </ToolStack>

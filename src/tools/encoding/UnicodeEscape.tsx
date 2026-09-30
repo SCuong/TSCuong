@@ -9,6 +9,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'unicode-escape';
 const SAMPLE_TEXT = 'Café “quotes” — 日本語 😀';
@@ -50,8 +51,8 @@ export default function UnicodeEscape() {
         />
         {direction === 'encode' ? (
           <>
-            <Opt label="Format">
-              <Select value={s.format} onChange={(e) => set('format', e.target.value as EscapeFormat)} aria-label="Escape format" className="w-48">
+            <Opt label={t('Format')}>
+              <Select value={s.format} onChange={(e) => set('format', e.target.value as EscapeFormat)} aria-label={t('Escape format')} className="w-48">
                 {ESCAPE_FORMATS.map((f) => (
                   <option key={f.value} value={f.value}>
                     {f.label}
@@ -59,29 +60,28 @@ export default function UnicodeEscape() {
                 ))}
               </Select>
             </Opt>
-            <Opt label="Escape">
-              <Select value={s.scope} onChange={(e) => set('scope', e.target.value as EscapeScope)} aria-label="Characters to escape" className="w-56">
-                <option value="nonAscii">Non-ASCII characters</option>
-                <option value="nonPrintable">Non-ASCII + control chars</option>
-                <option value="all">Every character</option>
+            <Opt label={t('Escape')}>
+              <Select value={s.scope} onChange={(e) => set('scope', e.target.value as EscapeScope)} aria-label={t('Characters to escape')} className="w-56">
+                <option value="nonAscii">{t('Non-ASCII characters')}</option>
+                <option value="nonPrintable">{t('Non-ASCII + control chars')}</option>
+                <option value="all">{t('Every character')}</option>
               </Select>
             </Opt>
-            <Switch label="Uppercase hex" checked={s.uppercase} onChange={(v) => set('uppercase', v)} className="pb-1.5" />
-            {example && <p className="w-full font-mono text-[12.5px] text-fg-muted">Example: é 😀 → {example}</p>}
+            <Switch label={t('Uppercase hex')} checked={s.uppercase} onChange={(v) => set('uppercase', v)} className="pb-1.5" />
+            {example && <p className="w-full font-mono text-[12.5px] text-fg-muted">{t('Example: é 😀 → {example}', { example })}</p>}
           </>
         ) : (
           <>
-            <Switch label="Decode CSS escapes (\e9)" checked={s.css} onChange={(v) => set('css', v)} className="pb-1.5" />
+            <Switch label={t('Decode CSS escapes (\\e9)')} checked={s.css} onChange={(v) => set('css', v)} className="pb-1.5" />
             <p className="w-full text-[12.5px] text-fg-muted">
-              Detects every style at once: \uXXXX (with surrogate pairs), \u{'{'}X{'}'}, \UXXXXXXXX, \xXX UTF-8 bytes, &amp;#xX;, &amp;#N;, U+XXXX and
-              CSS escapes with two or more hex digits (\e9).
+              {t('Detects every style at once: \\uXXXX (with surrogate pairs), \\u{X}, \\UXXXXXXXX, \\xXX UTF-8 bytes, &#xX;, &#N;, U+XXXX and CSS escapes with two or more hex digits (\\e9).')}
             </p>
           </>
         )}
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not convert this text" />
+      <ErrorMessage error={task.error} title={t('Could not convert this text')} />
       {result && result.warnings.length > 0 && (
-        <Alert tone="warning" title="Check the result">
+        <Alert tone="warning" title={t('Check the result')}>
           <ul className="list-disc pl-4">
             {result.warnings.map((w) => (
               <li key={w}>{w}</li>
@@ -91,25 +91,25 @@ export default function UnicodeEscape() {
       )}
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Text' : 'Escaped text'}
+          title={direction === 'encode' ? t('Text') : t('Escaped text')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Text with Unicode characters…' : 'Text with \\u00e9, \\u{1F600}, &#x2764; or U+2728…'}
+          placeholder={direction === 'encode' ? t('Text with Unicode characters…') : t('Text with \\u00e9, \\u{1F600}, &#x2764; or U+2728…')}
           sample={direction === 'encode' ? SAMPLE_TEXT : SAMPLE_ESCAPED}
           fileAccept={TEXT_FILE_ACCEPT}
           height="320px"
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Escaped' : 'Unescaped'}
+          title={direction === 'encode' ? t('Escaped') : t('Unescaped')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName={direction === 'encode' ? 'escaped.txt' : 'unescaped.txt'}
           height="320px"
           busy={task.pending}
           footer={
             input && result ? (
-              direction === 'decode' ? <span>{pluralize(result.count, 'escape')} decoded</span> : <TextFooter text={output} />
+              direction === 'decode' ? <span>{t('{count} decoded', { count: pluralize(result.count, t('escape'), t('escapes')) })}</span> : <TextFooter text={output} />
             ) : undefined
           }
         />

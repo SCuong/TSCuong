@@ -1,15 +1,16 @@
+import { t } from '@/lib/i18n';
 export type EscapeLanguage = 'json' | 'js' | 'java' | 'c' | 'sql' | 'regex' | 'shell' | 'csv' | 'xml';
 
 export const ESCAPE_LANGUAGES: Array<{ value: EscapeLanguage; label: string; hint: string }> = [
-  { value: 'json', label: 'JSON string', hint: 'Escapes " \\ and control characters; \\uXXXX for the rest.' },
-  { value: 'js', label: 'JavaScript', hint: "Escapes quotes, backslashes, line breaks and control characters (\\n, \\t, \\x.., \\u....)." },
-  { value: 'java', label: 'Java / C#', hint: 'Escapes " \\ and control characters; \\uXXXX for non-printable characters.' },
-  { value: 'c', label: 'C / C++', hint: 'Escapes quotes and control characters; non-ASCII becomes UTF-8 octal bytes.' },
-  { value: 'sql', label: 'SQL string', hint: "Doubles single quotes (O'Brien → O''Brien)." },
-  { value: 'regex', label: 'Regular expression', hint: 'Escapes . * + ? ^ $ { } ( ) | [ ] \\ / so the text matches literally.' },
-  { value: 'shell', label: 'Shell (single-quoted)', hint: "Wraps in '…' and turns ' into '\\'' for POSIX shells." },
-  { value: 'csv', label: 'CSV field', hint: 'Quotes the field when needed and doubles inner quotes (RFC 4180).' },
-  { value: 'xml', label: 'XML / HTML', hint: 'Escapes & < > " and \' as entities.' },
+  { value: 'json', label: t('JSON string'), hint: t('Escapes " \\ and control characters; \\uXXXX for the rest.') },
+  { value: 'js', label: t('JavaScript'), hint: t('Escapes quotes, backslashes, line breaks and control characters (\\n, \\t, \\x.., \\u....).') },
+  { value: 'java', label: t('Java / C#'), hint: t('Escapes " \\ and control characters; \\uXXXX for non-printable characters.') },
+  { value: 'c', label: 'C / C++', hint: t('Escapes quotes and control characters; non-ASCII becomes UTF-8 octal bytes.') },
+  { value: 'sql', label: t('SQL string'), hint: t('Doubles single quotes (O\'Brien → O\'\'Brien).') },
+  { value: 'regex', label: t('Regular expression'), hint: 'Escapes . * + ? ^ $ { } ( ) | [ ] \\ / so the text matches literally.' },
+  { value: 'shell', label: t('Shell (single-quoted)'), hint: t('Wraps in \'…\' and turns \' into \'\\\'\' for POSIX shells.') },
+  { value: 'csv', label: t('CSV field'), hint: t('Quotes the field when needed and doubles inner quotes (RFC 4180).') },
+  { value: 'xml', label: 'XML / HTML', hint: t('Escapes & < > " and \' as entities.') },
 ];
 
 export interface EscapeOptions {

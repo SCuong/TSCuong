@@ -24,6 +24,7 @@ import {
   type OutputEncoding,
 } from './lib/textEncoding';
 import { Opt } from '../text/components/shared';
+import { t } from '@/lib/i18n';
 
 const ID = 'text-encoding-converter';
 const MAX_FILE = 50 * 1024 * 1024;
@@ -36,21 +37,21 @@ export default function TextEncodingConverter() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Source">
+        <Opt label={t('Source')}>
           <Segmented
-            label="Source"
+            label={t('Source')}
             value={source}
             onChange={setSource}
             options={[
-              { value: 'file', label: 'Open a file' },
-              { value: 'paste', label: 'Fix garbled pasted text' },
+              { value: 'file', label: t('Open a file') },
+              { value: 'paste', label: t('Fix garbled pasted text') },
             ]}
           />
         </Opt>
         <p className="pb-2 text-[12.5px] text-fg-muted">
           {source === 'file'
-            ? 'Detect how a text file is encoded and save it as UTF-8 or UTF-16.'
-            : 'Repair “mojibake” such as cafÃ© or â€™ that appears when text is decoded with the wrong encoding.'}
+            ? t('Detect how a text file is encoded and save it as UTF-8 or UTF-16.')
+            : t('Repair “mojibake” such as cafÃ© or â€™ that appears when text is decoded with the wrong encoding.')}
         </p>
       </ToolBar>
       {source === 'file' ? <FileMode /> : <PasteMode />}
@@ -62,9 +63,9 @@ export default function TextEncodingConverter() {
 
 const OUTPUTS: Array<{ value: OutputEncoding; label: string }> = [
   { value: 'utf-8', label: 'UTF-8' },
-  { value: 'utf-8-bom', label: 'UTF-8 with BOM' },
-  { value: 'utf-16le-bom', label: 'UTF-16 LE with BOM' },
-  { value: 'utf-16be-bom', label: 'UTF-16 BE with BOM' },
+  { value: 'utf-8-bom', label: t('UTF-8 with BOM') },
+  { value: 'utf-16le-bom', label: t('UTF-16 LE with BOM') },
+  { value: 'utf-16be-bom', label: t('UTF-16 BE with BOM') },
 ];
 
 function FileMode() {
@@ -84,7 +85,7 @@ function FileMode() {
       setFile({ name: f.name, bytes, attempts, guess });
       setShowAll(false);
     } catch (e) {
-      setError(errorMessage(e, 'Could not read the file.'));
+      setError(errorMessage(e, t('Could not read the file.')));
     }
   }
 
@@ -125,8 +126,8 @@ function FileMode() {
           onFiles={(files) => void onFile(files[0])}
           maxSize={MAX_FILE}
           icon={FileText}
-          title="Drop a text file"
-          hint="Subtitles, CSV exports, old documents… up to 50 MB. Read locally, never uploaded."
+          title={t('Drop a text file')}
+          hint={t('Subtitles, CSV exports, old documents… up to 50 MB. Read locally, never uploaded.')}
           onReject={setError}
         />
         <ErrorMessage error={error} />
@@ -138,14 +139,14 @@ function FileMode() {
     return (
       <Alert
         tone="info"
-        title={`${file.name} is empty`}
+        title={t('{name} is empty', { name: file.name })}
         action={
           <Button size="sm" onClick={() => setFile(null)}>
-            Open another file
+            {t('Open another file')}
           </Button>
         }
       >
-        There is no text to detect or convert.
+        {t('There is no text to detect or convert.')}
       </Alert>
     );
   }
@@ -153,18 +154,18 @@ function FileMode() {
   return (
     <>
       {binaryWarning && (
-        <Alert tone="warning" title="This is probably not a text file">
+        <Alert tone="warning" title={t('This is probably not a text file')}>
           {binaryWarning}
         </Alert>
       )}
       <Panel
         title={<span className="break-all">{file.name}</span>}
-        description={`${formatBytes(file.bytes.length)} · ${bom ? `${bom.bom.toUpperCase()} byte order mark (BOM) found` : 'No byte order mark'} · ${validCount} of ${attempts.length} encodings decode without errors`}
-        actions={<IconButton icon={X} label="Open another file" size="sm" onClick={() => setFile(null)} />}
+        description={t('{size} · {value} · {validCount} of {count} encodings decode without errors', { size: formatBytes(file.bytes.length), value: bom ? `${bom.bom.toUpperCase()} byte order mark (BOM) found` : 'No byte order mark', validCount, count: attempts.length })}
+        actions={<IconButton icon={X} label={t('Open another file')} size="sm" onClick={() => setFile(null)} />}
         bodyClassName="p-0"
       >
         <fieldset>
-          <legend className="sr-only">Decode the file as</legend>
+          <legend className="sr-only">{t('Decode the file as')}</legend>
           <ul className="divide-y divide-line/70">
             {visible.map((a) => (
               <EncodingRow key={a.encoding.label} attempt={a} best={a.encoding.label === file.guess} selected={a.encoding.label === selected} onSelect={() => setSelected(a.encoding.label)} />
@@ -174,34 +175,33 @@ function FileMode() {
         {ranked.length > visible.length && (
           <div className="border-t border-line px-4 py-2">
             <Button size="sm" variant="ghost" onClick={() => setShowAll(true)}>
-              Show all {ranked.length} encodings
+              {t('Show all {count} encodings', { count: ranked.length })}
             </Button>
           </div>
         )}
       </Panel>
       <Alert tone="info">
-        Single-byte encodings (Windows-125x, ISO-8859-x, KOI8) accept almost any bytes, so “valid” only means no undefined bytes; compare the
-        previews. ISO-8859-1 and ISO-8859-9 are read as their Windows supersets, as browsers do.
+        {t('Single-byte encodings (Windows-125x, ISO-8859-x, KOI8) accept almost any bytes, so “valid” only means no undefined bytes; compare the previews. ISO-8859-1 and ISO-8859-9 are read as their Windows supersets, as browsers do.')}
       </Alert>
       {decoded && (
         <EditorPanel
-          title={`Decoded as ${decoded.encoding.name}`}
+          title={t('Decoded as {name}', { name: decoded.encoding.name })}
           value={decoded.text.length > PREVIEW_CHARS ? `${decoded.text.slice(0, PREVIEW_CHARS)}…` : decoded.text}
           height="320px"
           invalid={!decoded.valid}
           footer={
             <>
-              <span>{formatNumber(decoded.text.length, 0)} characters</span>
-              {decoded.replacements > 0 && <span className="text-warning">{formatNumber(decoded.replacements, 0)} undecodable bytes shown as �</span>}
-              {decoded.text.length > PREVIEW_CHARS && <span>Preview truncated; the download is complete.</span>}
+              <span>{t('{count} characters', { count: formatNumber(decoded.text.length, 0) })}</span>
+              {decoded.replacements > 0 && <span className="text-warning">{t('{replacements} undecodable bytes shown as �', { replacements: formatNumber(decoded.replacements, 0) })}</span>}
+              {decoded.text.length > PREVIEW_CHARS && <span>{t('Preview truncated; the download is complete.')}</span>}
             </>
           }
-          ariaLabel="Decoded text"
+          ariaLabel={t('Decoded text')}
         />
       )}
       <ToolBar>
-        <Opt label="Save as">
-          <Select value={output} onChange={(e) => setOutput(e.target.value as OutputEncoding)} aria-label="Output encoding" className="w-56">
+        <Opt label={t('Save as')}>
+          <Select value={output} onChange={(e) => setOutput(e.target.value as OutputEncoding)} aria-label={t('Output encoding')} className="w-56">
             {OUTPUTS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -210,10 +210,10 @@ function FileMode() {
           </Select>
         </Opt>
         <Button variant="primary" icon={Download} onClick={download} className="mb-px">
-          Download converted file
+          {t('Download converted file')}
         </Button>
         <p className="w-full text-[12.5px] text-fg-muted">
-          Browsers can only write Unicode (UTF-8 or UTF-16). Saving back to legacy encodings such as Shift_JIS or Windows-1252 is not possible here.
+          {t('Browsers can only write Unicode (UTF-8 or UTF-16). Saving back to legacy encodings such as Shift_JIS or Windows-1252 is not possible here.')}
         </p>
       </ToolBar>
     </>
@@ -233,9 +233,9 @@ function EncodingRow({ attempt, best, selected, onSelect }: { attempt: DecodeAtt
         <input type="radio" name="encoding" checked={selected} onChange={onSelect} className="size-4 accent-[var(--lk-accent)]" />
         <span className="truncate text-[13px] font-medium text-fg">{attempt.encoding.name}</span>
         {attempt.valid ? (
-          <Badge tone={best ? 'success' : 'neutral'}>{best ? 'Valid · best guess' : 'Valid'}</Badge>
+          <Badge tone={best ? 'success' : 'neutral'}>{best ? t('Valid · best guess') : t('Valid')}</Badge>
         ) : (
-          <Badge tone="danger">Invalid bytes</Badge>
+          <Badge tone="danger">{t('Invalid bytes')}</Badge>
         )}
         <span className="col-span-2 col-start-2 truncate font-mono text-[12.5px] text-fg-secondary sm:col-span-1 sm:col-start-auto">{preview || '—'}</span>
       </label>
@@ -259,8 +259,8 @@ function PasteMode() {
   return (
     <>
       <ToolBar>
-        <Opt label="Text was wrongly read as">
-          <Select value={wrong} onChange={(e) => setWrong(e.target.value)} aria-label="Wrong encoding" className="w-64">
+        <Opt label={t('Text was wrongly read as')}>
+          <Select value={wrong} onChange={(e) => setWrong(e.target.value)} aria-label={t('Wrong encoding')} className="w-64">
             {SINGLE_BYTE.map((e) => (
               <option key={e.label} value={e.label}>
                 {e.name}
@@ -268,8 +268,8 @@ function PasteMode() {
             ))}
           </Select>
         </Opt>
-        <Opt label="It is actually">
-          <Select value={right} onChange={(e) => setRight(e.target.value)} aria-label="Actual encoding" className="w-64">
+        <Opt label={t('It is actually')}>
+          <Select value={right} onChange={(e) => setRight(e.target.value)} aria-label={t('Actual encoding')} className="w-64">
             {TARGETS.map((e) => (
               <option key={e.label} value={e.label}>
                 {e.name}
@@ -278,18 +278,18 @@ function PasteMode() {
           </Select>
         </Opt>
       </ToolBar>
-      <ErrorMessage error={result && !result.ok ? result.error : null} title="Cannot repair with these encodings" />
+      <ErrorMessage error={result && !result.ok ? result.error : null} title={t('Cannot repair with these encodings')} />
       <SplitPanes>
         <EditorPanel
-          title="Garbled text"
+          title={t('Garbled text')}
           value={input}
           onChange={setInput}
-          placeholder="Paste text like cafÃ© or donâ€™t…"
+          placeholder={t('Paste text like cafÃ© or donâ€™t…')}
           sample={PASTE_SAMPLE}
           height="280px"
           invalid={Boolean(result && !result.ok)}
         />
-        <EditorPanel title="Repaired text" value={result?.ok ? result.text : ''} placeholder="Repaired text appears here" downloadName="repaired.txt" height="280px" />
+        <EditorPanel title={t('Repaired text')} value={result?.ok ? result.text : ''} placeholder={t('Repaired text appears here')} downloadName="repaired.txt" height="280px" />
       </SplitPanes>
     </>
   );

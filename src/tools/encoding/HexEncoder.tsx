@@ -10,6 +10,7 @@ import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'hex-encoder';
 const SAMPLE_TEXT = 'Hello, Wörld! 😀';
@@ -47,8 +48,8 @@ export default function HexEncoder() {
         <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output) && !task.pending} labels={{ encode: 'Text → Hex', decode: 'Hex → Text' }} />
         {direction === 'encode' ? (
           <>
-            <Opt label="Format">
-              <Select value={s.separator} onChange={(e) => set('separator', e.target.value as HexSeparator)} aria-label="Hex format" className="w-48">
+            <Opt label={t('Format')}>
+              <Select value={s.separator} onChange={(e) => set('separator', e.target.value as HexSeparator)} aria-label={t('Hex format')} className="w-48">
                 {HEX_SEPARATORS.map((h) => (
                   <option key={h.value} value={h.value}>
                     {h.label} ({h.example})
@@ -56,38 +57,38 @@ export default function HexEncoder() {
                 ))}
               </Select>
             </Opt>
-            <Opt label="Bytes per line" className="w-32">
+            <Opt label={t('Bytes per line')} className="w-32">
               <NumberInput
                 value={s.bytesPerLine}
                 onChange={(v) => set('bytesPerLine', v === '' ? '' : Math.max(1, Math.round(v)))}
                 min={1}
-                placeholder="All on one"
-                aria-label="Bytes per line"
+                placeholder={t('All on one')}
+                aria-label={t('Bytes per line')}
               />
             </Opt>
-            <Switch label="Uppercase" checked={s.uppercase} onChange={(v) => set('uppercase', v)} className="pb-1.5" />
+            <Switch label={t('Uppercase')} checked={s.uppercase} onChange={(v) => set('uppercase', v)} className="pb-1.5" />
           </>
         ) : (
-          <p className="pb-2 text-[12.5px] text-fg-muted">Accepts 48 65, 4865, 48:65, 0x48 0x65, \x48\x65 and %48%65. Bytes are decoded as UTF-8.</p>
+          <p className="pb-2 text-[12.5px] text-fg-muted">{t('Accepts 48 65, 4865, 48:65, 0x48 0x65, \\x48\\x65 and %48%65. Bytes are decoded as UTF-8.')}</p>
         )}
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not convert this text" />
+      <ErrorMessage error={task.error} title={t('Could not convert this text')} />
       {result && !result.ok && (
         <Alert
           tone="danger"
-          title={result.bytes ? 'Not valid UTF-8 text' : 'Invalid hex'}
-          action={result.bytes ? <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="bytes.bin" label="Download bytes" /> : undefined}
+          title={result.bytes ? t('Not valid UTF-8 text') : t('Invalid hex')}
+          action={result.bytes ? <DownloadButton data={() => new Blob([result.bytes!.slice()])} filename="bytes.bin" label={t('Download bytes')} /> : undefined}
         >
           {result.error}
-          {result.lossy !== undefined && <span className="mt-1 block text-fg-secondary">With replacement characters: {result.lossy.slice(0, 200)}</span>}
+          {result.lossy !== undefined && <span className="mt-1 block text-fg-secondary">{t('With replacement characters: {slice}', { slice: result.lossy.slice(0, 200) })}</span>}
         </Alert>
       )}
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Text' : 'Hex'}
+          title={direction === 'encode' ? t('Text') : t('Hex')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Text to convert to hex bytes…' : 'Hex bytes to decode…'}
+          placeholder={direction === 'encode' ? t('Text to convert to hex bytes…') : t('Hex bytes to decode…')}
           sample={direction === 'encode' ? SAMPLE_TEXT : SAMPLE_HEX}
           fileAccept={TEXT_FILE_ACCEPT}
           invalid={Boolean(result && !result.ok)}
@@ -95,13 +96,13 @@ export default function HexEncoder() {
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Hex (UTF-8 bytes)' : 'Text'}
+          title={direction === 'encode' ? t('Hex (UTF-8 bytes)') : t('Text')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName={direction === 'encode' ? 'hex.txt' : 'decoded.txt'}
           height="320px"
           busy={task.pending}
-          footer={result?.ok ? <span>{pluralize(result.bytes, 'byte')}{result.bytes >= 1024 ? ` (${formatBytes(result.bytes)})` : ''}</span> : undefined}
+          footer={result?.ok ? <span>{pluralize(result.bytes, t('byte'), t('bytes'))}{result.bytes >= 1024 ? ` (${formatBytes(result.bytes)})` : ''}</span> : undefined}
         />
       </SplitPanes>
     </ToolStack>

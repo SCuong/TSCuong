@@ -7,6 +7,7 @@ import { urlDecode, urlDecodeLenient, urlEncode, type UrlEncodeMode } from './li
 import { DirectionControls, type Direction } from './components/shared';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
+import { t } from '@/lib/i18n';
 
 const ID = 'url-encoder';
 const SAMPLE_ENCODE = 'name=Jürgen Müller&city=São Paulo&q=café & crème 100%';
@@ -54,28 +55,28 @@ export default function UrlEncoder() {
     <ToolStack>
       <ToolBar>
         <DirectionControls direction={direction} onDirection={setDirection} onSwap={swap} canSwap={Boolean(output)} />
-        <Opt label={direction === 'encode' ? 'Encoding' : 'Decoding'}>
-          <Select value={s.mode} onChange={(e) => set('mode', e.target.value as UrlEncodeMode)} aria-label="Encoding type" className="w-56">
-            <option value="component">URI component</option>
-            <option value="uri">Full URL</option>
-            <option value="form">Form data (+ for space)</option>
+        <Opt label={direction === 'encode' ? t('Encoding') : t('Decoding')}>
+          <Select value={s.mode} onChange={(e) => set('mode', e.target.value as UrlEncodeMode)} aria-label={t('Encoding type')} className="w-56">
+            <option value="component">{t('URI component')}</option>
+            <option value="uri">{t('Full URL')}</option>
+            <option value="form">{t('Form data (+ for space)')}</option>
           </Select>
         </Opt>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
           {direction === 'encode' ? (
             <>
-              {s.mode !== 'uri' && <Switch label="Also encode ! ' ( ) *" checked={s.strict} onChange={(v) => set('strict', v)} />}
-              <Switch label="Encode each line separately" checked={s.perLine} onChange={(v) => set('perLine', v)} />
+              {s.mode !== 'uri' && <Switch label={t('Also encode ! \' ( ) *')} checked={s.strict} onChange={(v) => set('strict', v)} />}
+              <Switch label={t('Encode each line separately')} checked={s.perLine} onChange={(v) => set('perLine', v)} />
             </>
           ) : (
             <>
               <Switch
-                label="Treat + as space"
+                label={t('Treat + as space')}
                 checked={plusAsSpace}
                 onChange={(v) => set('plusAsSpace', v)}
                 disabled={s.mode === 'form'}
               />
-              <Switch label="Skip malformed sequences" checked={s.lenient} onChange={(v) => set('lenient', v)} />
+              <Switch label={t('Skip malformed sequences')} checked={s.lenient} onChange={(v) => set('lenient', v)} />
             </>
           )}
         </div>
@@ -83,19 +84,19 @@ export default function UrlEncoder() {
           {direction === 'encode'
             ? MODE_HELP[s.mode]
             : s.mode === 'uri'
-              ? 'decodeURI leaves reserved characters such as %2F and %3F encoded, so the URL structure is preserved.'
+              ? t('decodeURI leaves reserved characters such as %2F and %3F encoded, so the URL structure is preserved.')
               : s.mode === 'form'
-                ? 'Decodes every %XX sequence as UTF-8 and every + as a space (form submissions).'
-                : 'Decodes every %XX sequence as UTF-8.'}
+                ? t('Decodes every %XX sequence as UTF-8 and every + as a space (form submissions).')
+                : t('Decodes every %XX sequence as UTF-8.')}
         </p>
       </ToolBar>
-      <ErrorMessage error={result && !result.ok ? result.error : null} title={direction === 'encode' ? 'Cannot encode' : 'Cannot decode'} />
+      <ErrorMessage error={result && !result.ok ? result.error : null} title={direction === 'encode' ? t('Cannot encode') : t('Cannot decode')} />
       <SplitPanes>
         <EditorPanel
-          title={direction === 'encode' ? 'Text' : 'Encoded'}
+          title={direction === 'encode' ? t('Text') : t('Encoded')}
           value={input}
           onChange={setInput}
-          placeholder={direction === 'encode' ? 'Text or URL to encode…' : 'Percent-encoded text or URL to decode…'}
+          placeholder={direction === 'encode' ? t('Text or URL to encode…') : t('Percent-encoded text or URL to decode…')}
           sample={direction === 'encode' ? SAMPLE_ENCODE : SAMPLE_DECODE}
           fileAccept={TEXT_FILE_ACCEPT}
           invalid={Boolean(result && !result.ok)}
@@ -103,9 +104,9 @@ export default function UrlEncoder() {
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title={direction === 'encode' ? 'Encoded' : 'Decoded'}
+          title={direction === 'encode' ? t('Encoded') : t('Decoded')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName={direction === 'encode' ? 'encoded.txt' : 'decoded.txt'}
           height="320px"
           footer={<TextFooter text={output} />}

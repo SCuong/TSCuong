@@ -10,6 +10,7 @@ import { allShifts, rotate } from './lib/rot';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from '../text/components/shared';
 import { OutputPanel } from '../text/components/OutputPanel';
 import { useTask } from '../text/components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'rot13-caesar';
 const SAMPLE = 'Why did the chicken cross the road? Gb trg gb gur bgure fvqr!';
@@ -31,18 +32,17 @@ export default function RotCipher() {
 
   return (
     <ToolStack>
-      <Alert tone="warning" title="Obfuscation, not security">
-        ROT13, Caesar and ROT47 hide text from a casual glance (spoilers, puzzle answers). Anyone can reverse them in seconds, so never use them to
-        protect passwords or private data.
+      <Alert tone="warning" title={t('Obfuscation, not security')}>
+        {t('ROT13, Caesar and ROT47 hide text from a casual glance (spoilers, puzzle answers). Anyone can reverse them in seconds, so never use them to protect passwords or private data.')}
       </Alert>
       <ToolBar>
-        <Opt label="Cipher">
+        <Opt label={t('Cipher')}>
           <Segmented
-            label="Cipher"
+            label={t('Cipher')}
             value={algo}
             onChange={setAlgo}
             options={[
-              { value: 'caesar', label: 'ROT13 / Caesar' },
+              { value: 'caesar', label: t('ROT13 / Caesar') },
               { value: 'rot47', label: 'ROT47' },
             ]}
           />
@@ -68,30 +68,30 @@ export default function RotCipher() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
-              <Switch label="Decode (shift back)" checked={decode} onChange={setDecode} />
-              <Switch label={shift === 13 ? 'Rotate digits (ROT18)' : 'Rotate digits too'} checked={digits} onChange={setDigits} />
-              <Switch label="Show all 25 shifts" checked={bruteForce} onChange={setBruteForce} />
+              <Switch label={t('Decode (shift back)')} checked={decode} onChange={setDecode} />
+              <Switch label={shift === 13 ? t('Rotate digits (ROT18)') : t('Rotate digits too')} checked={digits} onChange={setDigits} />
+              <Switch label={t('Show all 25 shifts')} checked={bruteForce} onChange={setBruteForce} />
             </div>
           </>
         ) : (
-          <p className="pb-2 text-[12.5px] text-fg-muted">ROT47 rotates every printable ASCII character (letters, digits and symbols). Applying it twice restores the text.</p>
+          <p className="pb-2 text-[12.5px] text-fg-muted">{t('ROT47 rotates every printable ASCII character (letters, digits and symbols). Applying it twice restores the text.')}</p>
         )}
       </ToolBar>
       <SplitPanes>
         <EditorPanel
-          title="Input"
+          title={t('Input')}
           value={input}
           onChange={setInput}
-          placeholder="Text to rotate…"
+          placeholder={t('Text to rotate…')}
           sample={SAMPLE}
           fileAccept={TEXT_FILE_ACCEPT}
           height="280px"
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title="Output"
+          title={t('Output')}
           value={output}
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           downloadName="rotated.txt"
           height="280px"
           busy={task.pending}
@@ -99,7 +99,7 @@ export default function RotCipher() {
         />
       </SplitPanes>
       {shifts.length > 0 && (
-        <Panel title="All shifts" description="Find the readable line to crack an unknown Caesar shift. Click a row to use it." bodyClassName="p-0">
+        <Panel title={t('All shifts')} description={t('Find the readable line to crack an unknown Caesar shift. Click a row to use it.')} bodyClassName="p-0">
           <ul className="max-h-96 divide-y divide-line overflow-y-auto">
             {shifts.map((s) => (
               <li key={s.shift}>
