@@ -9,6 +9,7 @@ import { Counts, Opt, SampleButton, TEXT_FILE_ACCEPT, TextFooter } from './compo
 import { OutputPanel } from './components/OutputPanel';
 import { regexTimeoutMs, RegexTimeoutAlert } from './components/RegexTimeout';
 import { useTask } from './components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'line-filter';
 const SAMPLE = `2024-05-01 10:00:01 INFO  Server started on port 8080
@@ -22,12 +23,12 @@ const SAMPLE = `2024-05-01 10:00:01 INFO  Server started on port 8080
 const DEFAULTS: FilterOptions = { action: 'keep', condition: 'contains', term: '', caseSensitive: false, wholeWord: false };
 
 const CONDITIONS: Array<{ value: FilterCondition; label: string }> = [
-  { value: 'contains', label: 'Contain' },
-  { value: 'startsWith', label: 'Start with' },
-  { value: 'endsWith', label: 'End with' },
-  { value: 'equals', label: 'Are exactly' },
-  { value: 'regex', label: 'Match regex' },
-  { value: 'empty', label: 'Are empty' },
+  { value: 'contains', label: t('Contain') },
+  { value: 'startsWith', label: t('Start with') },
+  { value: 'endsWith', label: t('End with') },
+  { value: 'equals', label: t('Are exactly') },
+  { value: 'regex', label: t('Match regex') },
+  { value: 'empty', label: t('Are empty') },
 ];
 
 export default function LineFilter() {
@@ -57,19 +58,19 @@ export default function LineFilter() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Action">
+        <Opt label={t('Action')}>
           <Segmented
-            label="Action"
+            label={t('Action')}
             value={o.action}
             onChange={(v) => set('action', v)}
             options={[
-              { value: 'keep', label: 'Keep lines that' },
-              { value: 'remove', label: 'Remove lines that' },
+              { value: 'keep', label: t('Keep lines that') },
+              { value: 'remove', label: t('Remove lines that') },
             ]}
           />
         </Opt>
-        <Opt label="Condition">
-          <Select value={o.condition} onChange={(e) => set('condition', e.target.value as FilterCondition)} aria-label="Condition" className="w-40">
+        <Opt label={t('Condition')}>
+          <Select value={o.condition} onChange={(e) => set('condition', e.target.value as FilterCondition)} aria-label={t('Condition')} className="w-40">
             {CONDITIONS.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
@@ -78,32 +79,32 @@ export default function LineFilter() {
           </Select>
         </Opt>
         {o.condition !== 'empty' && (
-          <Opt label={o.condition === 'regex' ? 'Pattern' : 'Text'} className="min-w-48 flex-1">
+          <Opt label={o.condition === 'regex' ? t('Pattern') : t('Text')} className="min-w-48 flex-1">
             <Input
               value={o.term}
               onChange={(e) => set('term', e.target.value)}
               mono
-              placeholder={o.condition === 'regex' ? 'e.g. ^\\d{4}-' : 'e.g. ERROR'}
-              aria-label={o.condition === 'regex' ? 'Regular expression' : 'Filter text'}
+              placeholder={o.condition === 'regex' ? 'e.g. ^\\d{4}-' : t('e.g. ERROR')}
+              aria-label={o.condition === 'regex' ? t('Regular expression') : t('Filter text')}
               aria-invalid={Boolean(patternError) || undefined}
             />
           </Opt>
         )}
         {o.condition !== 'empty' && (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
-            <Switch label="Match case" checked={o.caseSensitive} onChange={(v) => set('caseSensitive', v)} />
-            {o.condition !== 'regex' && <Switch label="Whole word" checked={o.wholeWord} onChange={(v) => set('wholeWord', v)} />}
+            <Switch label={t('Match case')} checked={o.caseSensitive} onChange={(v) => set('caseSensitive', v)} />
+            {o.condition !== 'regex' && <Switch label={t('Whole word')} checked={o.wholeWord} onChange={(v) => set('wholeWord', v)} />}
           </div>
         )}
       </ToolBar>
-      <ErrorMessage error={failure} title={patternError ? 'Invalid pattern' : undefined} />
+      <ErrorMessage error={failure} title={patternError ? t('Invalid pattern') : undefined} />
       {task.timedOut && <RegexTimeoutAlert size={deferred.length} />}
       <SplitPanes>
         <EditorPanel
-          title="Input"
+          title={t('Input')}
           value={input}
           onChange={setInput}
-          placeholder="Paste lines, a log file or a list…"
+          placeholder={t('Paste lines, a log file or a list…')}
           fileAccept={TEXT_FILE_ACCEPT}
           height="420px"
           lineWrapping={false}
@@ -111,18 +112,18 @@ export default function LineFilter() {
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title="Filtered"
+          title={t('Filtered')}
           value={output}
           placeholder={
             !input
-              ? 'Filtered lines appear here'
+              ? t('Filtered lines appear here')
               : !active
-                ? 'Enter a filter to see the result'
+                ? t('Enter a filter to see the result')
                 : failure || task.timedOut
-                  ? 'Fix the filter to see the result'
+                  ? t('Fix the filter to see the result')
                   : task.pending
-                    ? 'Filtering…'
-                    : 'No lines left after filtering'
+                    ? t('Filtering…')
+                    : t('No lines left after filtering')
           }
           downloadName="filtered.txt"
           height="420px"

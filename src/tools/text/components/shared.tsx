@@ -5,6 +5,7 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { cn, formatNumber, pluralize } from '@/lib/utils';
 import { codePointLabel, countCodePoints, countLines, visibleChar, whitespaceName } from '../lib/common';
 import type { FrequencyRow } from '../lib/frequency';
+import { t } from '@/lib/i18n';
 
 /** Standard file types for "Open file" on text inputs. */
 export const TEXT_FILE_ACCEPT = '.txt,.md,.csv,.tsv,.log,.json,.xml,.html,.htm,.yml,.yaml,.ini,.conf,.srt,.vtt,text/*';
@@ -26,8 +27,8 @@ export function TextFooter({ text, extra }: { text: string; extra?: ReactNode })
   if (!text) return null;
   return (
     <>
-      <span>{pluralize(counts.lines, 'line')}</span>
-      <span>{pluralize(counts.chars, 'character')}</span>
+      <span>{pluralize(counts.lines, t('line'), t('lines'))}</span>
+      <span>{pluralize(counts.chars, t('character'), t('characters'))}</span>
       {extra}
     </>
   );
@@ -100,8 +101,8 @@ export function HighlightedText({
       {(parts.truncated || parts.cappedHighlights) && (
         <p className="border-t border-line px-3 py-1.5 text-[12px] text-fg-muted">
           {parts.truncated
-            ? `Preview shows the first ${formatNumber(MAX_HIGHLIGHT_CHARS, 0)} characters.`
-            : `Only the first ${formatNumber(MAX_HIGHLIGHTS, 0)} matches are highlighted.`}
+            ? t('Preview shows the first {MAX_HIGHLIGHT_CHARS} characters.', { MAX_HIGHLIGHT_CHARS: formatNumber(MAX_HIGHLIGHT_CHARS, 0) })
+            : t('Only the first {MAX_HIGHLIGHTS} matches are highlighted.', { MAX_HIGHLIGHTS: formatNumber(MAX_HIGHLIGHTS, 0) })}
         </p>
       )}
     </div>
@@ -131,10 +132,10 @@ export function FrequencyTable({
               <th scope="col" className="w-12 py-2 pr-2 font-medium">#</th>
               <th scope="col" className="py-2 pr-3 font-medium">{itemHeader}</th>
               {mode === 'char' && (
-                <th scope="col" className="hidden py-2 pr-3 font-medium sm:table-cell">Code point</th>
+                <th scope="col" className="hidden py-2 pr-3 font-medium sm:table-cell">{t('Code point')}</th>
               )}
-              <th scope="col" className="py-2 pr-3 text-right font-medium">Count</th>
-              <th scope="col" className="py-2 text-right font-medium sm:w-[34%] sm:text-left">Share</th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">{t('Count')}</th>
+              <th scope="col" className="py-2 text-right font-medium sm:w-[34%] sm:text-left">{t('Share')}</th>
             </tr>
           </thead>
           <tbody>
@@ -170,11 +171,11 @@ export function FrequencyTable({
       {rows.length > visible.length && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[12.5px] text-fg-muted">
           <span>
-            Showing {formatNumber(visible.length, 0)} of {formatNumber(rows.length, 0)}. The CSV export includes every row.
+            {t('Showing {count} of {count2}. The CSV export includes every row.', { count: formatNumber(visible.length, 0), count2: formatNumber(rows.length, 0) })}
           </span>
           {!expanded && (
             <Button size="sm" variant="secondary" onClick={() => setExpanded(true)}>
-              Show more
+              {t('Show more')}
             </Button>
           )}
         </div>
@@ -206,5 +207,5 @@ export function Counts({ items }: { items: Array<{ label: string; value: number 
 
 /** "Load sample" action for editor panels whose sample also sets options. */
 export function SampleButton({ onClick }: { onClick: () => void }) {
-  return <IconButton icon={FlaskConical} label="Load sample" size="sm" onClick={onClick} />;
+  return <IconButton icon={FlaskConical} label={t('Load sample')} size="sm" onClick={onClick} />;
 }

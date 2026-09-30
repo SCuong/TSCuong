@@ -11,6 +11,7 @@ import { analyzeNormalization, type NormalForm, type NormalizationReport } from 
 import { HighlightedText, Opt, TEXT_FILE_ACCEPT } from './components/shared';
 import { OutputPanel } from './components/OutputPanel';
 import { useTask } from './components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'unicode-normalizer';
 const EMPTY_REPORT: NormalizationReport = analyzeNormalization('', { form: 'none', removeDiacritics: false });
@@ -47,9 +48,9 @@ export default function UnicodeNormalizer() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Normalization form">
+        <Opt label={t('Normalization form')}>
           <Segmented
-            label="Normalization form"
+            label={t('Normalization form')}
             value={form}
             onChange={setForm}
             options={[
@@ -57,20 +58,20 @@ export default function UnicodeNormalizer() {
               { value: 'NFD', label: 'NFD' },
               { value: 'NFKC', label: 'NFKC' },
               { value: 'NFKD', label: 'NFKD' },
-              { value: 'none', label: 'None' },
+              { value: 'none', label: t('None') },
             ]}
           />
         </Opt>
-        <Switch label="Remove diacritics (é → e)" checked={strip} onChange={setStrip} className="pb-1.5" />
+        <Switch label={t('Remove diacritics (é → e)')} checked={strip} onChange={setStrip} className="pb-1.5" />
         <p className="w-full text-[12.5px] text-fg-muted">{FORM_HELP[form]}</p>
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not normalize this text" />
+      <ErrorMessage error={task.error} title={t('Could not normalize this text')} />
       <SplitPanes>
-        <EditorPanel title="Input" value={input} onChange={setInput} placeholder="Paste text to normalize…" sample={SAMPLE} fileAccept={TEXT_FILE_ACCEPT} height="260px" />
+        <EditorPanel title={t('Input')} value={input} onChange={setInput} placeholder={t('Paste text to normalize…')} sample={SAMPLE} fileAccept={TEXT_FILE_ACCEPT} height="260px" />
         <OutputPanel
-          title="Normalized"
+          title={t('Normalized')}
           value={report.output}
-          placeholder="Normalized text appears here"
+          placeholder={t('Normalized text appears here')}
           downloadName="normalized.txt"
           height="260px"
           busy={task.pending}
@@ -78,13 +79,13 @@ export default function UnicodeNormalizer() {
       </SplitPanes>
       {input && task.value && (
         <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <Panel title="Before → after" bodyClassName="px-4 py-2">
+          <Panel title={t('Before → after')} bodyClassName="px-4 py-2">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="text-left text-[12px] text-fg-muted">
-                  <th scope="col" className="py-1.5 font-medium">Measure</th>
-                  <th scope="col" className="py-1.5 text-right font-medium">Before</th>
-                  <th scope="col" className="py-1.5 text-right font-medium">After</th>
+                  <th scope="col" className="py-1.5 font-medium">{t('Measure')}</th>
+                  <th scope="col" className="py-1.5 text-right font-medium">{t('Before')}</th>
+                  <th scope="col" className="py-1.5 text-right font-medium">{t('After')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -100,20 +101,20 @@ export default function UnicodeNormalizer() {
             <p className="mt-2 text-[12.5px] text-fg-muted">
               {report.output === analyzedText
                 ? form === 'none' && !strip
-                  ? 'Nothing to do: choose a form or remove diacritics.'
-                  : 'The text is already in this form.'
+                  ? t('Nothing to do: choose a form or remove diacritics.')
+                  : t('The text is already in this form.')
                 : partial
-                  ? `${pluralize(report.changed, 'character')} changed in the first ${formatNumber(report.analyzedChars, 0)} characters.`
-                  : `${pluralize(report.changed, 'character')} changed.`}
+                  ? t('{count} changed in the first {analyzedChars} characters.', { count: pluralize(report.changed, t('character'), t('characters')), analyzedChars: formatNumber(report.analyzedChars, 0) })
+                  : t('{count} changed.', { count: pluralize(report.changed, t('character'), t('characters')) })}
             </p>
           </Panel>
           <Panel
-            title="Changed characters"
+            title={t('Changed characters')}
             description={
               report.changed
                 ? partial
-                  ? `Highlighted in the first ${formatNumber(report.analyzedChars, 0)} characters of the input. Hover for code points.`
-                  : 'Highlighted in the input. Hover for code points.'
+                  ? t('Highlighted in the first {analyzedChars} characters of the input. Hover for code points.', { analyzedChars: formatNumber(report.analyzedChars, 0) })
+                  : t('Highlighted in the input. Hover for code points.')
                 : undefined
             }
             bodyClassName="p-3"
@@ -124,9 +125,9 @@ export default function UnicodeNormalizer() {
                   text={analyzedText.slice(0, report.analyzedChars)}
                   ranges={report.ranges}
                   maxHeight="180px"
-                  ariaLabel="Input with changed characters highlighted"
+                  ariaLabel={t('Input with changed characters highlighted')}
                 />
-                <ul className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" tabIndex={0} aria-label="Changed characters">
+                <ul className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" tabIndex={0} aria-label={t('Changed characters')}>
                   {report.changes.slice(0, 120).map((c) => (
                     <li key={c.before}>
                       <Badge className="font-mono">
@@ -143,8 +144,8 @@ export default function UnicodeNormalizer() {
             ) : (
               <p className="px-1 text-[13px] text-fg-muted">
                 {partial
-                  ? `No characters change in the first ${formatNumber(report.analyzedChars, 0)} characters.`
-                  : 'No characters change with these settings.'}
+                  ? t('No characters change in the first {analyzedChars} characters.', { analyzedChars: formatNumber(report.analyzedChars, 0) })
+                  : t('No characters change with these settings.')}
               </p>
             )}
           </Panel>

@@ -11,6 +11,7 @@ import { HighlightedText, Opt, SampleButton, TEXT_FILE_ACCEPT, TextFooter } from
 import { OutputPanel } from './components/OutputPanel';
 import { regexTimeoutMs, RegexTimeoutAlert } from './components/RegexTimeout';
 import { useTask } from './components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'find-replace';
 const SAMPLE = `Order #1042 shipped on 2024-03-15 to alice@example.com.
@@ -54,71 +55,71 @@ export default function FindReplace() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Find" className="min-w-52 flex-1">
+        <Opt label={t('Find')} className="min-w-52 flex-1">
           <Input
             value={find}
             onChange={(e) => setFind(e.target.value)}
             mono
-            placeholder={opts.regex ? 'Regular expression, e.g. (\\w+)@(\\w+)' : 'Text to find'}
-            aria-label="Find"
+            placeholder={opts.regex ? t('Regular expression, e.g. (\\w+)@(\\w+)') : t('Text to find')}
+            aria-label={t('Find')}
             aria-invalid={Boolean(patternError) || undefined}
           />
         </Opt>
-        <Opt label="Replace with" className="min-w-52 flex-1">
+        <Opt label={t('Replace with')} className="min-w-52 flex-1">
           <Input
             value={replacement}
             onChange={(e) => setReplacement(e.target.value)}
             mono
-            placeholder={opts.regex ? 'Use $1, $2 or $<name> for groups' : 'Replacement text'}
-            aria-label="Replace with"
+            placeholder={opts.regex ? t('Use $1, $2 or $<name> for groups') : t('Replacement text')}
+            aria-label={t('Replace with')}
           />
         </Opt>
         <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2">
-          <Switch label="Regex" checked={opts.regex} onChange={(v) => set('regex', v)} />
-          <Switch label="Match case" checked={opts.caseSensitive} onChange={(v) => set('caseSensitive', v)} />
-          <Switch label="Whole word" checked={opts.wholeWord} onChange={(v) => set('wholeWord', v)} />
+          <Switch label={t('Regex')} checked={opts.regex} onChange={(v) => set('regex', v)} />
+          <Switch label={t('Match case')} checked={opts.caseSensitive} onChange={(v) => set('caseSensitive', v)} />
+          <Switch label={t('Whole word')} checked={opts.wholeWord} onChange={(v) => set('wholeWord', v)} />
           {opts.regex && (
             <>
-              <Switch label="^ $ per line" checked={opts.multiline} onChange={(v) => set('multiline', v)} />
-              <Switch label=". matches newline" checked={opts.dotAll} onChange={(v) => set('dotAll', v)} />
+              <Switch label={t('^ $ per line')} checked={opts.multiline} onChange={(v) => set('multiline', v)} />
+              <Switch label={t('. matches newline')} checked={opts.dotAll} onChange={(v) => set('dotAll', v)} />
             </>
           )}
-          <Switch label="\n \t in replacement" checked={opts.escapes} onChange={(v) => set('escapes', v)} />
+          <Switch label={t('\\n \\t in replacement')} checked={opts.escapes} onChange={(v) => set('escapes', v)} />
           <span className="ml-auto flex items-center gap-2">
-            {task.pending && <Spinner size={14} label="Searching…" />}
+            {task.pending && <Spinner size={14} label={t('Searching…')} />}
             {showResult && result && !task.pending && (
-              <Badge tone={result.count ? 'accent' : 'neutral'}>{result.count ? pluralize(result.count, 'match', 'matches') : 'No matches'}</Badge>
+              <Badge tone={result.count ? 'accent' : 'neutral'}>{result.count ? pluralize(result.count, t('match'), t('matches')) : t('No matches')}</Badge>
             )}
           </span>
         </div>
       </ToolBar>
-      <ErrorMessage error={failure} title={patternError ? 'Invalid pattern' : undefined} />
+      <ErrorMessage error={failure} title={patternError ? t('Invalid pattern') : undefined} />
       {task.timedOut && <RegexTimeoutAlert size={deferredInput.length} />}
       <SplitPanes>
         <EditorPanel
-          title="Input"
+          title={t('Input')}
           value={input}
           onChange={setInput}
-          placeholder="Paste the text to search…"
+          placeholder={t('Paste the text to search…')}
           fileAccept={TEXT_FILE_ACCEPT}
           height="360px"
           actions={<SampleButton onClick={loadSample} />}
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title="Result"
+          title={t('Result')}
           value={!find ? deferredInput : showResult && result ? result.text : ''}
-          placeholder={find && (failure || task.timedOut) ? 'Fix the search to see the result' : 'The replaced text appears here'}
+          placeholder={find && (failure || task.timedOut) ? t('Fix the search to see the result') : t('The replaced text appears here')}
           downloadName="replaced.txt"
           height="360px"
           invalid={Boolean(failure) || task.timedOut}
           busy={task.pending}
-          footer={input && showResult && result ? <span>{`${formatNumber(result.count, 0)} replaced`}</span> : undefined}
+          footer={input && showResult && result ? <span>{t('{count} replaced', { count: formatNumber(result.count, 0) })}</span> : undefined}
         />
       </SplitPanes>
       {input && showResult && result && (
-        <Panel title="Matches" description="Highlighted in the input text." bodyClassName="p-3">
-          <HighlightedText text={searchedText} ranges={result.ranges} ariaLabel="Input with matches highlighted" />
+        <Panel title={t('Matches')} description={t('Highlighted in the input text.')} bodyClassName="p-3">
+          <HighlightedText text={searchedText} ranges={result.ranges} ariaLabel={t('Input with matches highlighted')} />
         </Panel>
       )}
     </ToolStack>

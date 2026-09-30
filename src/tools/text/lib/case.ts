@@ -1,4 +1,5 @@
 import { mapLines } from './common';
+import { t } from '@/lib/i18n';
 
 /**
  * Split an identifier or phrase into words. Handles separators (space, _, -, ., /),
@@ -182,17 +183,17 @@ export interface CaseVariant {
 
 export const CASE_VARIANTS: CaseVariant[] = [
   { id: 'camel', label: 'camelCase', convert: camelCase },
-  { id: 'pascal', label: 'PascalCase', convert: pascalCase },
+  { id: 'pascal', label: t('PascalCase'), convert: pascalCase },
   { id: 'snake', label: 'snake_case', convert: snakeCase },
   { id: 'constant', label: 'CONSTANT_CASE', convert: constantCase },
   { id: 'kebab', label: 'kebab-case', convert: kebabCase },
   { id: 'dot', label: 'dot.case', convert: dotCase },
-  { id: 'path', label: 'path/case', convert: pathCase },
-  { id: 'title', label: 'Title Case', convert: titleCase },
-  { id: 'capitalized', label: 'Capitalized Words', convert: capitalizedCase },
-  { id: 'sentence', label: 'Sentence case', convert: sentenceCase },
-  { id: 'lower', label: 'lower case', convert: lowerCase },
+  { id: 'path', label: t('path/case'), convert: pathCase },
+  { id: 'title', label: t('Title Case'), convert: titleCase },
+  { id: 'capitalized', label: t('Capitalized Words'), convert: capitalizedCase },
+  { id: 'sentence', label: t('Sentence case'), convert: sentenceCase },
+  { id: 'lower', label: t('lower case'), convert: lowerCase },
   { id: 'upper', label: 'UPPER CASE', convert: upperCase },
-  { id: 'alternating', label: 'aLtErNaTiNg cAsE', convert: alternatingCase },
-  { id: 'inverse', label: 'iNVERSE cASE', convert: inverseCase },
+  { id: 'alternating', label: t('aLtErNaTiNg cAsE'), convert: alternatingCase },
+  { id: 'inverse', label: t('iNVERSE cASE'), convert: inverseCase },
 ];

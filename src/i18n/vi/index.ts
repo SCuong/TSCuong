@@ -3,8 +3,9 @@ import tools from './tools';
 import pdf from './pdf';
 import image from './image';
 import json from './json';
+import text from './text';
 
 /** Vietnamese interface text, keyed by the English source text passed to `t()`. */
-const vi: Record<string, string> = Object.assign({}, shell, tools, pdf, image, json);
+const vi: Record<string, string> = Object.assign({}, shell, tools, pdf, image, json, text);
 
 export default vi;

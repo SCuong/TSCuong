@@ -4,6 +4,7 @@ import { CopyButton, DownloadButton } from '@/components/ui/Actions';
 import { Textarea } from '@/components/ui/Field';
 import { Spinner } from '@/components/ui/Feedback';
 import { cn, formatNumber } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /** Longest output shown in full; a text area with tens of megabytes makes the page crawl. */
 export const OUTPUT_PREVIEW_LIMIT = 1_000_000;
@@ -40,8 +41,8 @@ export function OutputPanel({
   busy,
   ariaLabel,
 }: OutputPanelProps) {
-  const spinner = busy ? <Spinner size={14} label="Updating…" /> : null;
-  const label = ariaLabel ?? (typeof title === 'string' ? title : 'Result');
+  const spinner = busy ? <Spinner size={14} label={t('Updating…')} /> : null;
+  const label = ariaLabel ?? (typeof title === 'string' ? title : t('Result'));
   if (value.length <= OUTPUT_PREVIEW_LIMIT) {
     return (
       <EditorPanel
@@ -65,7 +66,7 @@ export function OutputPanel({
         <h2 className="text-[13px] font-semibold tracking-tight text-fg">{title}</h2>
         <div className="flex flex-wrap items-center gap-1">
           {spinner}
-          {downloadName && <DownloadButton data={value} filename={downloadName} type={downloadType} label="Save" variant="ghost" />}
+          {downloadName && <DownloadButton data={value} filename={downloadName} type={downloadType} label={t('Save')} variant="ghost" />}
           <CopyButton value={value} iconOnly />
         </div>
       </header>
@@ -81,7 +82,7 @@ export function OutputPanel({
       <footer className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-1.5 text-[12.5px] text-fg-muted">
         {footer}
         <span>
-          Showing the first {formatNumber(OUTPUT_PREVIEW_LIMIT, 0)} of {formatNumber(value.length, 0)} characters. Copy and Save include everything.
+          {t('Showing the first {OUTPUT_PREVIEW_LIMIT} of {count} characters. Copy and Save include everything.', { OUTPUT_PREVIEW_LIMIT: formatNumber(OUTPUT_PREVIEW_LIMIT, 0), count: formatNumber(value.length, 0) })}
         </span>
       </footer>
     </section>

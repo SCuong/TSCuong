@@ -10,6 +10,7 @@ import { useToolState } from '@/lib/hooks';
 import { charFrequency, DEFAULT_CHAR_FREQ_OPTIONS, frequencyToCsv, type CharFrequencyOptions } from './lib/frequency';
 import { Counts, FrequencyTable, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
 import { useTask } from './components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'character-frequency';
 const SAMPLE = 'Hello, Wörld! 👋🏽 Ça va? Emoji like 👨‍👩‍👧 and flags 🇻🇳 count as one character each.';
@@ -27,29 +28,29 @@ export default function CharacterFrequency() {
     <ToolStack>
       <ToolBar>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-1">
-          <Switch label="Include whitespace" checked={o.includeWhitespace} onChange={(v) => set('includeWhitespace', v)} />
-          <Switch label="Ignore case" checked={o.caseFold} onChange={(v) => set('caseFold', v)} />
-          <Switch label="Letters and digits only" checked={o.lettersOnly} onChange={(v) => set('lettersOnly', v)} />
+          <Switch label={t('Include whitespace')} checked={o.includeWhitespace} onChange={(v) => set('includeWhitespace', v)} />
+          <Switch label={t('Ignore case')} checked={o.caseFold} onChange={(v) => set('caseFold', v)} />
+          <Switch label={t('Letters and digits only')} checked={o.lettersOnly} onChange={(v) => set('lettersOnly', v)} />
         </div>
       </ToolBar>
-      <ErrorMessage error={task.error} title="Could not count the characters" />
+      <ErrorMessage error={task.error} title={t('Could not count the characters')} />
       <SplitPanes>
         <EditorPanel
-          title="Text"
+          title={t('Text')}
           value={input}
           onChange={setInput}
-          placeholder="Paste text to count its characters…"
+          placeholder={t('Paste text to count its characters…')}
           sample={SAMPLE}
           fileAccept={TEXT_FILE_ACCEPT}
           height="520px"
           footer={<TextFooter text={input} />}
         />
         <Panel
-          title="Character frequency"
-          description="Counts user-perceived characters, so emoji and accented letters count once."
+          title={t('Character frequency')}
+          description={t('Counts user-perceived characters, so emoji and accented letters count once.')}
           actions={
             <>
-              {task.pending && <Spinner size={14} label="Counting…" />}
+              {task.pending && <Spinner size={14} label={t('Counting…')} />}
               <DownloadButton
                 data={() => frequencyToCsv(result?.rows ?? [], 'character')}
                 filename="character-frequency.csv"
@@ -62,26 +63,26 @@ export default function CharacterFrequency() {
         >
           {!result ? (
             task.pending ? (
-              <Spinner label="Counting characters…" className="p-2" />
+              <Spinner label={t('Counting characters…')} className="p-2" />
             ) : (
-              <EmptyState icon={ChartColumn} title="No text yet">
-                Each character, its code point and share appear here.
+              <EmptyState icon={ChartColumn} title={t('No text yet')}>
+                {t('Each character, its code point and share appear here.')}
               </EmptyState>
             )
           ) : result.rows.length === 0 ? (
-            <EmptyState icon={ChartColumn} title={input ? 'Nothing to count with these filters' : 'No text yet'}>
-              {input ? 'Turn on “Include whitespace” or allow punctuation.' : 'Each character, its code point and share appear here.'}
+            <EmptyState icon={ChartColumn} title={input ? t('Nothing to count with these filters') : t('No text yet')}>
+              {input ? t('Turn on “Include whitespace” or allow punctuation.') : t('Each character, its code point and share appear here.')}
             </EmptyState>
           ) : (
             <div className="flex max-h-[520px] flex-col gap-3">
               <Counts
                 items={[
-                  { label: 'characters counted', value: result.total },
+                  { label: t('characters counted'), value: result.total },
                   { label: 'distinct', value: result.unique, tone: 'accent' },
                 ]}
               />
-              <div className="min-h-0 overflow-y-auto" tabIndex={0} role="region" aria-label="Character frequency table">
-                <FrequencyTable rows={result.rows} itemHeader="Character" mode="char" />
+              <div className="min-h-0 overflow-y-auto" tabIndex={0} role="region" aria-label={t('Character frequency table')}>
+                <FrequencyTable rows={result.rows} itemHeader={t('Character')} mode="char" />
               </div>
             </div>
           )}

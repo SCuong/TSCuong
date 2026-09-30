@@ -5,6 +5,7 @@ import { useToolState } from '@/lib/hooks';
 import { pluralize } from '@/lib/utils';
 import { DEFAULT_URL_OPTIONS, extractUrls, findUrls, urlHost, type UrlExtractOptions } from './lib/extract';
 import { TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { t } from '@/lib/i18n';
 
 const ID = 'url-extractor';
 const SAMPLE = `Check the docs at https://developer.mozilla.org/en-US/docs/Web/API/URL (great reference).
@@ -28,39 +29,39 @@ export default function UrlExtractor() {
     <ToolStack>
       <ToolBar>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-1">
-          <Switch label="http / https" checked={o.protocols.http} onChange={(v) => setProto('http', v)} />
+          <Switch label={t('http / https')} checked={o.protocols.http} onChange={(v) => setProto('http', v)} />
           <Switch label="ftp" checked={o.protocols.ftp} onChange={(v) => setProto('ftp', v)} />
-          <Switch label="www. links" checked={o.protocols.www} onChange={(v) => setProto('www', v)} />
+          <Switch label={t('www. links')} checked={o.protocols.www} onChange={(v) => setProto('www', v)} />
           <span className="hidden h-5 w-px bg-line sm:block" aria-hidden />
-          <Switch label="Remove duplicates" checked={o.dedupe} onChange={(v) => set('dedupe', v)} />
-          <Switch label="Sort A → Z" checked={o.sort} onChange={(v) => set('sort', v)} />
-          <Switch label="Add https:// to www." checked={o.addProtocol} onChange={(v) => set('addProtocol', v)} />
+          <Switch label={t('Remove duplicates')} checked={o.dedupe} onChange={(v) => set('dedupe', v)} />
+          <Switch label={t('Sort A → Z')} checked={o.sort} onChange={(v) => set('sort', v)} />
+          <Switch label={t('Add https:// to www.')} checked={o.addProtocol} onChange={(v) => set('addProtocol', v)} />
         </div>
       </ToolBar>
       <SplitPanes>
         <EditorPanel
-          title="Text, HTML or Markdown"
+          title={t('Text, HTML or Markdown')}
           value={input}
           onChange={setInput}
-          placeholder="Paste anything that contains links…"
+          placeholder={t('Paste anything that contains links…')}
           sample={SAMPLE}
           fileAccept={TEXT_FILE_ACCEPT}
           height="420px"
           footer={<TextFooter text={input} />}
         />
         <EditorPanel
-          title="URLs"
+          title={t('URLs')}
           value={urls.join('\n')}
-          placeholder={input ? 'No links found' : 'Extracted links appear here, one per line'}
+          placeholder={input ? t('No links found') : t('Extracted links appear here, one per line')}
           downloadName="urls.txt"
           height="420px"
           lineWrapping={false}
           footer={
             input ? (
               <>
-                <span>{pluralize(urls.length, 'URL')}</span>
-                <span>{pluralize(hosts, 'host')}</span>
-                {found > urls.length && <span>{found - urls.length} filtered or duplicate</span>}
+                <span>{pluralize(urls.length, t('URL'), t('URLs'))}</span>
+                <span>{pluralize(hosts, t('host'), t('hosts'))}</span>
+                {found > urls.length && <span>{found - urls.length}{' '}{t('filtered or duplicate')}</span>}
               </>
             ) : undefined
           }

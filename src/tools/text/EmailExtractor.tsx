@@ -8,6 +8,7 @@ import { DEFAULT_EMAIL_OPTIONS, emailReport, type EmailExtractOptions } from './
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
 import { OutputPanel } from './components/OutputPanel';
 import { useTask } from './components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'email-extractor';
 const NONE: string[] = [];
@@ -50,55 +51,55 @@ export default function EmailExtractor() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Output">
+        <Opt label={t('Output')}>
           <Segmented
-            label="Output layout"
+            label={t('Output layout')}
             value={s.layout}
             onChange={(v) => set('layout', v)}
             options={[
-              { value: 'list', label: 'List' },
-              { value: 'grouped', label: 'Grouped by domain' },
+              { value: 'list', label: t('List') },
+              { value: 'grouped', label: t('Grouped by domain') },
             ]}
           />
         </Opt>
         {s.layout === 'list' && (
-          <Opt label="Separator">
+          <Opt label={t('Separator')}>
             <Segmented
-              label="Separator"
+              label={t('Separator')}
               value={s.separator}
               onChange={(v) => set('separator', v)}
               options={[
-                { value: 'newline', label: 'New line' },
-                { value: 'comma', label: 'Comma' },
-                { value: 'semicolon', label: 'Semicolon' },
+                { value: 'newline', label: t('New line') },
+                { value: 'comma', label: t('Comma') },
+                { value: 'semicolon', label: t('Semicolon') },
               ]}
             />
           </Opt>
         )}
-        <Opt label="Domain contains" className="w-44">
-          <Input value={domainFilter} onChange={(e) => setDomainFilter(e.target.value)} placeholder="e.g. example.com" aria-label="Filter by domain" />
+        <Opt label={t('Domain contains')} className="w-44">
+          <Input value={domainFilter} onChange={(e) => setDomainFilter(e.target.value)} placeholder={t('e.g. example.com')} aria-label={t('Filter by domain')} />
         </Opt>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
-          <Switch label="Remove duplicates" checked={s.dedupe} onChange={(v) => set('dedupe', v)} />
-          <Switch label="Lowercase" checked={s.lowercase} onChange={(v) => set('lowercase', v)} />
-          <Switch label="Sort A → Z" checked={s.sort} onChange={(v) => set('sort', v)} />
+          <Switch label={t('Remove duplicates')} checked={s.dedupe} onChange={(v) => set('dedupe', v)} />
+          <Switch label={t('Lowercase')} checked={s.lowercase} onChange={(v) => set('lowercase', v)} />
+          <Switch label={t('Sort A → Z')} checked={s.sort} onChange={(v) => set('sort', v)} />
         </div>
       </ToolBar>
       <SplitPanes>
         <EditorPanel
-          title="Text"
+          title={t('Text')}
           value={input}
           onChange={setInput}
-          placeholder="Paste e-mails, contact lists, HTML or CSV…"
+          placeholder={t('Paste e-mails, contact lists, HTML or CSV…')}
           sample={SAMPLE}
           fileAccept={TEXT_FILE_ACCEPT}
           height="420px"
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title="E-mail addresses"
+          title={t('E-mail addresses')}
           value={output}
-          placeholder={!input ? 'Addresses appear here' : task.pending ? 'Searching…' : 'No e-mail addresses found'}
+          placeholder={!input ? t('Addresses appear here') : task.pending ? t('Searching…') : t('No e-mail addresses found')}
           downloadName="emails.txt"
           height="420px"
           lineWrapping={s.layout === 'list' && s.separator !== 'newline'}
@@ -106,9 +107,9 @@ export default function EmailExtractor() {
           footer={
             input && task.value ? (
               <>
-                <span>{pluralize(emails.length, 'address', 'addresses')}</span>
-                <span>{pluralize(groups.length, 'domain')}</span>
-                {found > emails.length && <span>{found - emails.length} duplicate or filtered</span>}
+                <span>{pluralize(emails.length, t('address'), t('addresses'))}</span>
+                <span>{pluralize(groups.length, t('domain'), t('domains'))}</span>
+                {found > emails.length && <span>{found - emails.length}{' '}{t('duplicate or filtered')}</span>}
               </>
             ) : undefined
           }

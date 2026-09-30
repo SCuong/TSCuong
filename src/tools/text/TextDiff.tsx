@@ -16,6 +16,7 @@ import { collapseRows, inlineLineDiff, type DiffMode, type DiffResult, type Diff
 import type { DiffWorkerRequest } from './lib/diff.worker';
 import { detectEol } from './lib/common';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
+import { t } from '@/lib/i18n';
 
 const ID = 'text-diff';
 const EOL_NAMES = { '\n': 'LF', '\r\n': 'CRLF', '\r': 'CR' } as const;
@@ -69,7 +70,7 @@ function useDiffWorker() {
         cb?.(e.data);
       };
       w.onerror = () => {
-        for (const cb of pending.current.values()) cb({ id: -1, type: 'error', error: 'The comparison engine crashed (the input may be too large).' });
+        for (const cb of pending.current.values()) cb({ id: -1, type: 'error', error: t('The comparison engine crashed (the input may be too large).') });
         pending.current.clear();
         worker.current?.terminate();
         worker.current = null;
@@ -93,7 +94,7 @@ function useDiffWorker() {
         worker.current?.terminate();
         worker.current = null;
         // Settle the abandoned requests so nothing waits forever.
-        for (const [id, cb] of pending.current) cb({ id, type: 'error', error: 'Cancelled by a newer comparison.' });
+        for (const [id, cb] of pending.current) cb({ id, type: 'error', error: t('Cancelled by a newer comparison.') });
         pending.current.clear();
       }
       const id = ++seq.current;
@@ -160,7 +161,7 @@ export default function TextDiff() {
     try {
       const msg = await requestPatch({ type: 'patch', a, b, oldName: 'original.txt', newName: 'changed.txt' }, true);
       if (msg.type === 'patch') downloadBlob(msg.patch, 'changes.patch', 'text/x-diff;charset=utf-8');
-      else toast('Could not create the patch.', 'error');
+      else toast(t('Could not create the patch.'), 'error');
     } finally {
       setPatching(false);
     }
@@ -184,56 +185,56 @@ export default function TextDiff() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Compare by">
+        <Opt label={t('Compare by')}>
           <Segmented
-            label="Compare by"
+            label={t('Compare by')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'line', label: 'Lines' },
-              { value: 'word', label: 'Words' },
-              { value: 'char', label: 'Characters' },
+              { value: 'line', label: t('Lines') },
+              { value: 'word', label: t('Words') },
+              { value: 'char', label: t('Characters') },
             ]}
           />
         </Opt>
-        <Opt label="View" className="max-md:hidden">
+        <Opt label={t('View')} className="max-md:hidden">
           <Segmented
-            label="View"
+            label={t('View')}
             value={view}
             onChange={setView}
             options={[
-              { value: 'split', label: 'Side by side' },
-              { value: 'unified', label: mode === 'line' ? 'Unified' : 'Inline' },
+              { value: 'split', label: t('Side by side') },
+              { value: 'unified', label: mode === 'line' ? t('Unified') : t('Inline') },
             ]}
           />
         </Opt>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-1.5">
-          <Switch label="Ignore whitespace" checked={ignoreWhitespace} onChange={setIgnoreWhitespace} />
-          <Switch label="Ignore case" checked={ignoreCase} onChange={setIgnoreCase} />
-          {mode === 'line' && <Switch label="Hide unchanged lines" checked={collapse} onChange={setCollapse} />}
+          <Switch label={t('Ignore whitespace')} checked={ignoreWhitespace} onChange={setIgnoreWhitespace} />
+          <Switch label={t('Ignore case')} checked={ignoreCase} onChange={setIgnoreCase} />
+          {mode === 'line' && <Switch label={t('Hide unchanged lines')} checked={collapse} onChange={setCollapse} />}
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button icon={ArrowLeftRight} onClick={swap} disabled={!a && !b}>
-            Swap
+            {t('Swap')}
           </Button>
           <Button
             icon={Download}
             onClick={() => void downloadPatch()}
             disabled={!a && !b}
             loading={patching}
-            title="Unified diff of the exact line changes"
+            title={t('Unified diff of the exact line changes')}
           >
-            .patch
+            {t('.patch')}
           </Button>
         </div>
       </ToolBar>
 
       <SplitPanes>
         <EditorPanel
-          title="Original"
+          title={t('Original')}
           value={a}
           onChange={setA}
-          placeholder="Paste the original text…"
+          placeholder={t('Paste the original text…')}
           sample={SAMPLE_A}
           fileAccept={TEXT_FILE_ACCEPT}
           height="260px"
@@ -241,10 +242,10 @@ export default function TextDiff() {
           footer={<TextFooter text={a} />}
         />
         <EditorPanel
-          title="Changed"
+          title={t('Changed')}
           value={b}
           onChange={setB}
-          placeholder="Paste the changed text…"
+          placeholder={t('Paste the changed text…')}
           sample={SAMPLE_B}
           fileAccept={TEXT_FILE_ACCEPT}
           height="260px"
@@ -253,29 +254,28 @@ export default function TextDiff() {
         />
       </SplitPanes>
 
-      <ErrorMessage error={error} title="Could not compare" />
+      <ErrorMessage error={error} title={t('Could not compare')} />
       {eolMismatch && (
-        <Alert tone="info" title="Different line endings">
-          The original uses {eolMismatch.left} and the changed text uses {eolMismatch.right} line breaks, so lines that look the same
-          are reported as changed. Turn on Ignore whitespace to compare only the content.
+        <Alert tone="info" title={t('Different line endings')}>
+          {t('The original uses {left} and the changed text uses {right} line breaks, so lines that look the same are reported as changed. Turn on Ignore whitespace to compare only the content.', { left: eolMismatch.left, right: eolMismatch.right })}
         </Alert>
       )}
 
       <Panel
-        title="Differences"
+        title={t('Differences')}
         bodyClassName="p-0"
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
-            {busy && <Spinner size={14} label="Comparing…" />}
+            {busy && <Spinner size={14} label={t('Comparing…')} />}
             {stats && !busy && (
               identical ? (
-                <Badge tone="success">No differences</Badge>
+                <Badge tone="success">{t('No differences')}</Badge>
               ) : (
                 <>
                   <Badge tone="success">+{formatNumber(stats.added, 0)}</Badge>
                   <Badge tone="danger">−{formatNumber(stats.removed, 0)}</Badge>
                   <Badge>
-                    {formatNumber(stats.unchanged, 0)} {stats.unit} unchanged
+                    {t('{unchanged} {unit} unchanged', { unchanged: formatNumber(stats.unchanged, 0), unit: stats.unit })}
                   </Badge>
                 </>
               )
@@ -284,7 +284,7 @@ export default function TextDiff() {
         }
       >
         {!state || !state.result.ok ? (
-          <EmptyState icon={GitCompare} title={busy ? 'Comparing…' : 'Paste two texts to compare'}>
+          <EmptyState icon={GitCompare} title={busy ? t('Comparing…') : t('Paste two texts to compare')}>
             {!busy && 'Differences are highlighted line by line, word by word or character by character.'}
           </EmptyState>
         ) : state.mode === 'line' && state.rows ? (
@@ -342,7 +342,7 @@ function Marker({ kind }: { kind: 'ctx' | 'del' | 'add' }) {
         {kind === 'del' ? '−' : kind === 'add' ? '+' : ' '}
       </span>
       {/* Colour and the +/− marker are visual only; screen readers hear what happened to the line. */}
-      {kind !== 'ctx' && <span className="sr-only">{kind === 'del' ? 'Removed: ' : 'Added: '}</span>}
+      {kind !== 'ctx' && <span className="sr-only">{kind === 'del' ? t('Removed:') + ' ' : t('Added:') + ' '}</span>}
     </>
   );
 }
@@ -414,7 +414,7 @@ function LineDiffView({ rows, view, collapse, ignoreCase }: { rows: DiffRow[]; v
         className="flex w-full items-center gap-2 bg-surface-hover/60 px-3 py-1 text-left font-sans text-[12.5px] text-fg-muted hover:bg-surface-hover hover:text-fg"
       >
         <ChevronsUpDown size={13} aria-hidden />
-        Show {formatNumber(r.count, 0)} unchanged {r.count === 1 ? 'line' : 'lines'}
+        {(r.count === 1) ? t('Show {count} unchanged line', { count: formatNumber(r.count, 0) }) : t('Show {count} unchanged lines', { count: formatNumber(r.count, 0) })}
       </button>
     );
   }
@@ -459,7 +459,7 @@ function LineDiffView({ rows, view, collapse, ignoreCase }: { rows: DiffRow[]; v
   }
 
   if (count === 0) {
-    return <EmptyState icon={GitCompare} title="Both texts are empty" />;
+    return <EmptyState icon={GitCompare} title={t('Both texts are empty')} />;
   }
 
   return (
@@ -467,7 +467,7 @@ function LineDiffView({ rows, view, collapse, ignoreCase }: { rows: DiffRow[]; v
       ref={scrollRef}
       className="max-h-[640px] overflow-auto rounded-b-xl font-mono text-[12.5px] leading-[1.6] text-fg"
       role="region"
-      aria-label="Line differences"
+      aria-label={t('Line differences')}
       tabIndex={0}
     >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
@@ -536,21 +536,21 @@ function InlineDiffView({ changes, view }: { changes: Change[]; view: View }) {
     <div>
       {view === 'split' ? (
         <div className="grid grid-cols-2 divide-x divide-line">
-          <div className={box} role="region" tabIndex={0} aria-label="Original with removals highlighted">
+          <div className={box} role="region" tabIndex={0} aria-label={t('Original with removals highlighted')}>
             {left}
           </div>
-          <div className={box} role="region" tabIndex={0} aria-label="Changed with additions highlighted">
+          <div className={box} role="region" tabIndex={0} aria-label={t('Changed with additions highlighted')}>
             {right}
           </div>
         </div>
       ) : (
-        <div className={box} role="region" tabIndex={0} aria-label="Differences inline">
+        <div className={box} role="region" tabIndex={0} aria-label={t('Differences inline')}>
           {unified}
         </div>
       )}
       {truncated && (
         <p className="border-t border-line px-4 py-2 text-[12.5px] text-fg-muted">
-          The preview stops after {formatNumber(MAX_INLINE_CHARS, 0)} characters. The statistics cover the full text.
+          {t('The preview stops after {MAX_INLINE_CHARS} characters. The statistics cover the full text.', { MAX_INLINE_CHARS: formatNumber(MAX_INLINE_CHARS, 0) })}
         </p>
       )}
     </div>

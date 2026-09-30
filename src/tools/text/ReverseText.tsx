@@ -7,6 +7,7 @@ import { reverseText, type ReverseMode } from './lib/reverse';
 import { Opt, TEXT_FILE_ACCEPT, TextFooter } from './components/shared';
 import { OutputPanel } from './components/OutputPanel';
 import { useTask } from './components/useTask';
+import { t } from '@/lib/i18n';
 
 const ID = 'reverse-text';
 const SAMPLE = 'Hello, world! 👋🏽\nFamily: 👨‍👩‍👧 Flag: 🇻🇳 Café\nThe quick brown fox';
@@ -23,42 +24,42 @@ export default function ReverseText() {
   return (
     <ToolStack>
       <ToolBar>
-        <Opt label="Reverse">
+        <Opt label={t('Reverse')}>
           <Segmented
-            label="Reverse"
+            label={t('Reverse')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'characters', label: 'Characters' },
-              { value: 'words', label: 'Word order' },
-              { value: 'wordLetters', label: 'Letters in each word' },
-              { value: 'lines', label: 'Line order' },
+              { value: 'characters', label: t('Characters') },
+              { value: 'words', label: t('Word order') },
+              { value: 'wordLetters', label: t('Letters in each word') },
+              { value: 'lines', label: t('Line order') },
             ]}
           />
         </Opt>
         {(mode === 'characters' || mode === 'words') && (
-          <Switch label="Keep line order (reverse each line)" checked={perLine} onChange={setPerLine} className="pb-1.5" />
+          <Switch label={t('Keep line order (reverse each line)')} checked={perLine} onChange={setPerLine} className="pb-1.5" />
         )}
       </ToolBar>
       <SplitPanes>
         <EditorPanel
-          title="Text"
+          title={t('Text')}
           value={input}
           onChange={setInput}
-          placeholder="Type or paste text to reverse…"
+          placeholder={t('Type or paste text to reverse…')}
           sample={SAMPLE}
           fileAccept={TEXT_FILE_ACCEPT}
           height="360px"
           footer={<TextFooter text={input} />}
         />
         <OutputPanel
-          title="Reversed"
+          title={t('Reversed')}
           value={output}
-          placeholder="Reversed text appears here"
+          placeholder={t('Reversed text appears here')}
           downloadName="reversed.txt"
           height="360px"
           busy={task.pending}
-          footer={input ? <span>Emoji, flags and accented letters stay intact.</span> : undefined}
+          footer={input ? <span>{t('Emoji, flags and accented letters stay intact.')}</span> : undefined}
         />
       </SplitPanes>
     </ToolStack>
