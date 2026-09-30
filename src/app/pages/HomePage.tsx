@@ -8,8 +8,10 @@ import { ToolIcon } from '@/components/ToolIcon';
 import { Kbd } from '@/components/ui/Panel';
 import { cn, modKey } from '@/lib/utils';
 import { useDocumentTitle } from '../useDocumentTitle';
+import { t } from '@/lib/i18n';
 
-const QUICK_QUERIES = ['format json', 'merge pdf', 'compress image', 'decode jwt', 'csv to json', 'regex', 'diagram'];
+// Translated: in Vietnamese the chips search Vietnamese tool names.
+const QUICK_QUERIES = [t('format json'), t('merge pdf'), t('compress image'), t('decode jwt'), t('csv to json'), t('regex'), t('diagram')];
 
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -64,27 +66,27 @@ export function HomePage() {
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-4 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-line bg-surface/70 px-3 py-1 text-[12px] text-fg-secondary backdrop-blur">
             <span className="inline-flex items-center gap-1.5">
-              <HardDrive size={12} aria-hidden /> Runs on your device
+              <HardDrive size={12} aria-hidden />{' '}{t('Runs on your device')}
             </span>
             <span className="text-line-strong" aria-hidden>
               /
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck size={12} aria-hidden /> No uploads
+              <ShieldCheck size={12} aria-hidden />{' '}{t('No uploads')}
             </span>
             <span className="text-line-strong" aria-hidden>
               /
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <CloudOff size={12} aria-hidden /> Works offline
+              <CloudOff size={12} aria-hidden />{' '}{t('Works offline')}
             </span>
           </div>
           <h1 className="text-[32px] leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-fg sm:text-[46px]">
-            Every tool you reach for.
-            <br className="hidden sm:block" /> <span className="text-fg-secondary">None of your data leaves.</span>
+            {t('Every tool you reach for.')}
+            <br className="hidden sm:block" /> <span className="text-fg-secondary">{t('None of your data leaves.')}</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-pretty text-fg-secondary sm:text-base">
-            {TOOLS.length} fast utilities for PDFs, images, JSON, text, data and code — processed locally in your browser.
+            {t('{count} fast utilities for PDFs, images, JSON, text, data and code — processed locally in your browser.', { count: TOOLS.length })}
           </p>
 
           <form
@@ -104,8 +106,8 @@ export function HomePage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="What do you need? Try “jpg to webp” or “decode jwt”"
-              aria-label="Search tools"
+              placeholder={t('What do you need? Try “jpg to webp” or “decode jwt”')}
+              aria-label={t('Search tools')}
               autoComplete="off"
               spellCheck={false}
               className="h-14 w-full rounded-xl border border-line-strong bg-surface-raised pr-24 pl-12 text-[16px] text-fg shadow-raised transition-[border-color,box-shadow] outline-none placeholder:text-fg-muted focus:border-accent focus:shadow-[0_0_0_4px_var(--lk-accent-soft)] [&::-webkit-search-cancel-button]:hidden"
@@ -119,7 +121,7 @@ export function HomePage() {
                     inputRef.current?.focus();
                   }}
                   className="flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
-                  aria-label="Clear search"
+                  aria-label={t('Clear search')}
                 >
                   <X size={16} aria-hidden />
                 </button>
@@ -149,13 +151,13 @@ export function HomePage() {
 
         <div className="mt-12 sm:mt-14">
           {query.trim() ? (
-            <Section title={results.length ? `${results.length} matching tool${results.length === 1 ? '' : 's'}` : 'No matches'}>
+            <Section title={results.length ? (results.length === 1) ? t('{count} matching tool', { count: results.length }) : t('{count} matching tools', { count: results.length }) : t('No matches')}>
               <div aria-live="polite">
                 {results.length ? (
                   <ToolGrid tools={results} />
                 ) : (
                   <p className="rounded-xl border border-dashed border-line-strong px-6 py-10 text-center text-sm text-fg-muted">
-                    Nothing matches “{query.trim()}”. Try a file format (pdf, png, csv) or an action (merge, format, decode).
+                    {t('Nothing matches “{query}”. Try a file format (pdf, png, csv) or an action (merge, format, decode).', { query: query.trim() })}
                   </p>
                 )}
               </div>
@@ -164,10 +166,10 @@ export function HomePage() {
             <>
               {personal.length > 0 && (
                 <Section
-                  title="Your tools"
+                  title={t('Your tools')}
                   action={
                     <Link to="/favorites" className="text-[13px] text-fg-muted hover:text-fg">
-                      Manage
+                      {t('Manage')}
                     </Link>
                   }
                 >
@@ -175,13 +177,13 @@ export function HomePage() {
                 </Section>
               )}
               {recent.length > 0 && (
-                <Section title="Recently used">
+                <Section title={t('Recently used')}>
                   <ToolGrid tools={recent} variant="compact" />
                 </Section>
               )}
 
               {workspaces.length > 0 && (
-                <Section title="Workspaces">
+                <Section title={t('Workspaces')}>
                   <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {workspaces.map((tool) => (
                       <li key={tool.id} className="min-w-0">
@@ -197,8 +199,8 @@ export function HomePage() {
                               className="text-fg-muted transition-transform group-hover:translate-x-0.5 group-hover:text-fg"
                             />
                           </div>
-                          <h3 className="mt-3 text-[15px] font-semibold tracking-tight text-fg">{tool.name}</h3>
-                          <p className="mt-1 text-[13px] leading-snug text-fg-muted">{tool.description}</p>
+                          <h3 className="mt-3 text-[15px] font-semibold tracking-tight text-fg">{t(tool.name)}</h3>
+                          <p className="mt-1 text-[13px] leading-snug text-fg-muted">{t(tool.description)}</p>
                         </Link>
                       </li>
                     ))}
@@ -214,13 +216,13 @@ export function HomePage() {
                   return (
                     <Section
                       key={category.id}
-                      title={category.name}
+                      title={t(category.name)}
                       action={
                         <Link
                           to={`/category/${category.id}`}
                           className="inline-flex items-center gap-1 text-[13px] text-fg-muted hover:text-fg"
                         >
-                          {tools.length > 4 ? `All ${tools.length}` : 'Open category'}
+                          {tools.length > 4 ? t('All {count}', { count: tools.length }) : t('Open category')}
                           <ArrowRight size={13} aria-hidden />
                         </Link>
                       }

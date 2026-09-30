@@ -3,6 +3,7 @@ import { Check, Copy, Download } from 'lucide-react';
 import { copyText, downloadBlob } from '@/lib/utils';
 import { Button, IconButton, type ButtonSize, type ButtonVariant } from './Button';
 import { toast } from './Toast';
+import { t } from '@/lib/i18n';
 
 /** Copies text (or the result of a function) and confirms visually. Disabled when there is nothing to copy. */
 export function CopyButton({
@@ -30,7 +31,7 @@ export function CopyButton({
     if (!text) return;
     const ok = await copyText(text);
     if (!ok) {
-      toast('Copy failed. Your browser blocked clipboard access.', 'error');
+      toast(t('Copy failed. Your browser blocked clipboard access.'), 'error');
       return;
     }
     setCopied(true);
@@ -42,7 +43,7 @@ export function CopyButton({
     return (
       <IconButton
         icon={copied ? Check : Copy}
-        label={copied ? 'Copied' : label}
+        label={copied ? t('Copied') : label}
         size="sm"
         disabled={empty}
         onClick={onCopy}
@@ -53,7 +54,7 @@ export function CopyButton({
   }
   return (
     <Button size={size} variant={variant} icon={copied ? Check : Copy} disabled={empty} onClick={onCopy} className={className}>
-      {copied ? 'Copied' : label}
+      {copied ? t('Copied') : label}
     </Button>
   );
 }
@@ -90,7 +91,7 @@ export function DownloadButton({
           const value = typeof data === 'function' ? await data() : data;
           downloadBlob(value, typeof filename === 'function' ? filename() : filename, type);
         } catch {
-          toast('Could not prepare the download.', 'error');
+          toast(t('Could not prepare the download.'), 'error');
         }
       }}
     >

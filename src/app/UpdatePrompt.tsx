@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
+import { t } from '@/lib/i18n';
 
 /**
  * Registers the service worker (production only) and offers a reload when a
@@ -22,7 +23,7 @@ export function UpdatePrompt() {
           setNeedRefresh(true);
         },
         onOfflineReady() {
-          toast('LocalKit is ready to work offline.', 'info', 4000);
+          toast(t('LocalKit is ready to work offline.'), 'info', 4000);
         },
       });
     });
@@ -37,12 +38,12 @@ export function UpdatePrompt() {
       role="status"
       className="fixed bottom-4 left-4 z-[90] flex max-w-[calc(100%-32px)] items-center gap-3 rounded-lg border border-line-strong bg-surface-raised py-2 pr-2 pl-3.5 text-[13px] shadow-popover"
     >
-      <span>A new version of LocalKit is available.</span>
+      <span>{t('A new version of LocalKit is available.')}</span>
       <Button size="sm" variant="primary" icon={RefreshCw} onClick={() => void updateRef.current?.(true)}>
-        Reload
+        {t('Reload')}
       </Button>
       <Button size="sm" variant="ghost" onClick={() => setNeedRefresh(false)}>
-        Later
+        {t('Later')}
       </Button>
     </div>
   );

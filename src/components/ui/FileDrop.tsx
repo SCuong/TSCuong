@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Upload, type LucideIcon } from 'lucide-react';
 import { cn, formatBytes } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export interface FileDropProps {
   onFiles: (files: File[]) => void;
@@ -59,9 +60,16 @@ export function FileDrop({
     const rejected = files.length - accepted.length;
     if (rejected > 0) {
       const tooBig = maxSize ? files.some((f) => f.size > maxSize) : false;
+      const types = accept ? accept.replace(/,/g, ', ') : '';
       const reason = tooBig
-        ? `Some files are larger than ${formatBytes(maxSize!)} and were skipped.`
-        : `${rejected === files.length ? 'This file type is' : 'Some files are'} not supported here${accept ? ` (expected ${accept.replace(/,/g, ', ')})` : ''}.`;
+        ? t('Some files are larger than {size} and were skipped.', { size: formatBytes(maxSize!) })
+        : rejected === files.length
+          ? types
+            ? t('This file type is not supported here (expected {types}).', { types })
+            : t('This file type is not supported here.')
+          : types
+            ? t('Some files are not supported here (expected {types}).', { types })
+            : t('Some files are not supported here.');
       setRejection(reason);
       onReject?.(reason);
     } else {
@@ -104,19 +112,19 @@ export function FileDrop({
         </div>
         <div>
           <p className={cn('font-medium text-fg', compact ? 'text-[13px]' : 'text-[15px]')}>
-            {title ?? (multiple ? 'Drop files here' : 'Drop a file here')}{' '}
-            <span className="text-fg-muted">or</span>{' '}
+            {title ?? (multiple ? t('Drop files here') : t('Drop a file here'))}{' '}
+            <span className="text-fg-muted">{t('or')}</span>{' '}
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
               className="font-medium text-accent-text underline-offset-2 hover:underline"
               aria-describedby={`${id}-hint`}
             >
-              browse
+              {t('browse')}
             </button>
           </p>
           <p id={`${id}-hint`} className="mt-1 text-[12.5px] text-fg-muted">
-            {hint ?? 'Files are processed on this device and never uploaded.'}
+            {hint ?? t('Files are processed on this device and never uploaded.')}
           </p>
         </div>
         <input

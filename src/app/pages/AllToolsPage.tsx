@@ -6,9 +6,10 @@ import { ToolGrid } from '@/components/ToolCard';
 import { Input } from '@/components/ui/Field';
 import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '../useDocumentTitle';
+import { t } from '@/lib/i18n';
 
 export function AllToolsPage() {
-  useDocumentTitle('All tools');
+  useDocumentTitle(t('All tools'));
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryId | 'all'>('all');
   const categories = populatedCategories();
@@ -20,9 +21,9 @@ export function AllToolsPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-      <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-fg">All tools</h1>
+      <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-fg">{t('All tools')}</h1>
       <p className="mt-1 text-[14px] text-fg-secondary">
-        {TOOLS.length} tools across {categories.length} categories. Every one runs in your browser.
+        {t('{count} tools across {count2} categories. Every one runs in your browser.', { count: TOOLS.length, count2: categories.length })}
       </p>
 
       <div className="mt-6 flex flex-col gap-3">
@@ -32,13 +33,13 @@ export function AllToolsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter tools…"
-            aria-label="Filter tools"
+            placeholder={t('Filter tools…')}
+            aria-label={t('Filter tools')}
             className="pl-9"
           />
         </div>
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Category filter">
-          {[{ id: 'all' as const, name: 'All', count: TOOLS.length }, ...categories.map((c) => ({ id: c.id, name: c.name, count: toolsInCategory(c.id).length }))].map(
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label={t('Category filter')}>
+          {[{ id: 'all' as const, name: t('All'), count: TOOLS.length }, ...categories.map((c) => ({ id: c.id, name: t(c.name), count: toolsInCategory(c.id).length }))].map(
             (c) => (
               <button
                 key={c.id}
@@ -65,7 +66,7 @@ export function AllToolsPage() {
           <ToolGrid tools={tools} />
         ) : (
           <p className="rounded-xl border border-dashed border-line-strong px-6 py-10 text-center text-sm text-fg-muted">
-            No tools match your filter.
+            {t('No tools match your filter.')}
           </p>
         )}
       </div>

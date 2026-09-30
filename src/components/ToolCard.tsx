@@ -6,6 +6,7 @@ import { preloadTool, toolPath } from '@/tools/registry';
 import { toggleFavorite, useFavorites, usePinned } from '@/lib/userPrefs';
 import { cn } from '@/lib/utils';
 import { ToolIcon } from './ToolIcon';
+import { t } from '@/lib/i18n';
 
 export function ToolCard({ tool, variant = 'default' }: { tool: ToolDefinition; variant?: 'default' | 'compact' }) {
   const favorites = useFavorites();
@@ -29,11 +30,11 @@ export function ToolCard({ tool, variant = 'default' }: { tool: ToolDefinition; 
         <ToolIcon icon={tool.icon} hue={category.hue} size={variant === 'compact' ? 'sm' : 'md'} />
         <div className="min-w-0 flex-1">
           <h3 className="flex items-center gap-1.5 truncate text-[14px] font-medium text-fg">
-            <span className="truncate">{tool.name}</span>
-            {isPinned && <Pin size={11} className="shrink-0 text-fg-muted" aria-label="Pinned" />}
+            <span className="truncate">{t(tool.name)}</span>
+            {isPinned && <Pin size={11} className="shrink-0 text-fg-muted" aria-label={t('Pinned')} />}
           </h3>
           {variant === 'default' && (
-            <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-muted">{tool.description}</p>
+            <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-muted">{t(tool.description)}</p>
           )}
         </div>
       </Link>
@@ -42,8 +43,8 @@ export function ToolCard({ tool, variant = 'default' }: { tool: ToolDefinition; 
           type="button"
           onClick={() => toggleFavorite(tool.id)}
           aria-pressed={isFavorite}
-          aria-label={isFavorite ? `Remove ${tool.name} from favorites` : `Add ${tool.name} to favorites`}
-          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          aria-label={isFavorite ? t('Remove {name} from favorites', { name: t(tool.name) }) : t('Add {name} to favorites', { name: t(tool.name) })}
+          title={isFavorite ? t('Remove from favorites') : t('Add to favorites')}
           className={cn(
             'absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-md transition-[opacity,color,background-color] duration-100 hover:bg-surface-hover',
             isFavorite

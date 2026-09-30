@@ -105,7 +105,7 @@ export async function restoreBackup(backup: Backup, mode: 'merge' | 'replace'): 
 
 export async function clearAllData(): Promise<void> {
   for (const key of listLocalKeys()) {
-    if (key === 'theme') continue;
+    if (key === 'theme' || key === 'locale') continue;
     writeRaw(key, null);
   }
   for (const store of ALL_LOCAL_STORES) store.reload();

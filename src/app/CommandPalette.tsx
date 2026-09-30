@@ -10,6 +10,7 @@ import {
   History,
   KeyRound,
   LayoutGrid,
+  Languages,
   Monitor,
   Moon,
   Search,
@@ -27,7 +28,7 @@ import { buildAlphabet, generateStrings } from '@/tools/generators/lib/randomStr
 /** Copies a generated value and confirms it without leaving the keyboard flow. */
 async function copyAndConfirm(value: string, message: string) {
   if (await copyText(value)) toast(message);
-  else toast('The clipboard is not available here. Open the matching tool to copy it manually.', 'error');
+  else toast(t('The clipboard is not available here. Open the matching tool to copy it manually.'), 'error');
 }
 import { preloadTool, resolveTools, searchTools, toolPath, TOOLS } from '@/tools/registry';
 import { getCategory } from '@/tools/categories';
@@ -37,6 +38,10 @@ import { setThemePreference, useTheme } from '@/lib/theme';
 import { normalize } from '@/lib/search';
 import { ToolIcon } from '@/components/ToolIcon';
 import { Kbd } from '@/components/ui/Panel';
+import { getLocale, LOCALES, setLocale, t } from '@/lib/i18n';
+
+/** Read when the palette renders: this module loads before the language does. */
+const otherLocale = () => LOCALES.find((option) => option.id !== getLocale()) ?? LOCALES[0];
 
 interface ActionItem {
   kind: 'action';
@@ -85,7 +90,7 @@ export function CommandPalette() {
   return (
     <dialog
       ref={dialogRef}
-      aria-label="Command palette"
+      aria-label={t('Command palette')}
       onCancel={(e) => {
         e.preventDefault();
         closePalette();
@@ -117,7 +122,7 @@ function PaletteBody() {
       {
         kind: 'action',
         id: 'action:theme-toggle',
-        label: resolved === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+        label: resolved === 'dark' ? t('Switch to light theme') : t('Switch to dark theme'),
         icon: resolved === 'dark' ? Sun : Moon,
         keywords: 'theme dark light mode appearance toggle',
         run: () => setThemePreference(resolved === 'dark' ? 'light' : 'dark'),
@@ -125,15 +130,23 @@ function PaletteBody() {
       {
         kind: 'action',
         id: 'action:theme-system',
-        label: 'Use system theme',
+        label: t('Use system theme'),
         icon: Monitor,
         keywords: 'theme system auto appearance',
         run: () => setThemePreference('system'),
       },
       {
         kind: 'action',
+        id: 'action:language',
+        label: t('Switch language to {language}', { language: otherLocale().label }),
+        icon: Languages,
+        keywords: 'language locale ngon ngu tieng viet vietnamese english',
+        run: () => setLocale(otherLocale().id),
+      },
+      {
+        kind: 'action',
         id: 'action:all-tools',
-        label: 'Browse all tools',
+        label: t('Browse all tools'),
         icon: LayoutGrid,
         keywords: 'all tools browse categories list',
         run: () => navigate('/tools'),
@@ -141,7 +154,7 @@ function PaletteBody() {
       {
         kind: 'action',
         id: 'action:favorites',
-        label: 'Favorites & history',
+        label: t('Favorites & history'),
         icon: Star,
         keywords: 'favorites starred pinned recent history',
         run: () => navigate('/favorites'),
@@ -149,7 +162,7 @@ function PaletteBody() {
       {
         kind: 'action',
         id: 'action:settings',
-        label: 'Settings, backup & restore',
+        label: t('Settings, backup & restore'),
         icon: Settings,
         keywords: 'settings preferences backup export import restore data clear',
         run: () => navigate('/settings'),
@@ -157,40 +170,40 @@ function PaletteBody() {
       {
         kind: 'action',
         id: 'action:copy-uuid',
-        label: 'Copy a new UUID',
+        label: t('Copy a new UUID'),
         icon: Fingerprint,
         keywords: 'uuid guid v4 generate new random id copy',
         run: () => {
           const value = crypto.randomUUID();
-          void copyAndConfirm(value, `Copied ${value}`);
+          void copyAndConfirm(value, t('Copied {value}', { value }));
         },
       },
       {
         kind: 'action',
         id: 'action:copy-unix',
-        label: 'Copy the current Unix timestamp',
+        label: t('Copy the current Unix timestamp'),
         icon: Clock,
         keywords: 'unix epoch timestamp now current time seconds copy',
         run: () => {
           const value = String(Math.floor(Date.now() / 1000));
-          void copyAndConfirm(value, `Copied ${value}`);
+          void copyAndConfirm(value, t('Copied {value}', { value }));
         },
       },
       {
         kind: 'action',
         id: 'action:copy-iso',
-        label: 'Copy the current time (ISO 8601)',
+        label: t('Copy the current time (ISO 8601)'),
         icon: CalendarClock,
         keywords: 'iso 8601 date time now current timestamp utc copy',
         run: () => {
           const value = new Date().toISOString();
-          void copyAndConfirm(value, `Copied ${value}`);
+          void copyAndConfirm(value, t('Copied {value}', { value }));
         },
       },
       {
         kind: 'action',
         id: 'action:copy-password',
-        label: 'Copy a strong random password',
+        label: t('Copy a strong random password'),
         icon: KeyRound,
         keywords: 'password generate random secure strong passphrase copy',
         run: () => {
@@ -198,18 +211,18 @@ function PaletteBody() {
           if (!alphabet.ok) return;
           const [value] = generateStrings(alphabet.alphabet, 20, 1);
           // Never echo the password itself on screen.
-          if (value) void copyAndConfirm(value, 'Copied a 20-character password');
+          if (value) void copyAndConfirm(value, t('Copied a 20-character password'));
         },
       },
       {
         kind: 'action',
         id: 'action:clear-history',
-        label: 'Clear recent tools and searches',
+        label: t('Clear recent tools and searches'),
         icon: Eraser,
         keywords: 'clear history recent searches usage reset forget',
         run: () => {
           clearHistory();
-          toast('Recent tools and searches cleared');
+          toast(t('Recent tools and searches cleared'));
         },
       },
     ],
@@ -221,26 +234,26 @@ function PaletteBody() {
     if (!q) {
       const result: Group[] = [];
       const pinnedTools = resolveTools(pinned);
-      if (pinnedTools.length) result.push({ title: 'Pinned', items: pinnedTools.map(toolItem) });
-      const recentTools = resolveTools(recent).filter((t) => !pinned.includes(t.id)).slice(0, 6);
-      if (recentTools.length) result.push({ title: 'Recently used', items: recentTools.map(toolItem) });
+      if (pinnedTools.length) result.push({ title: t('Pinned'), items: pinnedTools.map(toolItem) });
+      const recentTools = resolveTools(recent).filter((tool) => !pinned.includes(tool.id)).slice(0, 6);
+      if (recentTools.length) result.push({ title: t('Recently used'), items: recentTools.map(toolItem) });
       const favTools = resolveTools(favorites)
-        .filter((t) => !pinned.includes(t.id) && !recentTools.includes(t))
+        .filter((tool) => !pinned.includes(tool.id) && !recentTools.includes(tool))
         .slice(0, 6);
-      if (favTools.length) result.push({ title: 'Favorites', items: favTools.map(toolItem) });
+      if (favTools.length) result.push({ title: t('Favorites'), items: favTools.map(toolItem) });
       if (recentSearches.length)
         result.push({
-          title: 'Recent searches',
+          title: t('Recent searches'),
           items: recentSearches.slice(0, 4).map((s) => ({ kind: 'query', id: `query:${s}`, query: s })),
         });
       if (result.length === 0) {
-        const suggestions = PALETTE_SUGGESTED_TOOL_IDS.map((id) => TOOLS.find((t) => t.id === id)).filter(
-          (t): t is ToolDefinition => Boolean(t),
+        const suggestions = PALETTE_SUGGESTED_TOOL_IDS.map((id) => TOOLS.find((tool) => tool.id === id)).filter(
+          (tool): tool is ToolDefinition => Boolean(tool),
         );
         const fallback = suggestions.length ? suggestions : TOOLS.slice(0, 6);
-        result.push({ title: 'Suggestions', items: fallback.map(toolItem) });
+        result.push({ title: t('Suggestions'), items: fallback.map(toolItem) });
       }
-      result.push({ title: 'Quick actions', items: actions });
+      result.push({ title: t('Quick actions'), items: actions });
       return result;
     }
     const tools = searchTools(q, 30).map((r) => toolItem(r.item));
@@ -249,8 +262,8 @@ function PaletteBody() {
       nq.split(' ').every((w) => normalize(`${a.label} ${a.keywords}`).includes(w)),
     );
     const result: Group[] = [];
-    if (tools.length) result.push({ title: 'Tools', items: tools });
-    if (matchingActions.length) result.push({ title: 'Actions', items: matchingActions });
+    if (tools.length) result.push({ title: t('Tools'), items: tools });
+    if (matchingActions.length) result.push({ title: t('Actions'), items: matchingActions });
     return result;
   }, [query, pinned, recent, favorites, recentSearches, actions]);
 
@@ -312,13 +325,13 @@ function PaletteBody() {
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tools and actions…"
+          placeholder={t('Search tools and actions…')}
           role="combobox"
           aria-expanded="true"
           aria-controls={listId}
           aria-activedescendant={activeId}
           aria-autocomplete="list"
-          aria-label="Search tools and actions"
+          aria-label={t('Search tools and actions')}
           spellCheck={false}
           autoComplete="off"
           className="h-14 min-w-0 flex-1 bg-transparent text-[15px] text-fg outline-none placeholder:text-fg-muted"
@@ -326,11 +339,11 @@ function PaletteBody() {
         <Kbd className="hidden sm:inline-flex">Esc</Kbd>
       </div>
 
-      <div ref={listRef} id={listId} role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div ref={listRef} id={listId} role="listbox" aria-label={t('Results')} className="min-h-0 flex-1 overflow-y-auto p-2">
         {flat.length === 0 && (
           <div className="px-4 py-10 text-center">
-            <p className="text-sm font-medium text-fg">No tools match “{query.trim()}”</p>
-            <p className="mt-1 text-[13px] text-fg-muted">Try a format (csv, pdf, png) or an action (merge, decode, compress).</p>
+            <p className="text-sm font-medium text-fg">{t('No tools match “{query}”', { query: query.trim() })}</p>
+            <p className="mt-1 text-[13px] text-fg-muted">{t('Try a format (csv, pdf, png) or an action (merge, decode, compress).')}</p>
           </div>
         )}
         {groups.map((group) => (
@@ -360,18 +373,17 @@ function PaletteBody() {
       <div className="hidden items-center gap-4 border-t border-line px-4 py-2 text-[12px] text-fg-muted sm:flex">
         <span className="flex items-center gap-1.5">
           <Kbd>↑</Kbd>
-          <Kbd>↓</Kbd> navigate
+          <Kbd>↓</Kbd>{' '}{t('navigate')}
         </span>
         <span className="flex items-center gap-1.5">
           <Kbd>
             <CornerDownLeft size={11} aria-hidden />
-          </Kbd>{' '}
-          open
+          </Kbd>{' '}{t('open')}
         </span>
         <span className="flex items-center gap-1.5">
-          <Kbd>Esc</Kbd> close
+          <Kbd>Esc</Kbd>{' '}{t('close')}
         </span>
-        <span className="ml-auto">{TOOLS.length} tools, all running locally</span>
+        <span className="ml-auto">{t('{count} tools, all running locally', { count: TOOLS.length })}</span>
       </div>
     </div>
   );
@@ -399,9 +411,9 @@ function PaletteRow({
   if (item.kind === 'tool') {
     const category = getCategory(item.tool.category);
     icon = <ToolIcon icon={item.tool.icon} hue={category.hue} size="sm" />;
-    title = item.tool.name;
-    subtitle = item.tool.description;
-    meta = <span className="hidden text-[12px] text-fg-muted sm:inline">{category.name}</span>;
+    title = t(item.tool.name);
+    subtitle = t(item.tool.description);
+    meta = <span className="hidden text-[12px] text-fg-muted sm:inline">{t(category.name)}</span>;
   } else if (item.kind === 'action') {
     const Icon = item.icon;
     icon = (

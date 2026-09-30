@@ -3,7 +3,7 @@ import { RouterProvider } from 'react-router/dom';
 import { Layout } from './Layout';
 import { RouteError } from './pages/RouteError';
 
-const router = createBrowserRouter([
+const routes: Parameters<typeof createBrowserRouter>[0] = [
   {
     path: '/',
     element: <Layout />,
@@ -23,8 +23,13 @@ const router = createBrowserRouter([
       { path: '*', lazy: async () => ({ Component: (await import('./pages/NotFoundPage')).NotFoundPage }) },
     ],
   },
-]);
+];
+
+let router: ReturnType<typeof createBrowserRouter> | null = null;
 
 export function App() {
+  // Created on first render, after the interface language has loaded: the router starts loading
+  // the current page right away, and pages may translate labels when their module loads.
+  router ??= createBrowserRouter(routes);
   return <RouterProvider router={router} />;
 }

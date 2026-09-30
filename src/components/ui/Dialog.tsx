@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button, IconButton } from './Button';
+import { t } from '@/lib/i18n';
 
 /**
  * Modal dialog built on the native <dialog> element, which provides focus
@@ -69,7 +70,7 @@ export function Dialog({
               </h2>
               {description && <p className="mt-0.5 text-[13px] text-fg-muted">{description}</p>}
             </div>
-            <IconButton icon={X} label="Close dialog" size="sm" onClick={onClose} />
+            <IconButton icon={X} label={t('Close dialog')} size="sm" onClick={onClose} />
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
           {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer>}
@@ -106,7 +107,7 @@ export function ConfirmDialog({
       footer={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} autoFocus>
             {confirmLabel}

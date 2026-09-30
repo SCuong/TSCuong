@@ -137,11 +137,27 @@ const SYNONYMS: Record<string, string[]> = {
   icons: ['icon', 'favicon'],
   barcode: ['qr'],
   pages: ['page'],
+  // Vietnamese (without diacritics, as normalize() leaves them).
+  hinh: ['anh', 'image'],
+  tep: ['file'],
+  giam: ['nen', 'compress'],
+  ghep: ['gop', 'merge'],
+  noi: ['gop', 'merge'],
+  tach: ['chia', 'split'],
+  chia: ['tach', 'split'],
+  xoay: ['rotate'],
+  doi: ['chuyen', 'convert'],
+  chuyen: ['doi', 'convert'],
+  sang: ['to'],
+  thanh: ['sang', 'to'],
+  kiem: ['check', 'validate'],
 };
 
 export function normalize(text: string): string {
   return text
     .toLowerCase()
+    // NFKD does not decompose the Vietnamese letter đ.
+    .replace(/đ/g, 'd')
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/→|->|=>/g, ' to ')
@@ -236,20 +252,31 @@ function matchToken(token: string, f: Field): number {
   return best * f.weight;
 }
 
-export function createSearchIndex<T extends SearchDoc>(items: T[], categoryName: (id: string) => string) {
+/**
+ * `translate` gives the name and description in the interface language; both languages are
+ * indexed, so English terms keep working in a translated interface.
+ */
+export function createSearchIndex<T extends SearchDoc>(
+  items: T[],
+  categoryName: (id: string) => string,
+  translate: (text: string) => string = (text) => text,
+) {
   const docs: IndexedDoc<T>[] = items.map((item) => {
+    const localName = translate(item.name);
+    const localDescription = translate(item.description);
     const fields: Field[] = [
       field(item.name, FIELD_WEIGHTS.name),
+      ...(localName !== item.name ? [field(localName, FIELD_WEIGHTS.name)] : []),
       ...(item.aliases ?? []).map((a) => field(a, FIELD_WEIGHTS.alias)),
       field(item.keywords.join(' '), FIELD_WEIGHTS.keyword),
       field(`${categoryName(item.category)} ${item.category}`, FIELD_WEIGHTS.category),
-      field(item.description, FIELD_WEIGHTS.description),
+      field(localDescription === item.description ? item.description : `${localDescription} ${item.description}`, FIELD_WEIGHTS.description),
     ];
     return {
       item,
       fields,
-      nameText: normalize(item.name),
-      phrases: [item.name, ...(item.aliases ?? [])].map(normalize),
+      nameText: normalize(localName),
+      phrases: [item.name, ...(localName !== item.name ? [localName] : []), ...(item.aliases ?? [])].map(normalize),
     };
   });
 

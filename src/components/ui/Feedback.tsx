@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { LoaderCircle, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
+import { t } from '@/lib/i18n';
 
 export function Spinner({ size = 16, className, label }: { size?: number; className?: string; label?: string }) {
   return (
     <span role="status" className={cn('inline-flex items-center gap-2 text-fg-muted', className)}>
       <LoaderCircle size={size} className="animate-spin" aria-hidden />
-      {label ? <span className="text-[13px]">{label}</span> : <span className="sr-only">Loading</span>}
+      {label ? <span className="text-[13px]">{label}</span> : <span className="sr-only">{t('Loading')}</span>}
     </span>
   );
 }
@@ -39,7 +40,7 @@ export function ProgressBar({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={pct ?? undefined}
-          aria-label={label || 'Progress'}
+          aria-label={label || t('Progress')}
           className="relative h-1.5 overflow-hidden rounded-full bg-surface-hover"
         >
           {pct === null ? (
@@ -51,7 +52,7 @@ export function ProgressBar({
       </div>
       {onCancel && (
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('Cancel')}
         </Button>
       )}
     </div>

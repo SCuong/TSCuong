@@ -1,6 +1,7 @@
 import type { CategoryId, ToolDefinition } from '../types';
 import { CATEGORIES, getCategory } from '../categories';
 import { createSearchIndex } from '@/lib/search';
+import { t } from '@/lib/i18n';
 import { workspaceTools } from './workspace';
 import { workspaceSnippetsTools } from './workspace-snippets';
 import { workspaceDataTools } from './workspace-data';
@@ -85,9 +86,23 @@ export function resolveTools(ids: string[]): ToolDefinition[] {
   return ids.map((id) => byId.get(id)).filter((t): t is ToolDefinition => Boolean(t));
 }
 
-const index = createSearchIndex(TOOLS, (id) => getCategory(id as CategoryId).name);
+/** A search index in the current interface language (English terms always match too). */
+export function createToolSearchIndex() {
+  return createSearchIndex(
+    TOOLS,
+    (id) => {
+      const category = getCategory(id as CategoryId);
+      return `${t(category.name)} ${category.name}`;
+    },
+    t,
+  );
+}
+
+// Built on first use: this module loads before the interface language does.
+let index: ReturnType<typeof createToolSearchIndex> | null = null;
 
 export function searchTools(query: string, limit?: number) {
+  index ??= createToolSearchIndex();
   return index.search(query, limit);
 }
 

@@ -6,6 +6,7 @@ import { getCategory } from '@/tools/categories';
 import { usePinned } from '@/lib/userPrefs';
 import { ToolIcon } from '@/components/ToolIcon';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 function NavItem({
   to,
@@ -52,20 +53,20 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const categories = populatedCategories();
 
   return (
-    <nav aria-label="Main" className="flex flex-col px-3 pt-3 pb-6">
+    <nav aria-label={t('Main')} className="flex flex-col px-3 pt-3 pb-6">
       <NavItem to="/" icon={House} end onNavigate={onNavigate}>
-        Home
+        {t('Home')}
       </NavItem>
       <NavItem to="/tools" icon={LayoutGrid} end onNavigate={onNavigate}>
-        All tools
+        {t('All tools')}
       </NavItem>
       <NavItem to="/favorites" icon={Star} onNavigate={onNavigate}>
-        Favorites &amp; history
+        {t('Favorites & history')}
       </NavItem>
 
       {pinned.length > 0 && (
         <>
-          <SectionTitle>Pinned</SectionTitle>
+          <SectionTitle>{t('Pinned')}</SectionTitle>
           {pinned.map((tool) => (
             <NavLink
               key={tool.id}
@@ -79,14 +80,14 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               }
             >
               <ToolIcon icon={tool.icon} hue={getCategory(tool.category).hue} size="sm" className="size-5.5 rounded-[5px] [&_svg]:size-3.5" />
-              <span className="min-w-0 flex-1 truncate">{tool.name}</span>
+              <span className="min-w-0 flex-1 truncate">{t(tool.name)}</span>
               <Pin size={12} aria-hidden className="text-fg-muted" />
             </NavLink>
           ))}
         </>
       )}
 
-      <SectionTitle>Categories</SectionTitle>
+      <SectionTitle>{t('Categories')}</SectionTitle>
       {categories.map((category) => (
         <NavItem
           key={category.id}
@@ -95,16 +96,16 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onNavigate={onNavigate}
           count={toolsInCategory(category.id).length}
         >
-          {category.name}
+          {t(category.name)}
         </NavItem>
       ))}
 
-      <SectionTitle>App</SectionTitle>
+      <SectionTitle>{t('App')}</SectionTitle>
       <NavItem to="/settings" icon={Settings} onNavigate={onNavigate}>
-        Settings &amp; backup
+        {t('Settings & backup')}
       </NavItem>
       <NavItem to="/privacy" icon={ShieldCheck} onNavigate={onNavigate}>
-        Privacy
+        {t('Privacy')}
       </NavItem>
     </nav>
   );

@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Link } from 'react-router';
 import { openPalette } from '../paletteStore';
 import { useDocumentTitle } from '../useDocumentTitle';
+import { t } from '@/lib/i18n';
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -33,7 +34,7 @@ function relativeTime(ts: number): string {
 }
 
 export function FavoritesPage() {
-  useDocumentTitle('Favorites & history');
+  useDocumentTitle(t('Favorites & history'));
   const favorites = resolveTools(useFavorites());
   const pinned = resolveTools(usePinned());
   const recent = resolveTools(useRecentTools());
@@ -48,36 +49,36 @@ export function FavoritesPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-      <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-fg">Favorites &amp; history</h1>
-      <p className="mt-1 text-[14px] text-fg-secondary">Stored only in this browser. Star a tool to favorite it; pin it to keep it in the sidebar.</p>
+      <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-fg">{t('Favorites & history')}</h1>
+      <p className="mt-1 text-[14px] text-fg-secondary">{t('Stored only in this browser. Star a tool to favorite it; pin it to keep it in the sidebar.')}</p>
 
       <div className="mt-8 flex flex-col gap-8">
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-fg">
-              <Pin size={15} aria-hidden /> Pinned
+              <Pin size={15} aria-hidden />{' '}{t('Pinned')}
             </h2>
             {pinned.length > 0 && (
               <Button size="sm" variant="ghost" onClick={() => pinnedStore.reset()}>
-                Unpin all
+                {t('Unpin all')}
               </Button>
             )}
           </div>
           {pinned.length ? (
             <ToolGrid tools={pinned} />
           ) : (
-            <p className="text-[13px] text-fg-muted">Use the pin button on any tool page to keep it one click away in the sidebar.</p>
+            <p className="text-[13px] text-fg-muted">{t('Use the pin button on any tool page to keep it one click away in the sidebar.')}</p>
           )}
         </section>
 
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-fg">
-              <Star size={15} aria-hidden /> Favorites
+              <Star size={15} aria-hidden />{' '}{t('Favorites')}
             </h2>
             {favorites.length > 0 && (
               <Button size="sm" variant="ghost" onClick={() => favoritesStore.reset()}>
-                Clear favorites
+                {t('Clear favorites')}
               </Button>
             )}
           </div>
@@ -87,14 +88,14 @@ export function FavoritesPage() {
             <Panel>
               <EmptyState
                 icon={Star}
-                title="No favorites yet"
+                title={t('No favorites yet')}
                 action={
                   <Button variant="secondary" onClick={() => openPalette()}>
-                    Find a tool
+                    {t('Find a tool')}
                   </Button>
                 }
               >
-                Star tools you use often and they will appear here and at the top of the home page.
+                {t('Star tools you use often and they will appear here and at the top of the home page.')}
               </EmptyState>
             </Panel>
           )}
@@ -102,11 +103,11 @@ export function FavoritesPage() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Panel
-            title="Most used"
+            title={t('Most used')}
             actions={
               (recent.length > 0 || searches.length > 0) && (
                 <Button size="sm" variant="ghost" icon={Trash} onClick={() => setConfirm(true)}>
-                  Clear history
+                  {t('Clear history')}
                 </Button>
               )
             }
@@ -118,7 +119,7 @@ export function FavoritesPage() {
                   <li key={tool.id}>
                     <Link to={toolPath(tool)} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-surface-hover">
                       <ToolIcon icon={tool.icon} hue={getCategory(tool.category).hue} size="sm" />
-                      <span className="min-w-0 flex-1 truncate text-[14px] text-fg">{tool.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[14px] text-fg">{t(tool.name)}</span>
                       <span className="text-[12px] text-fg-muted tabular-nums">
                         {count}× · {relativeTime(lastUsed)}
                       </span>
@@ -127,12 +128,12 @@ export function FavoritesPage() {
                 ))}
               </ol>
             ) : (
-              <EmptyState icon={History} title="No usage yet">
-                Tools you open are counted here, on this device only.
+              <EmptyState icon={History} title={t('No usage yet')}>
+                {t('Tools you open are counted here, on this device only.')}
               </EmptyState>
             )}
           </Panel>
-          <Panel title="Recent searches" bodyClassName="p-2">
+          <Panel title={t('Recent searches')} bodyClassName="p-2">
             {searches.length ? (
               <ul>
                 {searches.map((s) => (
@@ -149,8 +150,8 @@ export function FavoritesPage() {
                 ))}
               </ul>
             ) : (
-              <EmptyState icon={History} title="No recent searches">
-                Searches you open a tool from are remembered here. You can turn this off in Settings.
+              <EmptyState icon={History} title={t('No recent searches')}>
+                {t('Searches you open a tool from are remembered here. You can turn this off in Settings.')}
               </EmptyState>
             )}
           </Panel>
@@ -159,15 +160,15 @@ export function FavoritesPage() {
 
       <ConfirmDialog
         open={confirm}
-        title="Clear history?"
-        confirmLabel="Clear history"
+        title={t('Clear history?')}
+        confirmLabel={t('Clear history')}
         onCancel={() => setConfirm(false)}
         onConfirm={() => {
           clearHistory();
           setConfirm(false);
         }}
       >
-        Recently used tools, usage counts and recent searches will be removed. Favorites and pins are kept.
+        {t('Recently used tools, usage counts and recent searches will be removed. Favorites and pins are kept.')}
       </ConfirmDialog>
     </div>
   );

@@ -2,6 +2,7 @@ import { ImageOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { describeHosts } from '@/lib/remoteContent';
 import { cn, pluralize } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 /**
  * Shown above a preview whose remote images were blocked by `blockRemoteContent`.
@@ -29,10 +30,13 @@ export function RemoteContentNotice({
     >
       <ImageOff size={14} aria-hidden className="shrink-0 text-fg-muted" />
       <span className="min-w-0 flex-1">
-        {pluralize(blocked, 'remote image')} from {describeHosts(hosts)} not loaded, so this preview makes no network requests.
+        {t('{count} from {hosts} not loaded, so this preview makes no network requests.', {
+          count: pluralize(blocked, t('remote image'), t('remote images')),
+          hosts: describeHosts(hosts),
+        })}
       </span>
       <Button size="sm" onClick={onAllow}>
-        Load images
+        {t('Load images')}
       </Button>
     </div>
   );

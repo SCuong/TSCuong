@@ -7,6 +7,8 @@
  * relative URLs on this origin) are left alone.
  */
 
+import { t } from './i18n';
+
 export interface RemoteContentResult {
   html: string;
   /** Number of remote references that were blocked. */
@@ -115,8 +117,8 @@ export function blockRemoteContent(html: string): RemoteContentResult {
 
 /** "cdn.example.com", "a.com and b.com", "a.com, b.com and 3 more". */
 export function describeHosts(hosts: string[]): string {
-  if (hosts.length === 0) return 'other servers';
+  if (hosts.length === 0) return t('other servers');
   if (hosts.length === 1) return hosts[0]!;
-  if (hosts.length <= 3) return `${hosts.slice(0, -1).join(', ')} and ${hosts.at(-1)}`;
-  return `${hosts.slice(0, 2).join(', ')} and ${hosts.length - 2} more`;
+  if (hosts.length <= 3) return t('{hosts} and {last}', { hosts: hosts.slice(0, -1).join(', '), last: hosts.at(-1)! });
+  return t('{hosts} and {count} more', { hosts: hosts.slice(0, 2).join(', '), count: hosts.length - 2 });
 }

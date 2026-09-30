@@ -10,6 +10,7 @@ import { IconButton } from '@/components/ui/Button';
 import { CopyButton, DownloadButton } from '@/components/ui/Actions';
 import { toast } from '@/components/ui/Toast';
 import { matchesAccept } from '@/components/ui/FileDrop';
+import { t } from '@/lib/i18n';
 
 const MAX_TEXT_FILE = 50 * 1024 * 1024;
 /** Read-only plain outputs longer than this show a leading slice (textareas re-lay out all text). */
@@ -91,7 +92,7 @@ export function EditorPanel({
 
   async function openFile(file: File) {
     if (file.size > MAX_TEXT_FILE) {
-      toast('That file is too large to open as text (limit 50 MB).', 'error');
+      toast(t('That file is too large to open as text (limit 50 MB).'), 'error');
       return;
     }
     try {
@@ -99,7 +100,7 @@ export function EditorPanel({
       // Drop a UTF-8 byte-order mark so parsers (JSON, CSV, YAML…) see the real first character.
       onChange?.(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
     } catch (error) {
-      toast(errorMessage(error, 'Could not read the file.'), 'error');
+      toast(errorMessage(error, t('Could not read the file.')), 'error');
     }
   }
 
@@ -136,7 +137,7 @@ export function EditorPanel({
               if (!file) return;
               e.preventDefault();
               if (!matchesAccept(file, fileAccept)) {
-                toast(`That file type is not supported here (expected ${fileAccept?.replace(/,/g, ', ')}).`, 'error');
+                toast(t('That file type is not supported here (expected {types}).', { types: fileAccept?.replace(/,/g, ', ') ?? '' }), 'error');
                 return;
               }
               void openFile(file);
@@ -149,11 +150,11 @@ export function EditorPanel({
         <div className="flex flex-wrap items-center gap-1">
           {actions}
           {!readOnly && sample !== undefined && (
-            <IconButton icon={FlaskConical} label="Load sample" size="sm" onClick={() => onChange?.(sample)} />
+            <IconButton icon={FlaskConical} label={t('Load sample')} size="sm" onClick={() => onChange?.(sample)} />
           )}
           {!readOnly && fileAccept !== undefined && (
             <>
-              <IconButton icon={FileUp} label="Open file" size="sm" onClick={() => fileInput.current?.click()} />
+              <IconButton icon={FileUp} label={t('Open file')} size="sm" onClick={() => fileInput.current?.click()} />
               <input
                 ref={fileInput}
                 type="file"
@@ -170,10 +171,10 @@ export function EditorPanel({
             </>
           )}
           {!readOnly && (
-            <IconButton icon={Eraser} label="Clear" size="sm" disabled={!value} onClick={() => onChange?.('')} />
+            <IconButton icon={Eraser} label={t('Clear')} size="sm" disabled={!value} onClick={() => onChange?.('')} />
           )}
           {readOnly && downloadName && (
-            <DownloadButton data={value} filename={downloadName} type={downloadType} label="Save" variant="ghost" />
+            <DownloadButton data={value} filename={downloadName} type={downloadType} label={t('Save')} variant="ghost" />
           )}
           <CopyButton value={value} iconOnly />
         </div>
@@ -211,8 +212,7 @@ export function EditorPanel({
           {footer}
           {truncated && (
             <span>
-              Showing the first {formatNumber(PLAIN_DISPLAY_LIMIT)} of {formatNumber(value.length)} characters. Copy and
-              Save include everything.
+              {t('Showing the first {PLAIN_DISPLAY_LIMIT} of {count} characters. Copy and Save include everything.', { PLAIN_DISPLAY_LIMIT: formatNumber(PLAIN_DISPLAY_LIMIT), count: formatNumber(value.length) })}
             </span>
           )}
         </footer>

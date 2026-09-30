@@ -82,6 +82,41 @@ test('system theme follows prefers-color-scheme', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
+test('switching to Vietnamese translates the interface and persists', async ({ page }) => {
+  await page.goto('/settings');
+  // Choosing a language saves it and reloads the page.
+  await page.getByRole('group', { name: 'Language' }).getByRole('button', { name: 'Tiếng Việt' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Cài đặt' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+  await expect(page).toHaveTitle(/^Cài đặt · LocalKit/);
+
+  await page.goto('/tools/pdf/merge');
+  await expect(page.getByRole('heading', { level: 1, name: 'Gộp PDF' })).toBeVisible();
+  // Search understands Vietnamese, with or without diacritics.
+  await expect(page.getByRole('button', { name: 'Tìm công cụ' })).toBeVisible();
+  await page.keyboard.press('Control+k');
+  const input = page.getByRole('combobox', { name: 'Tìm công cụ và thao tác' });
+  await expect(input).toBeFocused();
+  await input.fill('nen anh');
+  await expect(page.getByRole('option').first()).toContainText('Nén ảnh');
+  await page.keyboard.press('Escape');
+
+  await page.goto('/settings');
+  await page.getByRole('group', { name: 'Ngôn ngữ' }).getByRole('button', { name: 'English' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test.describe('with a Vietnamese browser', () => {
+  test.use({ locale: 'vi-VN' });
+
+  test('Vietnamese is the default on a first visit', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await expect(page.getByRole('searchbox', { name: 'Tìm công cụ' })).toBeVisible();
+  });
+});
+
 test('favorites, pins and recent tools persist', async ({ page }) => {
   await page.goto('/tools/json-formatter');
   await page.getByRole('button', { name: 'Add to favorites' }).click();

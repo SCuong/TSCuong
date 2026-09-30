@@ -9,9 +9,11 @@ import { Spinner } from '@/components/ui/Feedback';
 import { modKey } from '@/lib/utils';
 import { SidebarContent } from './Sidebar';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { LanguageSwitcher, LanguageToggle } from './LanguageSwitcher';
 import { CommandPalette } from './CommandPalette';
 import { openPalette, togglePalette } from './paletteStore';
 import { UpdatePrompt } from './UpdatePrompt';
+import { t } from '@/lib/i18n';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -45,7 +47,7 @@ function MobileNav({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <dialog
       ref={ref}
-      aria-label="Navigation"
+      aria-label={t('Navigation')}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
@@ -58,10 +60,11 @@ function MobileNav({ open, onClose }: { open: boolean; onClose: () => void }) {
       <div className="flex h-full flex-col">
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
           <Logo />
-          <IconButton icon={X} label="Close navigation" onClick={onClose} />
+          <IconButton icon={X} label={t('Close navigation')} onClick={onClose} />
         </div>
-        <div className="border-b border-line px-4 py-3">
+        <div className="flex flex-col gap-2 border-b border-line px-4 py-3">
           <ThemeSwitcher withLabels className="w-full [&>button]:flex-1" />
+          <LanguageSwitcher className="w-full [&>button]:flex-1" />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{open && <SidebarContent onNavigate={onClose} />}</div>
       </div>
@@ -73,7 +76,7 @@ function NavigationProgress() {
   const navigation = useNavigation();
   if (navigation.state === 'idle') return null;
   return (
-    <div className="fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden" role="progressbar" aria-label="Loading page">
+    <div className="fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden" role="progressbar" aria-label={t('Loading page')}>
       <div className="h-full w-1/3 bg-accent [animation:lk-indeterminate_0.9s_ease-in-out_infinite]" />
     </div>
   );
@@ -118,13 +121,13 @@ export function Layout() {
         href="#main"
         className="sr-only z-[70] rounded-md bg-accent px-3 py-2 text-accent-contrast focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >
-        Skip to content
+        {t('Skip to content')}
       </a>
       <NavigationProgress />
       <header className="lk-no-print sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur-md supports-[backdrop-filter]:bg-bg/75">
         <div className="flex h-14 items-center gap-3 px-3 sm:px-4 lg:px-5">
-          <IconButton icon={Menu} label="Open navigation" className="lg:hidden" onClick={() => setNavOpen(true)} />
-          <Link to="/" className="shrink-0 rounded-md" aria-label="LocalKit home">
+          <IconButton icon={Menu} label={t('Open navigation')} className="lg:hidden" onClick={() => setNavOpen(true)} />
+          <Link to="/" className="shrink-0 rounded-md" aria-label={t('LocalKit home')}>
             <Logo />
           </Link>
           <div className="flex min-w-0 flex-1 justify-center px-1 sm:px-4">
@@ -132,13 +135,13 @@ export function Layout() {
               type="button"
               onClick={() => openPalette()}
               className="group flex h-9 w-full max-w-md items-center gap-2.5 rounded-lg border border-line-strong bg-surface-sunken px-3 text-left text-[13.5px] text-fg-muted shadow-card transition-colors hover:border-accent-line hover:text-fg-secondary"
-              aria-label="Search tools"
+              aria-label={t('Search tools')}
               aria-keyshortcuts="Control+K Meta+K"
             >
               <Search size={15} aria-hidden className="shrink-0" />
               <span className="min-w-0 flex-1 truncate">
-                <span className="hidden sm:inline">Search 100+ tools…</span>
-                <span className="sm:hidden">Search…</span>
+                <span className="hidden sm:inline">{t('Search 100+ tools…')}</span>
+                <span className="sm:hidden">{t('Search…')}</span>
               </span>
               <span className="hidden items-center gap-1 sm:flex">
                 <Kbd>{modKey}</Kbd>
@@ -146,11 +149,12 @@ export function Layout() {
               </span>
             </button>
           </div>
+          <LanguageToggle className="hidden md:inline-flex" />
           <ThemeSwitcher className="hidden md:inline-flex" />
           <Link
             to="/settings"
-            aria-label="Settings"
-            title="Settings"
+            aria-label={t('Settings')}
+            title={t('Settings')}
             className="hidden size-9 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg sm:inline-flex"
           >
             <Settings size={17} aria-hidden />
@@ -166,7 +170,7 @@ export function Layout() {
           <Suspense
             fallback={
               <div className="flex justify-center py-24">
-                <Spinner label="Loading…" />
+                <Spinner label={t('Loading…')} />
               </div>
             }
           >
