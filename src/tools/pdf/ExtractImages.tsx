@@ -17,6 +17,7 @@ import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PageScopeControl, usePageScope } from './components/PageScope';
 import { JobProgress, ResultFiles, downloadOutput } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { t } from '@/lib/i18n';
 
 interface Found extends OutputFile {
   page: number;
@@ -33,7 +34,7 @@ export default function ExtractImages() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to extract its images">
+      <PdfInput controller={controller} title={t('Drop a PDF to extract its images')}>
         {(pdf) => <ImagesWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -106,7 +107,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
       for (let k = 0; k < scope.pages.length; k++) {
         throwIfAborted(signal);
         const pageNo = scope.pages[k] + 1;
-        progress(k / scope.pages.length, `Scanning page ${pageNo} · ${pluralize(results.length, 'image')} found`);
+        progress(k / scope.pages.length, `Scanning page ${pageNo} · ${pluralize(results.length, t('image'), t('images'))} found`);
         const page = await pdf.doc.getPage(pageNo);
         try {
           const list = await page.getOperatorList();
@@ -182,8 +183,8 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
         <div className="flex flex-col gap-4">
           <PageScopeControl scope={scope} modes={['all', 'range']} />
           <Checkbox
-            label="Skip tiny images"
-            description="Ignore images smaller than 16 × 16 px (usually bullets, lines and decorations)."
+            label={t('Skip tiny images')}
+            description={t('Ignore images smaller than 16 × 16 px (usually bullets, lines and decorations).')}
             checked={skipSmall}
             onChange={setSkipSmall}
           />
@@ -195,24 +196,23 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void run()}
             >
-              Extract images
+              {t('Extract images')}
             </Button>
           </div>
           <p className="text-[12.5px] text-fg-muted">
-            Images are saved as PNG from the decoded pixels, so the original compression (such as JPEG) is not kept. Vector drawings are
-            not images, and stencil masks or unusual image types may not be extractable.
+            {t('Images are saved as PNG from the decoded pixels, so the original compression (such as JPEG) is not kept. Vector drawings are not images, and stencil masks or unusual image types may not be extractable.')}
           </p>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not extract images" />
+      <ErrorMessage error={job.error} title={t('Could not extract images')} />
       {found && (stats.duplicates > 0 || stats.skipped > 0 || stats.failed > 0 || stats.masks > 0) && (
         <Alert tone="info">
           {[
-            stats.duplicates > 0 && `${pluralize(stats.duplicates, 'duplicate')} skipped`,
-            stats.skipped > 0 && `${pluralize(stats.skipped, 'tiny image')} skipped`,
-            stats.masks > 0 && `${pluralize(stats.masks, 'stencil mask')} not exported`,
-            stats.failed > 0 && `${pluralize(stats.failed, 'image')} could not be decoded`,
+            stats.duplicates > 0 && `${pluralize(stats.duplicates, t('duplicate'), t('duplicates'))} skipped`,
+            stats.skipped > 0 && `${pluralize(stats.skipped, t('tiny image'), t('tiny images'))} skipped`,
+            stats.masks > 0 && `${pluralize(stats.masks, t('stencil mask'), t('stencil masks'))} not exported`,
+            stats.failed > 0 && `${pluralize(stats.failed, t('image'), t('images'))} could not be decoded`,
           ]
             .filter(Boolean)
             .join(' · ')}
@@ -220,32 +220,32 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
         </Alert>
       )}
       {found && found.length === 0 && (
-        <EmptyState icon={Images} title="No images found">
-          These pages don't contain extractable raster images. Text and vector graphics can be captured with PDF to Images instead.
+        <EmptyState icon={Images} title={t('No images found')}>
+          {t('These pages don\'t contain extractable raster images. Text and vector graphics can be captured with PDF to Images instead.')}
         </EmptyState>
       )}
       {found && found.length > 0 && (
         <>
-          <ResultFiles files={found} showList={found.length === 1} zipName={outputName(pdf.file.name, 'images', 'zip')} title={`${pluralize(found.length, 'image')} extracted`} />
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3" aria-label="Extracted images">
+          <ResultFiles files={found} showList={found.length === 1} zipName={outputName(pdf.file.name, 'images', 'zip')} title={t('{count} extracted', { count: pluralize(found.length, t('image'), t('images')) })} />
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3" aria-label={t('Extracted images')}>
             {found.slice(0, 300).map((img) => (
               <li key={img.url} className="flex min-w-0 flex-col rounded-xl border border-line bg-surface p-1.5 shadow-card">
                 <div className="lk-checker flex aspect-square items-center justify-center overflow-hidden rounded-lg">
-                  <img src={img.url} alt={`Image from page ${img.page}`} className="max-h-full max-w-full object-contain" loading="lazy" />
+                  <img src={img.url} alt={t('Image from page {page}', { page: img.page })} className="max-h-full max-w-full object-contain" loading="lazy" />
                 </div>
                 <div className="flex items-center gap-1 px-1 pt-1.5">
                   <div className="min-w-0 flex-1 leading-tight">
-                    <p className="truncate text-[12.5px] font-medium text-fg">Page {img.page}</p>
+                    <p className="truncate text-[12.5px] font-medium text-fg">{t('Page {page}', { page: img.page })}</p>
                     <p className="truncate text-[11.5px] text-fg-muted">
                       {img.width} × {img.height} · {formatBytes((img.data as Blob).size)}
                     </p>
                   </div>
-                  <IconButton icon={Download} label={`Download ${img.name}`} size="sm" onClick={() => downloadOutput(img)} />
+                  <IconButton icon={Download} label={t('Download {name}', { name: img.name })} size="sm" onClick={() => downloadOutput(img)} />
                 </div>
               </li>
             ))}
           </ul>
-          {found.length > 300 && <p className="text-[12.5px] text-fg-muted">Showing the first 300 previews. The ZIP contains all images.</p>}
+          {found.length > 300 && <p className="text-[12.5px] text-fg-muted">{t('Showing the first 300 previews. The ZIP contains all images.')}</p>}
         </>
       )}
     </>

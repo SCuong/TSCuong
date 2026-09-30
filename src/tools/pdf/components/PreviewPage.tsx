@@ -3,6 +3,7 @@ import { Spinner } from '@/components/ui/Feedback';
 import { cn } from '@/lib/utils';
 import type { PDFDocumentProxy } from '../lib/pdfjs';
 import { getThumbnail } from '../lib/thumbnails';
+import { t } from '@/lib/i18n';
 
 export interface PageGeometry {
   /** Displayed page size in points. */
@@ -68,7 +69,7 @@ export function PreviewPage({
         className={cn('flex aspect-[1/1.3] w-full items-center justify-center rounded-lg bg-surface-sunken', className)}
         style={{ maxWidth: width }}
       >
-        {current?.failed ? <span className="text-[12.5px] text-fg-muted">Preview unavailable</span> : <Spinner />}
+        {current?.failed ? <span className="text-[12.5px] text-fg-muted">{t('Preview unavailable')}</span> : <Spinner />}
       </div>
     );
   }
@@ -80,7 +81,7 @@ export function PreviewPage({
       className={cn('relative w-full overflow-hidden rounded-[3px] bg-white shadow-raised ring-1 ring-line-strong', className)}
       style={{ maxWidth: width }}
     >
-      <img src={current!.url} alt={`Preview of page ${pageIndex + 1}`} className="block h-auto w-full select-none" draggable={false} />
+      <img src={current!.url} alt={t('Preview of page {pageIndex}', { pageIndex: pageIndex + 1 })} className="block h-auto w-full select-none" draggable={false} />
       <div className={cn('absolute inset-0', !overlayInteractive && 'pointer-events-none')}>
         {children?.({ width: size.width, height: size.height, scale })}
       </div>

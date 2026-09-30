@@ -3,6 +3,7 @@ import { Check, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PDFDocumentProxy } from '../lib/pdfjs';
 import { Thumbnail } from './Thumbnail';
+import { t } from '@/lib/i18n';
 
 export interface GridItem {
   id: string;
@@ -407,7 +408,7 @@ export function PageGrid({
                 {onMove && (
                   <div data-card-action className="-mr-1 flex shrink-0 items-center">
                     <CardButton
-                      label={`Move ${item.label} earlier`}
+                      label={t('Move {label} earlier', { label: item.label })}
                       disabled={index === 0}
                       onClick={() => {
                         move(index, index - 1);
@@ -417,7 +418,7 @@ export function PageGrid({
                       <ChevronLeft size={15} aria-hidden />
                     </CardButton>
                     <CardButton
-                      label={`Move ${item.label} later`}
+                      label={t('Move {label} later', { label: item.label })}
                       disabled={index === items.length - 1}
                       onClick={() => {
                         move(index, index + 1);
@@ -454,7 +455,7 @@ export function PageGrid({
       )}
       {onMove && (
         <p className="sr-only" aria-live="polite">
-          {drag ? `Moving ${dragItem?.label}. Release to drop.` : announcement}
+          {drag ? t('Moving {label}. Release to drop.', { label: dragItem?.label }) : announcement}
         </p>
       )}
     </>

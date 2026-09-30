@@ -24,6 +24,7 @@ import { PdfInput } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { Thumbnail } from './components/Thumbnail';
 import './components/viewer.css';
+import { t } from '@/lib/i18n';
 
 const GAP = 12;
 const PAD = 12;
@@ -34,7 +35,7 @@ export default function PdfViewer() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to view it">
+      <PdfInput controller={controller} title={t('Drop a PDF to view it')}>
         {(pdf) => <Viewer key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -261,12 +262,12 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line px-2 py-1.5">
         <IconButton
           icon={sidebar ? PanelLeftClose : PanelLeft}
-          label={sidebar ? 'Hide thumbnails' : 'Show thumbnails'}
+          label={sidebar ? t('Hide thumbnails') : t('Show thumbnails')}
           size="sm"
           onClick={() => setSidebar((s) => !s)}
         />
         <div className="flex items-center gap-1">
-          <IconButton icon={ChevronLeft} label="Previous page" size="sm" disabled={currentPage === 0} onClick={() => goTo(currentPage - 1)} />
+          <IconButton icon={ChevronLeft} label={t('Previous page')} size="sm" disabled={currentPage === 0} onClick={() => goTo(currentPage - 1)} />
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -277,7 +278,7 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
             className="flex items-center gap-1 text-[13px] text-fg-muted"
           >
             <label htmlFor="lk-viewer-page" className="sr-only">
-              Page number
+              {t('Page number')}
             </label>
             <Input
               id="lk-viewer-page"
@@ -291,16 +292,16 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
           </form>
           <IconButton
             icon={ChevronRight}
-            label="Next page"
+            label={t('Next page')}
             size="sm"
             disabled={currentPage >= pdf.pageCount - 1}
             onClick={() => goTo(currentPage + 1)}
           />
         </div>
         <div className="flex items-center gap-1">
-          <IconButton icon={ZoomOut} label="Zoom out" size="sm" disabled={zoomIndex <= ZOOMS[0] + 0.01} onClick={zoomOut} />
+          <IconButton icon={ZoomOut} label={t('Zoom out')} size="sm" disabled={zoomIndex <= ZOOMS[0] + 0.01} onClick={zoomOut} />
           <label htmlFor="lk-viewer-zoom" className="sr-only">
-            Zoom
+            {t('Zoom')}
           </label>
           <Select
             id="lk-viewer-zoom"
@@ -311,21 +312,21 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
             }}
             className="h-7 w-[118px] py-0.5 pl-2 text-[13px]"
           >
-            <option value="fit-width">Fit width</option>
-            <option value="fit-page">Fit page</option>
+            <option value="fit-width">{t('Fit width')}</option>
+            <option value="fit-page">{t('Fit page')}</option>
             {ZOOMS.map((z) => (
               <option key={z} value={String(z)}>
                 {Math.round(z * 100)}%
               </option>
             ))}
           </Select>
-          <IconButton icon={ZoomIn} label="Zoom in" size="sm" disabled={zoomIndex >= ZOOMS[ZOOMS.length - 1] - 0.01} onClick={zoomIn} />
+          <IconButton icon={ZoomIn} label={t('Zoom in')} size="sm" disabled={zoomIndex >= ZOOMS[ZOOMS.length - 1] - 0.01} onClick={zoomIn} />
         </div>
         <div className="flex min-w-0 flex-1 basis-56 items-center justify-end gap-1">
           <div className="relative min-w-0 flex-1 sm:max-w-64">
             <Search size={14} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-fg-muted" aria-hidden />
             <label htmlFor="lk-viewer-search" className="sr-only">
-              Search in document
+              {t('Search in document')}
             </label>
             <Input
               id="lk-viewer-search"
@@ -333,25 +334,25 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
               role="searchbox"
               enterKeyHint="search"
               value={query}
-              placeholder="Search"
+              placeholder={t('Search')}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onSearchKey}
               className="h-7 py-0.5 pr-2 pl-7 text-[13px]"
             />
           </div>
           <span className="min-w-14 text-center text-[12px] whitespace-nowrap text-fg-muted tabular-nums" aria-live="polite">
-            {debouncedQuery ? (indexing && !hits.length ? <Spinner size={12} /> : hits.length ? `${Math.min(activeHit, hits.length - 1) + 1} / ${hits.length}` : 'No results') : ''}
+            {debouncedQuery ? (indexing && !hits.length ? <Spinner size={12} /> : hits.length ? `${Math.min(activeHit, hits.length - 1) + 1} / ${hits.length}` : t('No results')) : ''}
           </span>
-          <IconButton icon={ChevronUp} label="Previous result" size="sm" disabled={!hits.length} onClick={() => stepHit(-1)} />
-          <IconButton icon={ChevronDown} label="Next result" size="sm" disabled={!hits.length} onClick={() => stepHit(1)} />
-          {query && <IconButton icon={X} label="Clear search" size="sm" onClick={() => setQuery('')} />}
+          <IconButton icon={ChevronUp} label={t('Previous result')} size="sm" disabled={!hits.length} onClick={() => stepHit(-1)} />
+          <IconButton icon={ChevronDown} label={t('Next result')} size="sm" disabled={!hits.length} onClick={() => stepHit(1)} />
+          {query && <IconButton icon={X} label={t('Clear search')} size="sm" onClick={() => setQuery('')} />}
         </div>
       </div>
       <div className="relative flex h-[min(78dvh,960px)] min-h-[420px]">
         {sidebar && (
           <aside
             ref={thumbList}
-            aria-label="Page thumbnails"
+            aria-label={t('Page thumbnails')}
             className={cn(
               'z-10 w-36 shrink-0 overflow-y-auto border-r border-line bg-surface-sunken p-2',
               !wide && 'absolute inset-y-0 left-0 shadow-popover',
@@ -367,7 +368,7 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
                       if (!wide) setSidebar(false);
                     }}
                     aria-current={i === currentPage ? 'page' : undefined}
-                    aria-label={`Go to page ${i + 1}`}
+                    aria-label={t('Go to page {i}', { i: i + 1 })}
                     className={cn(
                       'block w-full rounded-lg border p-1 text-center transition-colors',
                       i === currentPage ? 'border-accent bg-accent-soft' : 'border-transparent hover:bg-surface-hover',
@@ -387,11 +388,11 @@ function Viewer({ pdf }: { pdf: LoadedPdf }) {
           className="relative min-w-0 flex-1 overflow-auto bg-surface-sunken"
           onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
           tabIndex={0}
-          aria-label="Document pages"
+          aria-label={t('Document pages')}
         >
           {!sizes ? (
             <div className="flex h-full items-center justify-center">
-              <Spinner label="Loading pages…" />
+              <Spinner label={t('Loading pages…')} />
             </div>
           ) : (
             <div className="relative mx-auto" style={{ height: layout.total, width: Math.max(maxWidth * scale + PAD * 2, 0) }}>
@@ -539,7 +540,7 @@ const ViewerPage = memo(function ViewerPage({
     <div
       className="lk-pdf-page relative h-full w-full overflow-hidden bg-white shadow-raised ring-1 ring-line"
       style={{ ['--scale-factor' as string]: String(scale) }}
-      aria-label={`Page ${index + 1}`}
+      aria-label={t('Page {index}', { index: index + 1 })}
       role="group"
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden />
@@ -547,7 +548,7 @@ const ViewerPage = memo(function ViewerPage({
       {!rendered && (
         // The page is always white paper (both themes), so a fixed dark gray keeps AA contrast.
         <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-neutral-600">
-          {failed ? 'This page could not be rendered.' : active ? <Spinner size={16} /> : `Page ${index + 1}`}
+          {failed ? t('This page could not be rendered.') : active ? <Spinner size={16} /> : t('Page {index}', { index: index + 1 })}
         </div>
       )}
     </div>

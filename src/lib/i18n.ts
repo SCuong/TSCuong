@@ -21,7 +21,8 @@ let locale: Locale = 'en';
 let messages: ReadonlyMap<string, string> | null = null;
 let ready = false;
 
-export type Params = Record<string, string | number>;
+/** Values are formatted like template-literal substitutions. */
+export type Params = Record<string, string | number | bigint | boolean | null | undefined>;
 
 function detectLocale(): Locale {
   const saved = readRaw(LOCALE_KEY);
@@ -70,6 +71,9 @@ export function t(text: string, params?: Params): string {
   const template = messages?.get(text) ?? text;
   return params ? format(template, params) : template;
 }
+
+// The dictionary is loaded once per page: a hot update would reset it, so reload instead.
+if (import.meta.hot) import.meta.hot.decline();
 
 /** Test hook: switch the dictionary without storage or a reload. */
 export function setMessagesForTests(next: Locale, dictionary: Record<string, string> | null) {

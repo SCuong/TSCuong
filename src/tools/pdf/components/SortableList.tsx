@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export interface SortableHandle {
   /** Spread on the drag handle element. */
@@ -108,7 +109,7 @@ export function SortableList<T>({
             handleProps: {
               role: 'button',
               tabIndex: 0,
-              'aria-label': `Reorder ${label}. Position ${index + 1} of ${items.length}.`,
+              'aria-label': t('Reorder {label}. Position {index} of {count}.', { label, index: index + 1, count: items.length }),
               'aria-describedby': helpId,
               className:
                 'flex h-9 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg active:cursor-grabbing',
@@ -130,12 +131,12 @@ export function SortableList<T>({
               },
             },
             moveUp: (
-              <MoveButton label={`Move ${label} up`} disabled={index === 0} onClick={() => move(index, index - 1)}>
+              <MoveButton label={t('Move {label} up', { label })} disabled={index === 0} onClick={() => move(index, index - 1)}>
                 <ArrowUp size={15} aria-hidden />
               </MoveButton>
             ),
             moveDown: (
-              <MoveButton label={`Move ${label} down`} disabled={index === items.length - 1} onClick={() => move(index, index + 1)}>
+              <MoveButton label={t('Move {label} down', { label })} disabled={index === items.length - 1} onClick={() => move(index, index + 1)}>
                 <ArrowDown size={15} aria-hidden />
               </MoveButton>
             ),
@@ -159,7 +160,7 @@ export function SortableList<T>({
         })}
       </ul>
       <p id={helpId} className="sr-only">
-        Drag the handle, or press Alt plus the arrow keys, to reorder.
+        {t('Drag the handle, or press Alt plus the arrow keys, to reorder.')}
       </p>
       <p className="sr-only" aria-live="polite">
         {announcement}

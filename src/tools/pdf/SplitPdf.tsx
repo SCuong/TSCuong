@@ -16,6 +16,7 @@ import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
+import { t } from '@/lib/i18n';
 
 type Mode = 'single' | 'every' | 'ranges';
 
@@ -23,7 +24,7 @@ export default function SplitPdf() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to split">
+      <PdfInput controller={controller} title={t('Drop a PDF to split')}>
         {(pdf) => <SplitWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -42,7 +43,7 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const plan = useMemo((): { groups: number[][]; error: string | null } => {
     if (mode === 'single') return { groups: chunkPages(pdf.pageCount, 1), error: null };
     if (mode === 'every') {
-      if (every === '' || !Number.isInteger(every) || every < 1) return { groups: [], error: 'Enter a whole number of pages per file.' };
+      if (every === '' || !Number.isInteger(every) || every < 1) return { groups: [], error: t('Enter a whole number of pages per file.') };
       return { groups: chunkPages(pdf.pageCount, every), error: null };
     }
     if (!ranges.trim()) return { groups: [], error: null };
@@ -78,43 +79,43 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
   return (
     <>
       {gate.notice}
-      <Panel title="How to split">
+      <Panel title={t('How to split')}>
         <div className="flex flex-col gap-4">
           <Segmented
             className="self-start"
-            label="Split mode"
+            label={t('Split mode')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'single', label: 'Every page' },
-              { value: 'every', label: 'Every N pages' },
-              { value: 'ranges', label: 'Custom ranges' },
+              { value: 'single', label: t('Every page') },
+              { value: 'every', label: t('Every N pages') },
+              { value: 'ranges', label: t('Custom ranges') },
             ]}
           />
           {mode === 'single' && (
             <p className="text-[13px] text-fg-secondary">
-              Creates {pluralize(pdf.pageCount, 'PDF')}, one for each page.
+              {t('Creates {count}, one for each page.', { count: pluralize(pdf.pageCount, t('PDF'), t('PDFs')) })}
             </p>
           )}
           {mode === 'every' && (
             <div className="w-40">
-              <Label htmlFor={everyId}>Pages per file</Label>
+              <Label htmlFor={everyId}>{t('Pages per file')}</Label>
               <NumberInput id={everyId} min={1} max={pdf.pageCount} step={1} value={every} onChange={setEvery} />
             </div>
           )}
           {mode === 'ranges' && (
             <div className="max-w-xl">
-              <Label htmlFor={rangesId}>Ranges (one file per comma-separated item)</Label>
+              <Label htmlFor={rangesId}>{t('Ranges (one file per comma-separated item)')}</Label>
               <Input
                 id={rangesId}
                 mono
                 value={ranges}
-                placeholder="e.g. 1-3, 4-6, 7-  or  odd, even"
+                placeholder={t('e.g. 1-3, 4-6, 7-  or  odd, even')}
                 onChange={(e) => setRanges(e.target.value)}
                 aria-invalid={plan.error ? true : undefined}
               />
               <p className="mt-1.5 text-[12.5px] text-fg-muted">
-                Each item becomes one PDF. Use "last" for the final page, "8-" for page 8 to the end.
+                {t('Each item becomes one PDF. Use "last" for the final page, "8-" for page 8 to the end.')}
               </p>
             </div>
           )}
@@ -122,19 +123,19 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
           {plan.groups.length > 0 && (
             <div>
               <p className="mb-2 text-[12.5px] font-medium text-fg-secondary">
-                {pluralize(plan.groups.length, 'file')} will be created
+                {t('{count} will be created', { count: pluralize(plan.groups.length, t('file'), t('files')) })}
               </p>
-              <ul className="flex flex-wrap gap-1.5" aria-label="Files that will be created">
+              <ul className="flex flex-wrap gap-1.5" aria-label={t('Files that will be created')}>
                 {preview.map((g, i) => (
                   <li
                     key={i}
                     className="rounded-md border border-line bg-surface-sunken px-2 py-1 text-[12px] text-fg-secondary tabular-nums"
                   >
-                    <span className="text-fg-muted">#{i + 1}</span> {g.length === 1 ? `page ${g[0]}` : `pages ${formatPageList(g)}`}
+                    <span className="text-fg-muted">#{i + 1}</span> {g.length === 1 ? t('page {g}', { g: g[0] }) : t('pages {formatPageList}', { formatPageList: formatPageList(g) })}
                   </li>
                 ))}
                 {plan.groups.length > preview.length && (
-                  <li className="px-2 py-1 text-[12px] text-fg-muted">+{plan.groups.length - preview.length} more</li>
+                  <li className="px-2 py-1 text-[12px] text-fg-muted">+{plan.groups.length - preview.length}{' '}{t('more')}</li>
                 )}
               </ul>
             </div>
@@ -147,13 +148,13 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void run()}
             >
-              Split PDF
+              {t('Split PDF')}
             </Button>
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Split failed" />
+      <ErrorMessage error={job.error} title={t('Split failed')} />
       <ResultFiles files={result.value ?? []} zipName={outputName(pdf.file.name, 'split', 'zip')} />
     </>
   );

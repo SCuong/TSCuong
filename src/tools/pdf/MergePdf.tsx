@@ -22,6 +22,7 @@ import { arrayMove } from './components/PageGrid';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
+import { t } from '@/lib/i18n';
 
 interface Entry {
   id: string;
@@ -95,7 +96,7 @@ export default function MergePdf() {
           status: 'error',
           error:
             e.kind === 'password' || e.kind === 'wrong-password'
-              ? `"${entry.file.name}" is password-protected. Remove the password in your PDF app, then add it again.`
+              ? t('"{name}" is password-protected. Remove the password in your PDF app, then add it again.', { name: entry.file.name })
               : e.message,
         });
       }
@@ -168,9 +169,9 @@ export default function MergePdf() {
           accept={PDF_ACCEPT}
           multiple
           onFiles={(files) => void addFiles(files)}
-          title="Drop PDFs to merge"
+          title={t('Drop PDFs to merge')}
           icon={Combine}
-          hint="Add two or more PDFs. You can reorder them and pick pages next. Nothing is uploaded."
+          hint={t('Add two or more PDFs. You can reorder them and pick pages next. Nothing is uploaded.')}
         />
       </ToolStack>
     );
@@ -179,11 +180,11 @@ export default function MergePdf() {
   return (
     <ToolStack>
       <Panel
-        title={`Files to merge (${entries.length})`}
-        description="Drag the handle or use the arrows to set the order. Leave pages empty to include every page."
+        title={t('Files to merge ({count})', { count: entries.length })}
+        description={t('Drag the handle or use the arrows to set the order. Leave pages empty to include every page.')}
         actions={
           <Button size="sm" variant="ghost" icon={Trash} onClick={clearAll}>
-            Clear all
+            {t('Clear all')}
           </Button>
         }
         bodyClassName="p-0"
@@ -192,7 +193,7 @@ export default function MergePdf() {
           items={entries}
           getKey={(e) => e.id}
           getLabel={(e) => e.file.name}
-          ariaLabel="Files to merge, in order"
+          ariaLabel={t('Files to merge, in order')}
           onMove={(from, to) => setEntries((list) => arrayMove(list, from, to))}
           className="divide-y divide-line"
           renderItem={(entry, index, sortable) => (
@@ -218,12 +219,12 @@ export default function MergePdf() {
                   <p className="text-[12.5px] text-danger">{entry.error}</p>
                 ) : (
                   <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-fg-muted">
-                    <span>{entry.status === 'ready' ? pluralize(entry.pageCount!, 'page') : 'Reading…'}</span>
+                    <span>{entry.status === 'ready' ? pluralize(entry.pageCount!, t('page'), t('pages')) : t('Reading…')}</span>
                     <span aria-hidden>·</span>
                     <span>{formatBytes(entry.file.size)}</span>
                     {entry.encrypted && (
                       <Badge tone="warning">
-                        <Lock size={11} aria-hidden /> Encrypted
+                        <Lock size={11} aria-hidden />{' '}{t('Encrypted')}
                       </Badge>
                     )}
                   </p>
@@ -235,7 +236,7 @@ export default function MergePdf() {
               <div className="ml-auto flex shrink-0 items-center">
                 {sortable.moveUp}
                 {sortable.moveDown}
-                <IconButton icon={Trash} label={`Remove ${entry.file.name}`} size="sm" onClick={() => remove(entry.id)} />
+                <IconButton icon={Trash} label={t('Remove {name}', { name: entry.file.name })} size="sm" onClick={() => remove(entry.id)} />
               </div>
             </div>
           )}
@@ -247,17 +248,16 @@ export default function MergePdf() {
             accept={PDF_ACCEPT}
             onFiles={(files) => void addFiles(files)}
             icon={FilePlus}
-            title="Add more PDFs"
-            hint="They are added to the end of the list."
+            title={t('Add more PDFs')}
+            hint={t('They are added to the end of the list.')}
           />
         </div>
       </Panel>
 
       {hasEncrypted && (
-        <Alert tone="warning" title="Some files are encrypted">
-          Pages copied out of an encrypted PDF come out blank or unreadable, because the in-browser PDF editor cannot decrypt them.
-          Remove the protection in your PDF app first (for example by printing to a new PDF), then add that copy here.
-          <Checkbox className="mt-2" label="Merge them anyway" checked={allowEncrypted} onChange={setAllowEncrypted} />
+        <Alert tone="warning" title={t('Some files are encrypted')}>
+          {t('Pages copied out of an encrypted PDF come out blank or unreadable, because the in-browser PDF editor cannot decrypt them. Remove the protection in your PDF app first (for example by printing to a new PDF), then add that copy here.')}
+          <Checkbox className="mt-2" label={t('Merge them anyway')} checked={allowEncrypted} onChange={setAllowEncrypted} />
         </Alert>
       )}
 
@@ -267,33 +267,33 @@ export default function MergePdf() {
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
         <div className="min-w-0 flex-1 basis-56">
-          <Label htmlFor={nameId}>Output file name</Label>
+          <Label htmlFor={nameId}>{t('Output file name')}</Label>
           <Input id={nameId} value={outputName} onChange={(e) => setOutputName(e.target.value)} spellCheck={false} />
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[13px] text-fg-muted">
-            {pluralize(ready.length, 'file')}, {pluralize(plan.pages, 'page')}
+            {pluralize(ready.length, t('file'), t('files'))}, {pluralize(plan.pages, t('page'), t('pages'))}
           </span>
           <Button variant="primary" icon={Combine} disabled={!canMerge || ready.length < 1} loading={job.running} onClick={() => void merge()}>
-            Merge PDFs
+            {t('Merge PDFs')}
           </Button>
         </div>
       </div>
       {ready.length === 1 && !loading && (
-        <p className="-mt-2 text-[12.5px] text-fg-muted">Add at least one more PDF to combine files (a single file can still be re-saved with a page selection).</p>
+        <p className="-mt-2 text-[12.5px] text-fg-muted">{t('Add at least one more PDF to combine files (a single file can still be re-saved with a page selection).')}</p>
       )}
 
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Merge failed" />
+      <ErrorMessage error={job.error} title={t('Merge failed')} />
       {result.value && (
         <ResultFiles
           files={[{ name: ensureExtension(outputName || 'merged', 'pdf'), data: result.value.data, type: 'application/pdf' }]}
-          title={`Merged ${pluralize(result.value.pages, 'page')} from ${pluralize(result.value.files, 'file')}`}
+          title={t('Merged {count} from {count2}', { count: pluralize(result.value.pages, t('page'), t('pages')), count2: pluralize(result.value.files, t('file'), t('files')) })}
         />
       )}
       {!result.value && !job.running && ready.length === 0 && !loading && (
-        <EmptyState icon={Combine} title="No readable PDFs yet">
-          Remove the files with errors or add other PDFs.
+        <EmptyState icon={Combine} title={t('No readable PDFs yet')}>
+          {t('Remove the files with errors or add other PDFs.')}
         </EmptyState>
       )}
     </ToolStack>
@@ -306,15 +306,15 @@ function RangeInput({ entry, onChange }: { entry: Entry; onChange: (range: strin
   return (
     <div className="w-full sm:w-44">
       <label htmlFor={id} className="sr-only">
-        Pages of {entry.file.name} to include
+        {t('Pages of {name} to include', { name: entry.file.name })}
       </label>
       <Input
         id={id}
         value={entry.range}
-        placeholder={`All pages (1-${entry.pageCount})`}
+        placeholder={t('All pages (1-{pageCount})', { pageCount: entry.pageCount })}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={r && !r.ok ? true : undefined}
-        title={r && !r.ok ? r.error : 'Pages to include, e.g. 1-3, 5, odd'}
+        title={r && !r.ok ? r.error : t('Pages to include, e.g. 1-3, 5, odd')}
         className="h-8 py-1 text-[13px]"
         mono
       />

@@ -20,6 +20,7 @@ import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { sizeChange } from './lib/sizeChange';
 import { verifyEncryptedEdit } from './components/verifyEdit';
+import { t } from '@/lib/i18n';
 
 type Mode = 'lossless' | 'rasterize';
 
@@ -33,7 +34,7 @@ export default function CompressPdf() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to compress">
+      <PdfInput controller={controller} title={t('Drop a PDF to compress')}>
         {(pdf) => <CompressWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -125,35 +126,33 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
   return (
     <>
       {gate.notice}
-      <Panel title="Compression method">
+      <Panel title={t('Compression method')}>
         <div className="flex flex-col gap-4">
           <Segmented
             className="self-start"
-            label="Compression method"
+            label={t('Compression method')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'lossless', label: 'Lossless' },
-              { value: 'rasterize', label: 'Strong (rasterize)' },
+              { value: 'lossless', label: t('Lossless') },
+              { value: 'rasterize', label: t('Strong (rasterize)') },
             ]}
           />
           {mode === 'lossless' ? (
             <p className="max-w-2xl text-[13px] text-fg-secondary">
-              Re-saves the PDF with compressed object streams, removes objects nothing refers to, and deflates uncompressed streams. Text,
-              images, links and forms are kept exactly. Savings depend on how the file was made: already-optimized PDFs may not shrink.
+              {t('Re-saves the PDF with compressed object streams, removes objects nothing refers to, and deflates uncompressed streams. Text, images, links and forms are kept exactly. Savings depend on how the file was made: already-optimized PDFs may not shrink.')}
             </p>
           ) : (
             <>
-              <Alert tone="warning" title="Text will no longer be selectable">
-                Every page is re-drawn as a JPEG image. This can shrink scans and image-heavy PDFs a lot, but text becomes a picture (no
-                search, copy or screen readers) and links, bookmarks and form fields are removed.
+              <Alert tone="warning" title={t('Text will no longer be selectable')}>
+                {t('Every page is re-drawn as a JPEG image. This can shrink scans and image-heavy PDFs a lot, but text becomes a picture (no search, copy or screen readers) and links, bookmarks and form fields are removed.')}
                 {pdf.encrypted && ' The new file is not encrypted: its password and permission restrictions are not carried over.'}
               </Alert>
               <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
                 <div>
-                  <Label>Resolution</Label>
+                  <Label>{t('Resolution')}</Label>
                   <Segmented
-                    label="Resolution"
+                    label={t('Resolution')}
                     value={dpi}
                     onChange={setDpi}
                     options={[
@@ -165,7 +164,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   />
                 </div>
                 <div className="w-56">
-                  <Label htmlFor={qualityId}>JPEG quality: {Math.round(quality * 100)}%</Label>
+                  <Label htmlFor={qualityId}>{t('JPEG quality: {round}%', { round: Math.round(quality * 100) })}</Label>
                   <input
                     id={qualityId}
                     type="range"
@@ -177,45 +176,45 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
                     onChange={(e) => setQuality(Number(e.target.value))}
                   />
                 </div>
-                <Checkbox label="Grayscale" checked={grayscale} onChange={setGrayscale} className="pb-1.5" />
+                <Checkbox label={t('Grayscale')} checked={grayscale} onChange={setGrayscale} className="pb-1.5" />
               </div>
             </>
           )}
           <div className="border-t border-line pt-4">
             <Button variant="primary" icon={Minimize2} disabled={!gate.ok || job.running} loading={job.running} onClick={() => void run()}>
-              Compress PDF
+              {t('Compress PDF')}
             </Button>
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Compression failed" />
+      <ErrorMessage error={job.error} title={t('Compression failed')} />
       {done && change && change.verdict !== 'smaller' && (
         <Alert tone="warning" title={NOT_SMALLER_TITLE[change.verdict]}>
           {done.mode === 'lossless'
-            ? 'This PDF is already well optimized. Keep your original file, or try the strong (rasterize) method if it is mostly scans or images.'
-            : 'Rasterizing did not help for this file (it is probably mostly text or vector graphics). Keep your original, or try a lower resolution or quality.'}
+            ? t('This PDF is already well optimized. Keep your original file, or try the strong (rasterize) method if it is mostly scans or images.')
+            : t('Rasterizing did not help for this file (it is probably mostly text or vector graphics). Keep your original, or try a lower resolution or quality.')}
         </Alert>
       )}
       {done && change && (
         <ResultFiles
           files={[done.file]}
           tone={change.verdict === 'smaller' ? 'success' : 'neutral'}
-          title={change.verdict === 'smaller' ? `Reduced by ${Math.round(-change.fraction * 100)}%` : 'Compressed file'}
+          title={change.verdict === 'smaller' ? t('Reduced by {round}%', { round: Math.round(-change.fraction * 100) }) : t('Compressed file')}
         >
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-fg-secondary">
             <span>
-              Before: <strong className="font-medium text-fg">{formatBytes(before)}</strong>
+              {t('Before:')}{' '}<strong className="font-medium text-fg">{formatBytes(before)}</strong>
             </span>
             <span>
-              After: <strong className="font-medium text-fg">{formatBytes(done.size)}</strong>
+              {t('After:')}{' '}<strong className="font-medium text-fg">{formatBytes(done.size)}</strong>
             </span>
             <span>
-              Change: <strong className={change.verdict === 'smaller' ? 'font-medium text-success' : 'font-medium text-warning'}>{change.percent}</strong>
+              {t('Change:')}{' '}<strong className={change.verdict === 'smaller' ? 'font-medium text-success' : 'font-medium text-warning'}>{change.percent}</strong>
             </span>
             {done.stats && (
               <span>
-                {pluralize(done.stats.removedObjects, 'unused object')} removed · {pluralize(done.stats.compressedStreams, 'stream')} compressed
+                {t('{count} removed · {count2} compressed', { count: pluralize(done.stats.removedObjects, t('unused object'), t('unused objects')), count2: pluralize(done.stats.compressedStreams, t('stream'), t('streams')) })}
               </span>
             )}
           </div>

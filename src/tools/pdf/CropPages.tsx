@@ -18,6 +18,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { verifyEncryptedEdit } from './components/verifyEdit';
+import { t } from '@/lib/i18n';
 
 type Unit = 'mm' | 'pt';
 const SIDES: Array<keyof Margins> = ['top', 'right', 'bottom', 'left'];
@@ -27,7 +28,7 @@ export default function CropPages() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to crop">
+      <PdfInput controller={controller} title={t('Drop a PDF to crop')}>
         {(pdf) => <CropWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -74,16 +75,16 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
     <>
       {gate.notice}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Panel title="Crop margins" description="Measured from the edges of the page as you see it. Or draw a rectangle on the preview.">
+        <Panel title={t('Crop margins')} description={t('Measured from the edges of the page as you see it. Or draw a rectangle on the preview.')}>
           <div className="flex flex-col gap-4">
             <Segmented
               className="self-start"
-              label="Unit"
+              label={t('Unit')}
               value={unit}
               onChange={setUnit}
               options={[
-                { value: 'mm', label: 'Millimetres' },
-                { value: 'pt', label: 'Points' },
+                { value: 'mm', label: t('Millimetres') },
+                { value: 'pt', label: t('Points') },
               ]}
             />
             <div className="grid max-w-md grid-cols-2 gap-3">
@@ -104,24 +105,24 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" onClick={() => setMargins(ZERO)}>
-                Reset
+                {t('Reset')}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setMargins((m) => ({ top: m.top, right: m.top, bottom: m.top, left: m.top }))}
               >
-                Use top margin on all sides
+                {t('Use top margin on all sides')}
               </Button>
             </div>
-            <PageScopeControl scope={scope} modes={['all', 'range']} label="Pages to crop" />
+            <PageScopeControl scope={scope} modes={['all', 'range']} label={t('Pages to crop')} />
             <Checkbox
-              label="Permanent crop"
-              description="Also shrinks the page itself (the MediaBox), so apps cannot simply show the trimmed margins again. Without it, only the visible area (the CropBox) changes. Either way the trimmed content stays inside the file, so do not rely on cropping to hide sensitive information."
+              label={t('Permanent crop')}
+              description={t('Also shrinks the page itself (the MediaBox), so apps cannot simply show the trimmed margins again. Without it, only the visible area (the CropBox) changes. Either way the trimmed content stays inside the file, so do not rely on cropping to hide sensitive information.')}
               checked={permanent}
               onChange={setPermanent}
             />
-            <ErrorMessage error={invalid ? 'Margins must be positive numbers.' : null} />
+            <ErrorMessage error={invalid ? t('Margins must be positive numbers.') : null} />
             <div className="border-t border-line pt-4">
               <Button
                 variant="primary"
@@ -130,12 +131,12 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 loading={job.running}
                 onClick={() => void run()}
               >
-                Crop pages
+                {t('Crop pages')}
               </Button>
             </div>
           </div>
         </Panel>
-        <Panel title="Preview" description={previewPage !== undefined ? `Page ${previewPage + 1} · drag to draw the area to keep` : undefined} className="h-fit">
+        <Panel title={t('Preview')} description={previewPage !== undefined ? t('Page {previewPage} · drag to draw the area to keep', { previewPage: previewPage + 1 }) : undefined} className="h-fit">
           {previewPage !== undefined ? (
             <div className="flex justify-center">
               <PreviewPage doc={pdf.doc} pageIndex={previewPage} width={320} overlayInteractive>
@@ -149,12 +150,12 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
               </PreviewPage>
             </div>
           ) : (
-            <p className="text-[13px] text-fg-muted">Select pages to see a preview.</p>
+            <p className="text-[13px] text-fg-muted">{t('Select pages to see a preview.')}</p>
           )}
         </Panel>
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not crop" />
+      <ErrorMessage error={job.error} title={t('Could not crop')} />
       {result.value && <ResultFiles files={[result.value]} />}
     </>
   );

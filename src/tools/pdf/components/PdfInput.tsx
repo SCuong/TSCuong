@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Panel';
 import { Spinner } from '@/components/ui/Feedback';
 import { formatBytes, pluralize } from '@/lib/utils';
 import type { LoadedPdf, PdfFileController } from './usePdfFile';
+import { t } from '@/lib/i18n';
 
 export const PDF_ACCEPT = 'application/pdf,.pdf';
 
@@ -40,7 +41,7 @@ export function PdfInput({
   if (state.status === 'loading') {
     return (
       <div className="flex min-h-40 items-center justify-center rounded-xl border border-line bg-surface shadow-card">
-        <Spinner label={`Opening ${state.name}…`} />
+        <Spinner label={t('Opening {name}…', { name: state.name })} />
       </div>
     );
   }
@@ -51,13 +52,13 @@ export function PdfInput({
 
   return (
     <div className="flex flex-col gap-3">
-      {state.status === 'error' && <ErrorMessage error={state.error} title="Could not open the PDF" />}
+      {state.status === 'error' && <ErrorMessage error={state.error} title={t('Could not open the PDF')} />}
       <FileDrop
         accept={PDF_ACCEPT}
         onFiles={(files) => void open(files[0])}
         title={title}
         icon={FileText}
-        hint={hint ?? 'PDF files are processed on this device and never uploaded.'}
+        hint={hint ?? t('PDF files are processed on this device and never uploaded.')}
       />
     </div>
   );
@@ -101,12 +102,12 @@ export function PdfFileBar({
           {pdf.file.name}
         </p>
         <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-fg-muted">
-          <span>{pluralize(pdf.pageCount, 'page')}</span>
+          <span>{pluralize(pdf.pageCount, t('page'), t('pages'))}</span>
           <span aria-hidden>·</span>
           <span>{formatBytes(pdf.file.size)}</span>
           {pdf.encrypted && (
             <Badge tone="warning" className="ml-0.5">
-              <Lock size={11} aria-hidden /> Encrypted
+              <Lock size={11} aria-hidden />{' '}{t('Encrypted')}
             </Badge>
           )}
         </p>
@@ -114,9 +115,9 @@ export function PdfFileBar({
       <div className="flex items-center gap-1.5">
         {extra}
         <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => input.current?.click()}>
-          Change
+          {t('Change')}
         </Button>
-        <IconButton icon={X} label="Close file" size="sm" onClick={onClose} />
+        <IconButton icon={X} label={t('Close file')} size="sm" onClick={onClose} />
         <input
           ref={input}
           type="file"
@@ -161,14 +162,14 @@ function PasswordPrompt({
           <Lock size={17} aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium break-words text-fg">"{name}" is password-protected</p>
+          <p className="text-sm font-medium break-words text-fg">{t('"{name}" is password-protected', { name })}</p>
           <p className="text-[13px] text-fg-muted">
-            Enter the password to open it. The password is only used in this tab to decrypt the file.
+            {t('Enter the password to open it. The password is only used in this tab to decrypt the file.')}
           </p>
         </div>
       </div>
       <div className="max-w-sm">
-        <Label htmlFor={id}>Password</Label>
+        <Label htmlFor={id}>{t('Password')}</Label>
         <Input
           id={id}
           type="password"
@@ -186,10 +187,10 @@ function PasswordPrompt({
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" disabled={!password}>
-          Open PDF
+          {t('Open PDF')}
         </Button>
         <Button variant="ghost" onClick={onCancel}>
-          Choose another file
+          {t('Choose another file')}
         </Button>
       </div>
     </form>
@@ -224,9 +225,10 @@ export function useEncryptionGate(pdf: LoadedPdf | null, impact: EncryptionImpac
       ok: true,
       ignoreEncryption: true,
       notice: (
-        <Alert tone="info" title="This PDF is encrypted">
-          It is protected with {protection}. The edited copy keeps the same protection
-          {pdf.password ? ', so it opens with the same password' : ''}.
+        <Alert tone="info" title={t('This PDF is encrypted')}>
+          {pdf.password
+            ? t('It is protected with {protection}. The edited copy keeps the same protection, so it opens with the same password.', { protection })
+            : t('It is protected with {protection}. The edited copy keeps the same protection.', { protection })}
         </Alert>
       ),
     };
@@ -243,17 +245,17 @@ export function useEncryptionGate(pdf: LoadedPdf | null, impact: EncryptionImpac
     notice: (
       <Alert
         tone="warning"
-        title="This PDF is encrypted"
+        title={t('This PDF is encrypted')}
         action={
           tried ? undefined : (
             <Button size="sm" variant="secondary" onClick={() => setAllowed(pdf)}>
-              Try anyway
+              {t('Try anyway')}
             </Button>
           )
         }
       >
-        It is protected with {protection}. {consequence}{' '}
-        {tried ? 'You chose to try anyway: check the result before relying on it.' : PROTECTION_HINT}
+        {t('It is protected with {protection}. {consequence}', { protection, consequence })}{' '}
+        {tried ? t('You chose to try anyway: check the result before relying on it.') : PROTECTION_HINT}
       </Alert>
     ),
   };

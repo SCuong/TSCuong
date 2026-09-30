@@ -14,12 +14,13 @@ import { PagePicker, PageScopeControl, usePageScope } from './components/PageSco
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
+import { t } from '@/lib/i18n';
 
 export default function ExtractPages() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to extract pages from">
+      <PdfInput controller={controller} title={t('Drop a PDF to extract pages from')}>
         {(pdf) => <ExtractWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -49,15 +50,15 @@ function ExtractWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
   const summary =
     scope.pages.length > 0
-      ? `${pluralize(scope.pages.length, 'page')}: ${formatPageList(scope.pages.map((p) => p + 1))}`
-      : 'No pages selected yet';
+      ? `${pluralize(scope.pages.length, t('page'), t('pages'))}: ${formatPageList(scope.pages.map((p) => p + 1))}`
+      : t('No pages selected yet');
 
   return (
     <>
       {gate.notice}
-      <Panel title="Pages to extract" description="The new PDF keeps the order you give, so a range like 10-1 reverses the pages.">
+      <Panel title={t('Pages to extract')} description={t('The new PDF keeps the order you give, so a range like 10-1 reverses the pages.')}>
         <div className="flex flex-col gap-4">
-          <PageScopeControl scope={scope} modes={['pick', 'range']} pickLabel="Select visually" />
+          <PageScopeControl scope={scope} modes={['pick', 'range']} pickLabel={t('Select visually')} />
           {scope.mode === 'pick' && <PagePicker pdf={pdf} selected={scope.picked} onChange={scope.setPicked} />}
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
             <Button
@@ -67,15 +68,15 @@ function ExtractWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void run()}
             >
-              Extract pages
+              {t('Extract pages')}
             </Button>
             <span className="min-w-0 truncate text-[13px] text-fg-muted">{summary}</span>
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Extraction failed" />
-      {result.value && <ResultFiles files={[result.value.file]} title={`Extracted ${pluralize(result.value.count, 'page')}`} />}
+      <ErrorMessage error={job.error} title={t('Extraction failed')} />
+      {result.value && <ResultFiles files={[result.value.file]} title={t('Extracted {count}', { count: pluralize(result.value.count, t('page'), t('pages')) })} />}
     </>
   );
 }

@@ -18,12 +18,13 @@ import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { verifyEncryptedEdit } from './components/verifyEdit';
 import { isoToLocalInput, localInputToIso } from './lib/dates';
+import { t } from '@/lib/i18n';
 
 export default function EditMetadata() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to view or edit its metadata">
+      <PdfInput controller={controller} title={t('Drop a PDF to view or edit its metadata')}>
         {(pdf) => <MetadataWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -37,12 +38,12 @@ interface Loaded {
 }
 
 const TEXT_FIELDS: Array<{ key: keyof MetadataFields; label: string; multiline?: boolean; hint?: string }> = [
-  { key: 'title', label: 'Title' },
-  { key: 'author', label: 'Author' },
-  { key: 'subject', label: 'Subject', multiline: true },
-  { key: 'keywords', label: 'Keywords', hint: 'Usually separated by commas.' },
-  { key: 'creator', label: 'Creator', hint: 'The app that created the original document.' },
-  { key: 'producer', label: 'Producer', hint: 'The app that produced the PDF.' },
+  { key: 'title', label: t('Title') },
+  { key: 'author', label: t('Author') },
+  { key: 'subject', label: t('Subject'), multiline: true },
+  { key: 'keywords', label: t('Keywords'), hint: t('Usually separated by commas.') },
+  { key: 'creator', label: t('Creator'), hint: t('The app that created the original document.') },
+  { key: 'producer', label: t('Producer'), hint: t('The app that produced the PDF.') },
 ];
 
 async function readWithPdfjs(pdf: LoadedPdf): Promise<Loaded> {
@@ -90,7 +91,7 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
         setLoaded(data);
         setFields(data.fields);
       })
-      .catch(() => alive && setLoadError('The metadata could not be read.'));
+      .catch(() => alive && setLoadError(t('The metadata could not be read.')));
     return () => {
       alive = false;
     };
@@ -131,12 +132,12 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
   }
 
   if (loadError) return <ErrorMessage error={loadError} />;
-  if (!loaded) return <Spinner label="Reading metadata…" />;
+  if (!loaded) return <Spinner label={t('Reading metadata…')} />;
 
   return (
     <>
       {gate.notice}
-      <Panel title="Document information" description="Leave a field empty to remove it.">
+      <Panel title={t('Document information')} description={t('Leave a field empty to remove it.')}>
         <div className="grid gap-4 sm:grid-cols-2">
           {TEXT_FIELDS.map((f) => (
             <div key={f.key} className={f.multiline ? 'sm:col-span-2' : undefined}>
@@ -158,7 +159,7 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
           ))}
           {(['creationDate', 'modDate'] as const).map((key) => (
             <div key={key}>
-              <Label htmlFor={`${baseId}-${key}`}>{key === 'creationDate' ? 'Created' : 'Modified'}</Label>
+              <Label htmlFor={`${baseId}-${key}`}>{key === 'creationDate' ? t('Created') : t('Modified')}</Label>
               <div className="flex gap-2">
                 <Input
                   id={`${baseId}-${key}`}
@@ -168,59 +169,59 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   onChange={(e) => set(key, localInputToIso(e.target.value))}
                 />
                 <Button size="md" variant="secondary" onClick={() => set(key, new Date().toISOString())}>
-                  Now
+                  {t('Now')}
                 </Button>
               </div>
-              <p className="mt-1 text-[12px] text-fg-muted">Your local time; saved in UTC.</p>
+              <p className="mt-1 text-[12px] text-fg-muted">{t('Your local time; saved in UTC.')}</p>
             </div>
           ))}
         </div>
         {loaded.custom.length > 0 && (
           <div className="mt-5">
-            <p className="mb-1 text-[13px] font-medium text-fg-secondary">Custom properties (kept as they are)</p>
+            <p className="mb-1 text-[13px] font-medium text-fg-secondary">{t('Custom properties (kept as they are)')}</p>
             <KeyValueList items={loaded.custom.map((c) => ({ key: c.key, label: c.key, value: c.value || '—' }))} />
           </div>
         )}
         <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4">
           {loaded.hasXmp && (
             <Checkbox
-              label="Also remove the XMP metadata packet"
-              description="PDF viewers often prefer XMP over the fields above, so leaving an outdated packet can make your changes invisible."
+              label={t('Also remove the XMP metadata packet')}
+              description={t('PDF viewers often prefer XMP over the fields above, so leaving an outdated packet can make your changes invisible.')}
               checked={removeXmp}
               onChange={setRemoveXmp}
             />
           )}
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" icon={Save} disabled={!gate.ok || job.running || (!changed && !(loaded.hasXmp && removeXmp))} loading={job.running} onClick={() => void save(false)}>
-              Save metadata
+              {t('Save metadata')}
             </Button>
             <Button variant="secondary" icon={Eraser} disabled={job.running} onClick={() => setConfirmStrip(true)}>
-              Remove all metadata
+              {t('Remove all metadata')}
             </Button>
             {changed && (
               <Button variant="ghost" onClick={() => setFields(loaded.fields)}>
-                Revert changes
+                {t('Revert changes')}
               </Button>
             )}
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not save" />
+      <ErrorMessage error={job.error} title={t('Could not save')} />
       {result.value && (
-        <ResultFiles files={[result.value.file]} title={result.value.stripped ? 'PDF saved without metadata' : 'PDF saved with the new metadata'} />
+        <ResultFiles files={[result.value.file]} title={result.value.stripped ? t('PDF saved without metadata') : t('PDF saved with the new metadata')} />
       )}
       <ConfirmDialog
         open={confirmStrip}
         onCancel={() => setConfirmStrip(false)}
         onConfirm={() => void save(true)}
-        title="Remove all metadata?"
-        confirmLabel="Remove metadata"
+        title={t('Remove all metadata?')}
+        confirmLabel={t('Remove metadata')}
       >
-        The new PDF will have no title, author, dates, producer, keywords, custom properties or XMP packet. Pages are not changed.
+        {t('The new PDF will have no title, author, dates, producer, keywords, custom properties or XMP packet. Pages are not changed.')}
       </ConfirmDialog>
       <p className="flex items-center gap-1.5 text-[12.5px] text-fg-muted">
-        <Tags size={13} aria-hidden /> Your original file is never modified: a new copy is created.
+        <Tags size={13} aria-hidden />{' '}{t('Your original file is never modified: a new copy is created.')}
       </p>
     </>
   );

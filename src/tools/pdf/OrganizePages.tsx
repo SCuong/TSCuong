@@ -44,6 +44,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useHistory } from './components/useHistory';
 import { useKeyedResult } from './components/useKeyedResult';
+import { t } from '@/lib/i18n';
 
 interface ExtraSource {
   name: string;
@@ -55,7 +56,7 @@ export default function OrganizePages() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to organize">
+      <PdfInput controller={controller} title={t('Drop a PDF to organize')}>
         {(pdf) => <OrganizeWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -114,13 +115,13 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
     () =>
       items.map((it) =>
         it.kind === 'blank'
-          ? { id: it.id, doc: null, pageIndex: 0, label: 'Blank page', sublabel: `${Math.round(it.width)} × ${Math.round(it.height)} pt` }
+          ? { id: it.id, doc: null, pageIndex: 0, label: t('Blank page'), sublabel: `${Math.round(it.width)} × ${Math.round(it.height)} pt` }
           : {
               id: it.id,
               doc: docs[it.source],
               pageIndex: it.index,
               rotation: it.rotate,
-              label: it.source === 0 ? `Page ${it.index + 1}` : `p. ${it.index + 1}`,
+              label: it.source === 0 ? t('Page {index}', { index: it.index + 1 }) : `p. ${it.index + 1}`,
               sublabel: it.source === 0 ? undefined : extras[it.source - 1]?.name,
             },
       ),
@@ -149,7 +150,7 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
     try {
       const bytes = await readPdfFile(file);
       if (looksEncrypted(bytes)) {
-        toast(`"${file.name}" is encrypted, so its pages would come out blank. Remove the protection in your PDF app first.`, 'error', 6000);
+        toast(t('"{name}" is encrypted, so its pages would come out blank. Remove the protection in your PDF app first.', { name: file.name }), 'error', 6000);
         return;
       }
       const opened = await openPdf(bytes, { fileName: file.name });
@@ -167,10 +168,10 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
         rotate: 0,
       }));
       change((list) => insertAfterSelection(list, selected, inserted));
-      toast(`Inserted ${pluralize(inserted.length, 'page')} from ${file.name}`);
+      toast(t('Inserted {count} from {name}', { count: pluralize(inserted.length, t('page'), t('pages')), name: file.name }));
     } catch (error) {
       const e = toPdfError(error, file.name);
-      toast(e.kind === 'password' ? `"${file.name}" is password-protected and cannot be inserted.` : e.message, 'error', 5000);
+      toast(e.kind === 'password' ? t('"{name}" is password-protected and cannot be inserted.', { name: file.name }) : e.message, 'error', 5000);
     } finally {
       setInserting(false);
     }
@@ -229,31 +230,31 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
       {gate.notice}
       <div className="z-20 flex flex-col sm:sticky sm:top-16 gap-2 rounded-xl border border-line bg-surface/95 px-3 py-2.5 shadow-raised backdrop-blur supports-[backdrop-filter]:bg-surface/85">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button size="sm" variant="ghost" icon={Undo2} disabled={!history.canUndo} onClick={history.undo} title={`Undo (${modKey}+Z)`}>
-            Undo
+          <Button size="sm" variant="ghost" icon={Undo2} disabled={!history.canUndo} onClick={history.undo} title={t('Undo ({modKey}+Z)', { modKey })}>
+            {t('Undo')}
           </Button>
-          <Button size="sm" variant="ghost" icon={Redo2} disabled={!history.canRedo} onClick={history.redo} title={`Redo (${modKey}+Shift+Z)`}>
-            Redo
+          <Button size="sm" variant="ghost" icon={Redo2} disabled={!history.canRedo} onClick={history.redo} title={t('Redo ({modKey}+Shift+Z)', { modKey })}>
+            {t('Redo')}
           </Button>
           <span className="mx-1 hidden h-5 w-px bg-line sm:block" aria-hidden />
           <Button size="sm" variant="ghost" icon={RotateCcw} disabled={!hasSel} onClick={() => rotate(-90)}>
-            Left
+            {t('Left')}
           </Button>
           <Button size="sm" variant="ghost" icon={RotateCw} disabled={!hasSel} onClick={() => rotate(90)}>
-            Right
+            {t('Right')}
           </Button>
           <Button size="sm" variant="ghost" icon={Copy} disabled={!hasSel} onClick={() => duplicate()}>
-            Duplicate
+            {t('Duplicate')}
           </Button>
           <Button size="sm" variant="ghost" icon={Trash} disabled={!hasSel || selected.size >= items.length} onClick={() => remove()}>
             Delete
           </Button>
           <span className="mx-1 hidden h-5 w-px bg-line sm:block" aria-hidden />
-          <Button size="sm" variant="ghost" icon={Square} onClick={addBlank} title={hasSel ? 'Insert after the selection' : 'Insert at the end'}>
-            Blank page
+          <Button size="sm" variant="ghost" icon={Square} onClick={addBlank} title={hasSel ? t('Insert after the selection') : t('Insert at the end')}>
+            {t('Blank page')}
           </Button>
           <Button size="sm" variant="ghost" icon={FilePlus} loading={inserting} onClick={() => insertInput.current?.click()}>
-            Insert PDF
+            {t('Insert PDF')}
           </Button>
           <input
             ref={insertInput}
@@ -273,14 +274,14 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
             variant="ghost"
             icon={ArrowDownUp}
             onClick={() => change((list) => reverseItems(list, selected))}
-            title={selected.size > 1 ? 'Reverse the selected pages' : 'Reverse all pages'}
+            title={selected.size > 1 ? t('Reverse the selected pages') : t('Reverse all pages')}
           >
-            Reverse
+            {t('Reverse')}
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-line pt-2">
           <span className="mr-1 text-[12.5px] text-fg-muted">
-            Select{hasSel ? ` (${selected.size})` : ''}:
+            {t('Select')}{hasSel ? ` (${selected.size})` : ''}:
           </span>
           {(['all', 'odd', 'even'] as const).map((w) => (
             <Button key={w} size="sm" variant="ghost" onClick={() => setSelected(idsByPosition(items, w))}>
@@ -288,10 +289,10 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
             </Button>
           ))}
           <Button size="sm" variant="ghost" disabled={!hasSel} onClick={() => setSelected(new Set())}>
-            None
+            {t('None')}
           </Button>
           <span className="ml-auto flex items-center gap-2">
-            <span className="text-[12.5px] text-fg-muted">{pluralize(items.length, 'page')}</span>
+            <span className="text-[12.5px] text-fg-muted">{pluralize(items.length, t('page'), t('pages'))}</span>
             <Button
               size="sm"
               variant="primary"
@@ -300,28 +301,28 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void save()}
             >
-              Save PDF
+              {t('Save PDF')}
             </Button>
           </span>
         </div>
       </div>
 
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not save" />
-      {result.value && <ResultFiles files={[result.value.file]} title={`Organized PDF with ${pluralize(result.value.count, 'page')}`} />}
+      <ErrorMessage error={job.error} title={t('Could not save')} />
+      {result.value && <ResultFiles files={[result.value.file]} title={t('Organized PDF with {count}', { count: pluralize(result.value.count, t('page'), t('pages')) })} />}
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong px-6 py-10 text-center">
           <LayoutGrid size={20} className="text-fg-muted" aria-hidden />
-          <p className="text-sm text-fg">All pages were deleted.</p>
+          <p className="text-sm text-fg">{t('All pages were deleted.')}</p>
           <Button size="sm" icon={Undo2} onClick={history.undo} disabled={!history.canUndo}>
-            Undo
+            {t('Undo')}
           </Button>
         </div>
       ) : (
         <PageGrid
           items={gridItems}
-          ariaLabel="Pages in the new document"
+          ariaLabel={t('Pages in the new document')}
           selected={selected}
           onSelectionChange={setSelected}
           onMove={(from, to) => change((list) => arrayMove(list, from, to))}
@@ -330,15 +331,15 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
             <>
               {item.doc && (
                 <>
-                  <CardButton label={`Rotate ${item.label} left`} onClick={() => rotate(-90, item.id)}>
+                  <CardButton label={t('Rotate {label} left', { label: item.label })} onClick={() => rotate(-90, item.id)}>
                     <RotateCcw size={14} aria-hidden />
                   </CardButton>
-                  <CardButton label={`Rotate ${item.label} right`} onClick={() => rotate(90, item.id)}>
+                  <CardButton label={t('Rotate {label} right', { label: item.label })} onClick={() => rotate(90, item.id)}>
                     <RotateCw size={14} aria-hidden />
                   </CardButton>
                 </>
               )}
-              <CardButton label={`Duplicate ${item.label}`} onClick={() => duplicate(item.id)}>
+              <CardButton label={t('Duplicate {label}', { label: item.label })} onClick={() => duplicate(item.id)}>
                 <Copy size={14} aria-hidden />
               </CardButton>
               <CardButton label={`Delete ${item.label}`} danger disabled={items.length <= 1} onClick={() => remove(item.id)}>
@@ -349,9 +350,8 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
         />
       )}
       <p className="text-[12.5px] text-fg-muted">
-        Tips: drag pages to reorder (on touch screens use the grip). With a page focused: <Kbd>Space</Kbd> selects,{' '}
-        <Kbd>R</Kbd> rotates, <Kbd>Del</Kbd> deletes, <Kbd>Alt</Kbd>+<Kbd>←</Kbd>/<Kbd>→</Kbd> moves. <Kbd>{modKey}</Kbd>+<Kbd>Z</Kbd>{' '}
-        undoes.
+        {t('Tips: drag pages to reorder (on touch screens use the grip). With a page focused:')}{' '}<Kbd>Space</Kbd>{' '}{t('selects,')}{' '}
+        <Kbd>R</Kbd>{' '}{t('rotates,')}{' '}<Kbd>Del</Kbd>{' '}{t('deletes,')}{' '}<Kbd>Alt</Kbd>+<Kbd>←</Kbd>/<Kbd>→</Kbd>{' '}{t('moves.')}{' '}<Kbd>{modKey}</Kbd>+<Kbd>Z</Kbd>{' '}{t('undoes.')}
       </p>
     </div>
   );

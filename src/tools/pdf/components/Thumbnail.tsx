@@ -3,6 +3,7 @@ import { FileWarning } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PDFDocumentProxy } from '../lib/pdfjs';
 import { docId, getThumbnail } from '../lib/thumbnails';
+import { t } from '@/lib/i18n';
 
 /**
  * Lazily rendered page thumbnail. Rendering starts when the element scrolls
@@ -84,12 +85,12 @@ export function Thumbnail({
         <div
           className="aspect-[1/1.414] h-[88%] rounded-[2px] bg-white shadow-card ring-1 ring-line-strong"
           // An empty alt means the surrounding control already names the page (like <img alt="">).
-          {...((alt ?? 'Blank page') ? { role: 'img', 'aria-label': alt ?? 'Blank page' } : { 'aria-hidden': true })}
+          {...((alt ?? 'Blank page') ? { role: 'img', 'aria-label': alt ?? t('Blank page') } : { 'aria-hidden': true })}
         />
       ) : current?.url ? (
         <img
           src={current.url}
-          alt={alt ?? `Page ${pageIndex + 1}`}
+          alt={alt ?? t('Page {pageIndex}', { pageIndex: pageIndex + 1 })}
           draggable={false}
           className="max-h-full max-w-full rounded-[2px] bg-white object-contain shadow-card ring-1 ring-line-strong transition-transform duration-200"
           style={normalized ? { transform: `rotate(${normalized}deg)` } : undefined}
@@ -97,7 +98,7 @@ export function Thumbnail({
       ) : current?.failed ? (
         <div className="flex flex-col items-center gap-1 text-[11.5px] text-fg-muted">
           <FileWarning size={18} aria-hidden />
-          Preview unavailable
+          {t('Preview unavailable')}
         </div>
       ) : (
         <div className="aspect-[1/1.3] h-[85%] animate-pulse rounded-[2px] bg-surface-hover" aria-hidden />

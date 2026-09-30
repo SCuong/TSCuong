@@ -12,6 +12,7 @@ import { errorMessage, formatBytes, formatNumber, withExtension } from '@/lib/ut
 import { createOcrEngine, type OcrEngine } from './lib/engine';
 import { imageFileToCanvas } from './lib/canvas';
 import { confidenceLevel, type OcrPageResult } from './lib/result';
+import { t } from '@/lib/i18n';
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif';
 
@@ -39,7 +40,7 @@ export default function ImageOcr() {
     setRunning(true);
     setError(null);
     setResult(null);
-    setProgress({ value: null, label: 'Preparing the image' });
+    setProgress({ value: null, label: t('Preparing the image') });
     let canvas: HTMLCanvasElement | null = null;
     try {
       canvas = await imageFileToCanvas(target);
@@ -60,7 +61,7 @@ export default function ImageOcr() {
       setResult(out);
     } catch (e) {
       if (id !== runId.current) return;
-      setError(errorMessage(e, 'Text recognition failed.'));
+      setError(errorMessage(e, t('Text recognition failed.')));
     } finally {
       if (canvas) {
         canvas.width = 0;
@@ -88,29 +89,28 @@ export default function ImageOcr() {
   return (
     <ToolStack>
       <Alert tone="info">
-        Recognition runs on this device with Tesseract. Only <strong>English</strong> language data is included, so other languages
-        and scripts will be recognized poorly or not at all.
+        {t('Recognition runs on this device with Tesseract. Only')}{' '}<strong>{t('English')}</strong>{' '}{t('language data is included, so other languages and scripts will be recognized poorly or not at all.')}
       </Alert>
       {!file ? (
         <FileDrop
           accept={ACCEPT}
           onFiles={(files) => choose(files[0])}
-          title="Drop an image with text"
+          title={t('Drop an image with text')}
           icon={ScanText}
-          hint="Screenshots, photos of documents, scans. You can also paste an image. Nothing is uploaded."
+          hint={t('Screenshots, photos of documents, scans. You can also paste an image. Nothing is uploaded.')}
         />
       ) : (
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <Panel
-            title="Image"
+            title={t('Image')}
             description={`${file.name} · ${formatBytes(file.size)}`}
             actions={
               <>
-                <Switch label="Word boxes" checked={showBoxes} onChange={setShowBoxes} />
-                <IconButton icon={RefreshCw} label="Run again" size="sm" disabled={running} onClick={() => void recognize(file)} />
+                <Switch label={t('Word boxes')} checked={showBoxes} onChange={setShowBoxes} />
+                <IconButton icon={RefreshCw} label={t('Run again')} size="sm" disabled={running} onClick={() => void recognize(file)} />
                 <IconButton
                   icon={X}
-                  label="Close image"
+                  label={t('Close image')}
                   size="sm"
                   onClick={() => {
                     cancel();
@@ -123,7 +123,7 @@ export default function ImageOcr() {
             }
           >
             <div className="relative mx-auto w-fit max-w-full">
-              {url && <img src={url} alt="Image being recognized" className="block max-h-[560px] max-w-full rounded-md" />}
+              {url && <img src={url} alt={t('Image being recognized')} className="block max-h-[560px] max-w-full rounded-md" />}
               {showBoxes && result && result.width > 0 && (
                 <svg
                   className="pointer-events-none absolute inset-0 h-full w-full"
@@ -163,7 +163,7 @@ export default function ImageOcr() {
                   <span className="size-2.5 rounded-sm bg-warning" /> 60–85%
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="size-2.5 rounded-sm bg-danger" /> below 60% confidence
+                  <span className="size-2.5 rounded-sm bg-danger" />{' '}{t('below 60% confidence')}
                 </span>
               </p>
             )}
@@ -171,43 +171,43 @@ export default function ImageOcr() {
           <div className="flex min-w-0 flex-col gap-4">
             {running && (
               <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-                <ProgressBar value={progress.value} label={progress.label || 'Working…'} onCancel={cancel} />
+                <ProgressBar value={progress.value} label={progress.label || t('Working…')} onCancel={cancel} />
               </div>
             )}
-            <ErrorMessage error={error} title="Recognition failed" />
+            <ErrorMessage error={error} title={t('Recognition failed')} />
             {!running && !result && !error && (
               <Button variant="primary" icon={ScanText} onClick={() => void recognize(file)}>
-                Recognize text
+                {t('Recognize text')}
               </Button>
             )}
             {result && (
               <EditorPanel
                 title={
                   <span className="inline-flex items-center gap-2">
-                    Recognized text
+                    {t('Recognized text')}
                     <Badge tone={level === 'high' ? 'success' : level === 'medium' ? 'warning' : 'danger'}>
-                      {Math.round(result.confidence)}% confidence
+                      {t('{round}% confidence', { round: Math.round(result.confidence) })}
                     </Badge>
                   </span>
                 }
-                ariaLabel="Recognized text"
+                ariaLabel={t('Recognized text')}
                 value={result.text}
                 readOnly
                 height="440px"
                 downloadName={withExtension(file.name, 'txt')}
-                placeholder="No text was found in this image."
+                placeholder={t('No text was found in this image.')}
                 footer={
                   <>
-                    <span>{formatNumber(result.lines.length, 0)} lines</span>
-                    <span>{formatNumber(result.lines.reduce((n, l) => n + l.words.length, 0), 0)} words</span>
-                    <span>{formatNumber(result.text.length, 0)} characters</span>
+                    <span>{t('{count} lines', { count: formatNumber(result.lines.length, 0) })}</span>
+                    <span>{formatNumber(result.lines.reduce((n, l) => n + l.words.length, 0), 0)}{' '}{t('words')}</span>
+                    <span>{t('{count} characters', { count: formatNumber(result.text.length, 0) })}</span>
                   </>
                 }
               />
             )}
             {result && level === 'low' && result.text && (
               <Alert tone="warning">
-                Confidence is low. Results improve with sharp, well-lit, straight images of printed English text at a decent resolution.
+                {t('Confidence is low. Results improve with sharp, well-lit, straight images of printed English text at a decent resolution.')}
               </Alert>
             )}
           </div>

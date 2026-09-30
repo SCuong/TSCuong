@@ -17,12 +17,13 @@ import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PageScopeControl, usePageScope } from './components/PageScope';
 import { JobProgress } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { t } from '@/lib/i18n';
 
 export default function ExtractText() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to extract its text">
+      <PdfInput controller={controller} title={t('Drop a PDF to extract its text')}>
         {(pdf) => <TextWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -78,46 +79,46 @@ function TextWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void run()}
             >
-              Extract text
+              {t('Extract text')}
             </Button>
-            <Switch label="Page separators" checked={separators} onChange={setSeparators} />
+            <Switch label={t('Page separators')} checked={separators} onChange={setSeparators} />
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not extract text" />
+      <ErrorMessage error={job.error} title={t('Could not extract text')} />
       {pages && empty.length > 0 && (
         <Alert
           tone={allEmpty ? 'warning' : 'info'}
-          title={allEmpty ? 'No text layer found' : `${pluralize(empty.length, 'page')} without text`}
+          title={allEmpty ? t('No text layer found') : t('{count} without text', { count: pluralize(empty.length, t('page'), t('pages')) })}
           action={
             <Link
               to="/tools/pdf/ocr"
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface-raised px-2.5 text-[13px] font-medium text-fg shadow-card hover:bg-surface-hover"
             >
-              <ScanText size={14} aria-hidden /> Open OCR
+              <ScanText size={14} aria-hidden />{' '}{t('Open OCR')}
             </Link>
           }
         >
           {allEmpty
-            ? 'This PDF looks scanned: its pages are images without selectable text. Use OCR to recognize the text.'
-            : `Pages ${formatPageList(empty)} contain no selectable text (they may be scans or pictures). OCR can read them.`}
+            ? t('This PDF looks scanned: its pages are images without selectable text. Use OCR to recognize the text.')
+            : t('Pages {formatPageList} contain no selectable text (they may be scans or pictures). OCR can read them.', { formatPageList: formatPageList(empty) })}
         </Alert>
       )}
       {pages && (
         <EditorPanel
-          title="Extracted text"
+          title={t('Extracted text')}
           value={text}
           readOnly
           height="520px"
           downloadName={outputName(pdf.file.name, '', 'txt')}
           downloadType="text/plain;charset=utf-8"
-          placeholder="No text found."
+          placeholder={t('No text found.')}
           footer={
             <>
-              <span>{pluralize(pages.length, 'page')}</span>
-              <span>{formatNumber(words, 0)} words</span>
-              <span>{formatNumber(text.length, 0)} characters</span>
+              <span>{pluralize(pages.length, t('page'), t('pages'))}</span>
+              <span>{t('{words} words', { words: formatNumber(words, 0) })}</span>
+              <span>{t('{count} characters', { count: formatNumber(text.length, 0) })}</span>
             </>
           }
         />

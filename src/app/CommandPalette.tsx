@@ -23,7 +23,6 @@ import { closePalette, getPaletteInitialQuery, usePaletteOpen } from './paletteS
 import { PALETTE_SUGGESTED_TOOL_IDS } from './paletteSuggestions';
 import { toast } from '@/components/ui/Toast';
 import { cn, copyText } from '@/lib/utils';
-import { buildAlphabet, generateStrings } from '@/tools/generators/lib/randomString';
 
 /** Copies a generated value and confirms it without leaving the keyboard flow. */
 async function copyAndConfirm(value: string, message: string) {
@@ -207,11 +206,14 @@ function PaletteBody() {
         icon: KeyRound,
         keywords: 'password generate random secure strong passphrase copy',
         run: () => {
-          const alphabet = buildAlphabet('alnumSymbols', '', true);
-          if (!alphabet.ok) return;
-          const [value] = generateStrings(alphabet.alphabet, 20, 1);
-          // Never echo the password itself on screen.
-          if (value) void copyAndConfirm(value, t('Copied a 20-character password'));
+          // Loaded on demand: tool modules load after the interface language, never with the shell.
+          void import('@/tools/generators/lib/randomString').then(({ buildAlphabet, generateStrings }) => {
+            const alphabet = buildAlphabet('alnumSymbols', '', true);
+            if (!alphabet.ok) return;
+            const [value] = generateStrings(alphabet.alphabet, 20, 1);
+            // Never echo the password itself on screen.
+            if (value) void copyAndConfirm(value, t('Copied a 20-character password'));
+          });
         },
       },
       {

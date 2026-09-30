@@ -22,22 +22,23 @@ import { unsupportedCharacters } from './lib/winansi';
 import { unsupportedCharacterMessage } from './lib/errors';
 import { useKeyedResult } from './components/useKeyedResult';
 import { PositionGrid } from './components/PositionGrid';
+import { t } from '@/lib/i18n';
 
 const FORMATS = ['{n}', 'Page {n}', 'Page {n} of {total}', '{n} / {total}', '- {n} -'] as const;
 const POSITIONS: Array<{ value: NumberPosition; label: string }> = [
-  { value: 'top-left', label: 'Top left' },
-  { value: 'top-center', label: 'Top center' },
-  { value: 'top-right', label: 'Top right' },
-  { value: 'bottom-left', label: 'Bottom left' },
-  { value: 'bottom-center', label: 'Bottom center' },
-  { value: 'bottom-right', label: 'Bottom right' },
+  { value: 'top-left', label: t('Top left') },
+  { value: 'top-center', label: t('Top center') },
+  { value: 'top-right', label: t('Top right') },
+  { value: 'bottom-left', label: t('Bottom left') },
+  { value: 'bottom-center', label: t('Bottom center') },
+  { value: 'bottom-right', label: t('Bottom right') },
 ];
 
 export default function AddPageNumbers() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to number its pages">
+      <PdfInput controller={controller} title={t('Drop a PDF to number its pages')}>
         {(pdf) => <NumbersWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -104,12 +105,12 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
     <>
       {gate.notice}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Panel title="Numbering">
+        <Panel title={t('Numbering')}>
           <div className="flex flex-col gap-4">
             <div>
-              <Label>Position</Label>
+              <Label>{t('Position')}</Label>
               <PositionGrid
-                label="Position"
+                label={t('Position')}
                 value={position}
                 onChange={setPosition}
                 options={POSITIONS}
@@ -126,41 +127,41 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor={ids.format}>Format</Label>
+                <Label htmlFor={ids.format}>{t('Format')}</Label>
                 <Select id={ids.format} value={preset} onChange={(e) => setPreset(e.target.value)}>
                   {FORMATS.map((f) => (
                     <option key={f} value={f}>
                       {formatPageNumber(f, 1, pdf.pageCount)}
                     </option>
                   ))}
-                  <option value="custom">Custom…</option>
+                  <option value="custom">{t('Custom…')}</option>
                 </Select>
               </div>
               {preset === 'custom' && (
                 <div>
-                  <Label htmlFor={ids.custom}>Custom format</Label>
-                  <Input id={ids.custom} mono value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Page {n} of {total}" />
+                  <Label htmlFor={ids.custom}>{t('Custom format')}</Label>
+                  <Input id={ids.custom} mono value={custom} onChange={(e) => setCustom(e.target.value)} placeholder={t('Page {n} of {total}')} />
                   <p className="mt-1.5 text-[12.5px] text-fg-muted">
-                    <code>{'{n}'}</code> = number, <code>{'{total}'}</code> = last number, <code>{'{n:6}'}</code> = zero-padded (Bates, e.g. <code>{'ABC{n:6}'}</code> → ABC000001)
+                    <code>{'{n}'}</code>{' '}{t('= number,')}{' '}<code>{'{total}'}</code>{' '}{t('= last number,')}{' '}<code>{'{n:6}'}</code>{' '}{t('= zero-padded (Bates, e.g.')}{' '}<code>{'ABC{n:6}'}</code> → ABC000001)
                   </p>
                 </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div>
-                <Label htmlFor={ids.size}>Font size (pt)</Label>
+                <Label htmlFor={ids.size}>{t('Font size (pt)')}</Label>
                 <NumberInput id={ids.size} min={4} max={144} value={fontSize} onChange={setFontSize} />
               </div>
               <div>
-                <Label htmlFor={ids.margin}>Margin (mm)</Label>
+                <Label htmlFor={ids.margin}>{t('Margin (mm)')}</Label>
                 <NumberInput id={ids.margin} min={0} max={100} step={1} value={marginMm} onChange={setMarginMm} />
               </div>
               <div>
-                <Label htmlFor={ids.start}>Start at</Label>
+                <Label htmlFor={ids.start}>{t('Start at')}</Label>
                 <NumberInput id={ids.start} min={0} step={1} value={start} onChange={setStart} />
               </div>
               <div>
-                <Label htmlFor={ids.color}>Color</Label>
+                <Label htmlFor={ids.color}>{t('Color')}</Label>
                 <input
                   id={ids.color}
                   type="color"
@@ -170,10 +171,10 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 />
               </div>
             </div>
-            <PageScopeControl scope={scope} modes={['all', 'range']} label="Pages to number" />
+            <PageScopeControl scope={scope} modes={['all', 'range']} label={t('Pages to number')} />
             <Checkbox
-              label="Skip the first page"
-              description="Useful for a cover page. Numbering starts on the next numbered page."
+              label={t('Skip the first page')}
+              description={t('Useful for a cover page. Numbering starts on the next numbered page.')}
               checked={skipFirst}
               onChange={setSkipFirst}
             />
@@ -188,15 +189,15 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 loading={job.running}
                 onClick={() => void run()}
               >
-                Add page numbers
+                {t('Add page numbers')}
               </Button>
               <span className="text-[13px] text-fg-muted">
-                {pages.length ? `${pluralize(pages.length, 'page')} numbered ${start === '' ? '' : `${start}–${last}`}` : 'No pages selected'}
+                {pages.length ? t('{count} numbered {value}', { count: pluralize(pages.length, t('page'), t('pages')), value: start === '' ? '' : `${start}–${last}` }) : t('No pages selected')}
               </span>
             </div>
           </div>
         </Panel>
-        <Panel title="Preview" description={firstNumbered !== undefined ? `Page ${firstNumbered + 1}` : undefined} className="h-fit">
+        <Panel title={t('Preview')} description={firstNumbered !== undefined ? t('Page {firstNumbered}', { firstNumbered: firstNumbered + 1 }) : undefined} className="h-fit">
           {firstNumbered !== undefined && errors.length === 0 ? (
             <div className="flex justify-center">
               <PreviewPage doc={pdf.doc} pageIndex={firstNumbered} width={300}>
@@ -225,12 +226,12 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
               </PreviewPage>
             </div>
           ) : (
-            <p className="text-[13px] text-fg-muted">Choose valid options to see a preview.</p>
+            <p className="text-[13px] text-fg-muted">{t('Choose valid options to see a preview.')}</p>
           )}
         </Panel>
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not add page numbers" />
+      <ErrorMessage error={job.error} title={t('Could not add page numbers')} />
       {result.value && <ResultFiles files={[result.value]} />}
     </>
   );

@@ -6,6 +6,7 @@ import { pluralize } from '@/lib/utils';
 import { formatPageList, parsePageRange } from '../lib/ranges';
 import type { LoadedPdf } from './usePdfFile';
 import { PageGrid, type GridItem } from './PageGrid';
+import { t } from '@/lib/i18n';
 
 export type ScopeMode = 'all' | 'range' | 'pick';
 
@@ -62,13 +63,13 @@ export function PageScopeControl({
       {scope.mode === 'range' && (
         <div className="max-w-md">
           <Label htmlFor={id} className="sr-only">
-            Page range
+            {t('Page range')}
           </Label>
           <Input
             id={id}
             value={scope.range}
             onChange={(e) => scope.setRange(e.target.value)}
-            placeholder="e.g. 1-3, 5, 8-  or  odd, even, last"
+            placeholder={t('e.g. 1-3, 5, 8-  or  odd, even, last')}
             aria-invalid={scope.error ? true : undefined}
             aria-describedby={`${id}-help`}
             mono
@@ -76,8 +77,8 @@ export function PageScopeControl({
           <p id={`${id}-help`} role={scope.error ? 'alert' : undefined} className={`mt-1.5 text-[12.5px] ${scope.error ? 'text-danger' : 'text-fg-muted'}`}>
             {scope.error ??
               (scope.range.trim()
-                ? `${pluralize(scope.pages.length, 'page')}: ${formatPageList(scope.pages.map((p) => p + 1))}`
-                : 'Use commas and dashes. Also: all, odd, even, last, 5- (to the end).')}
+                ? `${pluralize(scope.pages.length, t('page'), t('pages'))}: ${formatPageList(scope.pages.map((p) => p + 1))}`
+                : t('Use commas and dashes. Also: all, odd, even, last, 5- (to the end).'))}
           </p>
         </div>
       )}
@@ -102,21 +103,21 @@ export function QuickSelect({
   };
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-[12.5px] text-fg-muted">{pluralize(selected.size, 'page')} selected</span>
+      <span className="mr-1 text-[12.5px] text-fg-muted">{t('{count} selected', { count: pluralize(selected.size, t('page'), t('pages')) })}</span>
       <Button size="sm" variant="ghost" onClick={() => pick(() => true)}>
-        All
+        {t('All')}
       </Button>
       <Button size="sm" variant="ghost" onClick={() => pick((i) => i % 2 === 0)}>
-        Odd
+        {t('Odd')}
       </Button>
       <Button size="sm" variant="ghost" onClick={() => pick((i) => i % 2 === 1)}>
-        Even
+        {t('Even')}
       </Button>
       <Button size="sm" variant="ghost" onClick={() => pick((i) => !selected.has(pageId(i)))}>
-        Invert
+        {t('Invert')}
       </Button>
       <Button size="sm" variant="ghost" disabled={selected.size === 0} onClick={() => onChange(new Set())}>
-        None
+        {t('None')}
       </Button>
     </div>
   );
@@ -145,7 +146,7 @@ export function PagePicker({
         doc: pdf.doc,
         pageIndex: i,
         rotation: rotation?.(i) ?? 0,
-        label: `Page ${i + 1}`,
+        label: t('Page {i}', { i: i + 1 }),
         state: removed?.(i) ? 'removed' : 'normal',
       })),
     [pdf, rotation, removed],
@@ -153,7 +154,7 @@ export function PagePicker({
   return (
     <div className="flex flex-col gap-3">
       <QuickSelect pageCount={pdf.pageCount} selected={selected} onChange={onChange} />
-      <PageGrid items={items} ariaLabel="Pages" selected={selected} onSelectionChange={onChange} />
+      <PageGrid items={items} ariaLabel={t('Pages')} selected={selected} onSelectionChange={onChange} />
     </div>
   );
 }

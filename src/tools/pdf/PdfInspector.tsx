@@ -16,12 +16,13 @@ import { docId } from './lib/thumbnails';
 import { toPdfError } from './lib/errors';
 import { PdfInput } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
+import { t } from '@/lib/i18n';
 
 export default function PdfInspector() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to inspect">
+      <PdfInput controller={controller} title={t('Drop a PDF to inspect')}>
         {(pdf) => <Inspector key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -130,11 +131,11 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
     };
   }, [pdf]);
 
-  if (error) return <Alert tone="danger" title="Could not analyze this PDF">{error}</Alert>;
+  if (error) return <Alert tone="danger" title={t('Could not analyze this PDF')}>{error}</Alert>;
   if (!report) {
     return (
       <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-        <ProgressBar value={progress || null} label="Analyzing the document…" />
+        <ProgressBar value={progress || null} label={t('Analyzing the document…')} />
       </div>
     );
   }
@@ -150,7 +151,7 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
   const groups = groupSizes(report.pages);
   const annotationTotal = Object.values(report.annotations).reduce((a, b) => a + b, 0);
   const version = report.structure?.catalogVersion && report.structure.catalogVersion > (report.version ?? '') ? report.structure.catalogVersion : report.version;
-  const yesNo = (v: boolean, detail?: ReactNode) => (v ? <span>Yes{detail ? <span className="text-fg-muted"> · {detail}</span> : null}</span> : <span className="text-fg-muted">No</span>);
+  const yesNo = (v: boolean, detail?: ReactNode) => (v ? <span>{t('Yes')}{detail ? <span className="text-fg-muted"> · {detail}</span> : null}</span> : <span className="text-fg-muted">{t('No')}</span>);
 
   const json = () =>
     JSON.stringify(
@@ -176,68 +177,68 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Pages" value={formatNumber(report.pages.length, 0)} />
-        <Stat label="PDF version" value={version ?? 'Unknown'} />
-        <Stat label="File size" value={formatBytes(pdf.file.size)} />
-        <Stat label="Encrypted" value={pdf.encrypted ? 'Yes' : 'No'} />
+        <Stat label={t('Pages')} value={formatNumber(report.pages.length, 0)} />
+        <Stat label={t('PDF version')} value={version ?? 'Unknown'} />
+        <Stat label={t('File size')} value={formatBytes(pdf.file.size)} />
+        <Stat label={t('Encrypted')} value={pdf.encrypted ? 'Yes' : 'No'} />
       </div>
-      {report.structureError && <Alert tone="warning">Some structural details could not be read: {report.structureError}</Alert>}
+      {report.structureError && <Alert tone="warning">{t('Some structural details could not be read: {structureError}', { structureError: report.structureError })}</Alert>}
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <Panel title="Document information" actions={<CopyButton value={json} label="Copy report (JSON)" />}>
+        <Panel title={t('Document information')} actions={<CopyButton value={json} label={t('Copy report (JSON)')} />}>
           <KeyValueList
             mono={false}
             items={[
-              { label: 'Title', value: str('Title') ?? <Muted /> },
-              { label: 'Author', value: str('Author') ?? <Muted /> },
-              { label: 'Subject', value: str('Subject') ?? <Muted /> },
-              { label: 'Keywords', value: str('Keywords') ?? <Muted /> },
-              { label: 'Creator', value: str('Creator') ?? <Muted /> },
-              { label: 'Producer', value: str('Producer') ?? <Muted /> },
-              { label: 'Created', value: date('CreationDate') ?? <Muted /> },
-              { label: 'Modified', value: date('ModDate') ?? <Muted /> },
-              { label: 'XMP metadata', value: yesNo(report.hasXmp) },
+              { label: t('Title'), value: str('Title') ?? <Muted /> },
+              { label: t('Author'), value: str('Author') ?? <Muted /> },
+              { label: t('Subject'), value: str('Subject') ?? <Muted /> },
+              { label: t('Keywords'), value: str('Keywords') ?? <Muted /> },
+              { label: t('Creator'), value: str('Creator') ?? <Muted /> },
+              { label: t('Producer'), value: str('Producer') ?? <Muted /> },
+              { label: t('Created'), value: date('CreationDate') ?? <Muted /> },
+              { label: t('Modified'), value: date('ModDate') ?? <Muted /> },
+              { label: t('XMP metadata'), value: yesNo(report.hasXmp) },
             ]}
           />
         </Panel>
-        <Panel title="Structure">
+        <Panel title={t('Structure')}>
           <KeyValueList
             mono={false}
             items={[
-              { label: 'Encryption', value: pdf.encrypted ? <span>{String(info.EncryptFilterName ?? 'Yes')}{pdf.password ? ' · open password' : ' · permissions only'}</span> : <span className="text-fg-muted">None</span> },
+              { label: t('Encryption'), value: pdf.encrypted ? <span>{String(info.EncryptFilterName ?? 'Yes')}{pdf.password ? ' ' + t('· open password') : ' ' + t('· permissions only')}</span> : <span className="text-fg-muted">{t('None')}</span> },
               ...(report.permissions
                 ? [
                     {
-                      label: 'Allowed',
+                      label: t('Allowed'),
                       value: describePermissions(report.permissions),
                     },
                   ]
                 : []),
-              { label: 'Fast web view', value: yesNo(report.linearized, 'linearized') },
-              { label: 'Tagged (accessible)', value: yesNo(Boolean(report.structure?.tagged)) },
-              { label: 'Form', value: yesNo(report.acroForm || report.xfa, [report.formFields ? pluralize(report.formFields, 'field') : null, report.xfa ? 'XFA' : null].filter(Boolean).join(', ') || undefined) },
-              { label: 'Digital signatures', value: yesNo(report.signatures) },
-              { label: 'Annotations', value: annotationTotal ? `${formatNumber(annotationTotal, 0)} (${Object.entries(report.annotations).map(([k, v]) => `${k} ${v}`).join(', ')})` : <Muted text="None" /> },
-              { label: 'Bookmarks', value: report.outlineItems ? pluralize(report.outlineItems, 'item') : <Muted text="None" /> },
-              { label: 'Attachments', value: report.attachments.length ? report.attachments.map((a) => (a.size >= 0 ? `${a.name} (${formatBytes(a.size)})` : a.name)).join(', ') : <Muted text="None" /> },
-              { label: 'JavaScript', value: yesNo(Boolean(report.structure?.hasJavaScript)) },
-              { label: 'Page labels', value: yesNo(report.pageLabels) },
-              ...(report.structure ? [{ label: 'Objects', value: formatNumber(report.structure.objectCount, 0) }] : []),
+              { label: t('Fast web view'), value: yesNo(report.linearized, 'linearized') },
+              { label: t('Tagged (accessible)'), value: yesNo(Boolean(report.structure?.tagged)) },
+              { label: t('Form'), value: yesNo(report.acroForm || report.xfa, [report.formFields ? pluralize(report.formFields, t('field'), t('fields')) : null, report.xfa ? 'XFA' : null].filter(Boolean).join(', ') || undefined) },
+              { label: t('Digital signatures'), value: yesNo(report.signatures) },
+              { label: t('Annotations'), value: annotationTotal ? `${formatNumber(annotationTotal, 0)} (${Object.entries(report.annotations).map(([k, v]) => `${k} ${v}`).join(', ')})` : <Muted text={t('None')} /> },
+              { label: t('Bookmarks'), value: report.outlineItems ? pluralize(report.outlineItems, t('item'), t('items')) : <Muted text={t('None')} /> },
+              { label: t('Attachments'), value: report.attachments.length ? report.attachments.map((a) => (a.size >= 0 ? `${a.name} (${formatBytes(a.size)})` : a.name)).join(', ') : <Muted text={t('None')} /> },
+              { label: t('JavaScript'), value: yesNo(Boolean(report.structure?.hasJavaScript)) },
+              { label: t('Page labels'), value: yesNo(report.pageLabels) },
+              ...(report.structure ? [{ label: t('Objects'), value: formatNumber(report.structure.objectCount, 0) }] : []),
             ]}
           />
         </Panel>
       </div>
 
-      <Panel title="Page sizes" description={groups.length === 1 ? 'All pages have the same size.' : `${groups.length} different sizes`} bodyClassName="p-0">
-        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Page sizes table">
+      <Panel title={t('Page sizes')} description={groups.length === 1 ? t('All pages have the same size.') : t('{count} different sizes', { count: groups.length })} bodyClassName="p-0">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={t('Page sizes table')}>
           <table className="w-full min-w-[560px] text-left text-[13px]">
             <thead className="border-b border-line text-[12px] text-fg-muted">
               <tr>
-                <th className="px-4 py-2 font-medium">Pages</th>
-                <th className="px-4 py-2 font-medium">Points</th>
-                <th className="px-4 py-2 font-medium">Millimetres</th>
-                <th className="px-4 py-2 font-medium">Inches</th>
-                <th className="px-4 py-2 font-medium">Orientation</th>
+                <th className="px-4 py-2 font-medium">{t('Pages')}</th>
+                <th className="px-4 py-2 font-medium">{t('Points')}</th>
+                <th className="px-4 py-2 font-medium">{t('Millimetres')}</th>
+                <th className="px-4 py-2 font-medium">{t('Inches')}</th>
+                <th className="px-4 py-2 font-medium">{t('Orientation')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -252,7 +253,7 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span className="capitalize">{orientation(g.width, g.height)}</span>
                       {d.paper && <Badge className="ml-2">{d.paper}</Badge>}
-                      {g.rotation ? <Badge className="ml-1">rotated {g.rotation}°</Badge> : null}
+                      {g.rotation ? <Badge className="ml-1">{t('rotated {rotation}°', { rotation: g.rotation })}</Badge> : null}
                     </td>
                   </tr>
                 );
@@ -262,20 +263,20 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
         </div>
       </Panel>
 
-      <Panel title={`Fonts${report.structure ? ` (${report.structure.fonts.length})` : ''}`} bodyClassName="p-0">
+      <Panel title={t('Fonts{value}', { value: report.structure ? ` (${report.structure.fonts.length})` : '' })} bodyClassName="p-0">
         {!report.structure ? (
-          <p className="px-4 py-3 text-[13px] text-fg-muted">Font information is unavailable for this file.</p>
+          <p className="px-4 py-3 text-[13px] text-fg-muted">{t('Font information is unavailable for this file.')}</p>
         ) : report.structure.fonts.length === 0 ? (
-          <p className="px-4 py-3 text-[13px] text-fg-muted">No fonts are used (the document may contain only images, e.g. a scan).</p>
+          <p className="px-4 py-3 text-[13px] text-fg-muted">{t('No fonts are used (the document may contain only images, e.g. a scan).')}</p>
         ) : (
-          <div className="max-h-96 overflow-auto" tabIndex={0} role="region" aria-label="Fonts table">
+          <div className="max-h-96 overflow-auto" tabIndex={0} role="region" aria-label={t('Fonts table')}>
             <table className="w-full min-w-[560px] text-left text-[13px]">
               <thead className="sticky top-0 border-b border-line bg-surface text-[12px] text-fg-muted">
                 <tr>
-                  <th className="px-4 py-2 font-medium">Font</th>
-                  <th className="px-4 py-2 font-medium">Type</th>
-                  <th className="px-4 py-2 font-medium">Embedded</th>
-                  <th className="px-4 py-2 font-medium">Pages</th>
+                  <th className="px-4 py-2 font-medium">{t('Font')}</th>
+                  <th className="px-4 py-2 font-medium">{t('Type')}</th>
+                  <th className="px-4 py-2 font-medium">{t('Embedded')}</th>
+                  <th className="px-4 py-2 font-medium">{t('Pages')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -284,7 +285,7 @@ function Inspector({ pdf }: { pdf: LoadedPdf }) {
                     <td className="px-4 py-2 font-mono text-[12.5px] break-all text-fg">{f.name}</td>
                     <td className="px-4 py-2 whitespace-nowrap">{f.type}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
-                      {f.embedded ? <Badge tone="success">{f.subset ? 'Subset' : 'Yes'}</Badge> : <Badge tone="warning">No</Badge>}
+                      {f.embedded ? <Badge tone="success">{f.subset ? t('Subset') : t('Yes')}</Badge> : <Badge tone="warning">{t('No')}</Badge>}
                     </td>
                     <td className="max-w-48 px-4 py-2 font-mono text-[12px] break-words text-fg-muted">{formatPageList(f.pages)}</td>
                   </tr>

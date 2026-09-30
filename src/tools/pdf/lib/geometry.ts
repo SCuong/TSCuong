@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n';
 /**
  * Page geometry helpers. "Visual" coordinates are what the reader sees: origin
  * at the bottom-left of the displayed (rotated) page, y pointing up, in points.
@@ -140,8 +141,8 @@ export const ptToIn = (pt: number) => pt / 72;
 
 export const PAPER_SIZES = {
   a4: { width: 595.28, height: 841.89, label: 'A4' },
-  letter: { width: 612, height: 792, label: 'Letter' },
-  legal: { width: 612, height: 1008, label: 'Legal' },
+  letter: { width: 612, height: 792, label: t('Letter') },
+  legal: { width: 612, height: 1008, label: t('Legal') },
   a3: { width: 841.89, height: 1190.55, label: 'A3' },
   a5: { width: 419.53, height: 595.28, label: 'A5' },
 } as const;

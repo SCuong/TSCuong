@@ -22,6 +22,7 @@ import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PageScopeControl, usePageScope } from './components/PageScope';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
+import { t } from '@/lib/i18n';
 
 type Dpi = '150' | '200' | '300';
 
@@ -60,15 +61,27 @@ function startEngine(signal: AbortSignal, onProgress: OcrProgress): Promise<OcrE
   });
 }
 
+/** Explains pages that were read from their text layer instead of being recognized. */
+function skippedNote(skipped: number, keptInPdf: boolean): string {
+  const count = pluralize(skipped, t('page'), t('pages'));
+  if (skipped === 1) {
+    return keptInPdf
+      ? t('{count} already had selectable text, so it was read directly and left unchanged in the PDF.', { count })
+      : t('{count} already had selectable text, so it was read directly.', { count });
+  }
+  return keptInPdf
+    ? t('{count} already had selectable text, so they were read directly and left unchanged in the PDF.', { count })
+    : t('{count} already had selectable text, so they were read directly.', { count });
+}
+
 export default function OcrPdf() {
   const controller = usePdfFile();
   return (
     <ToolStack>
       <Alert tone="info">
-        OCR runs on this device with Tesseract. Only <strong>English</strong> language data is included, so other languages will be
-        recognized poorly. Expect a few seconds per page.
+        {t('OCR runs on this device with Tesseract. Only')}{' '}<strong>{t('English')}</strong>{' '}{t('language data is included, so other languages will be recognized poorly. Expect a few seconds per page.')}
       </Alert>
-      <PdfInput controller={controller} title="Drop a scanned PDF">
+      <PdfInput controller={controller} title={t('Drop a scanned PDF')}>
         {(pdf) => <OcrWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -193,15 +206,15 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
             <div>
-              <Label>Scan resolution</Label>
+              <Label>{t('Scan resolution')}</Label>
               <Segmented
-                label="Scan resolution"
+                label={t('Scan resolution')}
                 value={dpi}
                 onChange={setDpi}
                 options={[
-                  { value: '150', label: '150 DPI (fast)' },
+                  { value: '150', label: t('150 DPI (fast)') },
                   { value: '200', label: '200' },
-                  { value: '300', label: '300 (accurate)' },
+                  { value: '300', label: t('300 (accurate)') },
                 ]}
               />
             </div>
@@ -209,14 +222,14 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
           </div>
           <div className="flex flex-col gap-2.5">
             <Checkbox
-              label="Create a searchable PDF"
-              description="Adds an invisible text layer on top of each scanned page, so you can search, select and copy. The page images are not changed."
+              label={t('Create a searchable PDF')}
+              description={t('Adds an invisible text layer on top of each scanned page, so you can search, select and copy. The page images are not changed.')}
               checked={searchable}
               onChange={setSearchable}
             />
             <Checkbox
-              label="Skip pages that already have text"
-              description="Pages with a real text layer are read directly instead of being OCR'd."
+              label={t('Skip pages that already have text')}
+              description={t('Pages with a real text layer are read directly instead of being OCR\'d.')}
               checked={skipText}
               onChange={setSkipText}
             />
@@ -229,26 +242,25 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void run()}
             >
-              Run OCR on {scope.pages.length ? pluralize(scope.pages.length, 'page') : 'pages'}
+              {t('Run OCR on')}{' '}{scope.pages.length ? pluralize(scope.pages.length, t('page'), t('pages')) : t('pages')}
             </Button>
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="OCR failed" />
+      <ErrorMessage error={job.error} title={t('OCR failed')} />
       {pages && skipped > 0 && (
         <Alert tone="info">
-          {pluralize(skipped, 'page')} already had selectable text, so {skipped === 1 ? 'it was' : 'they were'} read directly
-          {searchable && ocrPages.length > 0 ? ' and left unchanged in the PDF' : ''}.
+          {skippedNote(skipped, searchable && ocrPages.length > 0)}
         </Alert>
       )}
       {pages && searchable && !file && ocrPages.length === 0 && (
-        <Alert tone="info">No page needed OCR, so no new PDF was created.</Alert>
+        <Alert tone="info">{t('No page needed OCR, so no new PDF was created.')}</Alert>
       )}
       {file && (
-        <ResultFiles files={[file]} title="Searchable PDF ready">
+        <ResultFiles files={[file]} title={t('Searchable PDF ready')}>
           <p className="text-[12.5px] text-fg-secondary">
-            Text layer added to {pluralize(ocrPages.length, 'page')}. Open it in any PDF viewer and search or select text.
+            {t('Text layer added to {count}. Open it in any PDF viewer and search or select text.', { count: pluralize(ocrPages.length, t('page'), t('pages')) })}
           </p>
         </ResultFiles>
       )}
@@ -256,24 +268,24 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
         <EditorPanel
           title={
             <span className="inline-flex items-center gap-2">
-              Recognized text
+              {t('Recognized text')}
               {avg !== null && (
                 <Badge tone={confidenceLevel(avg) === 'high' ? 'success' : confidenceLevel(avg) === 'medium' ? 'warning' : 'danger'}>
-                  {Math.round(avg)}% avg. confidence
+                  {t('{round}% avg. confidence', { round: Math.round(avg) })}
                 </Badge>
               )}
             </span>
           }
-          ariaLabel="Recognized text"
+          ariaLabel={t('Recognized text')}
           value={text}
           readOnly
           height="480px"
           downloadName={outputName(pdf.file.name, 'ocr', 'txt')}
-          placeholder="No text was recognized."
+          placeholder={t('No text was recognized.')}
           footer={
             <>
-              <span>{pluralize(pages.length, 'page')}</span>
-              <span>{formatNumber(text.split(/\s+/).filter(Boolean).length, 0)} words</span>
+              <span>{pluralize(pages.length, t('page'), t('pages'))}</span>
+              <span>{t('{count} words', { count: formatNumber(text.split(/\s+/).filter(Boolean).length, 0) })}</span>
             </>
           }
         />

@@ -17,6 +17,7 @@ import { PageScopeControl, usePageScope } from './components/PageScope';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
+import { t } from '@/lib/i18n';
 
 type Format = 'png' | 'jpeg' | 'webp';
 const MIME: Record<Format, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' };
@@ -28,7 +29,7 @@ export default function PdfToImages() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to convert to images">
+      <PdfInput controller={controller} title={t('Drop a PDF to convert to images')}>
         {(pdf) => <ImagesWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -126,25 +127,25 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
   return (
     <>
-      <Panel title="Image settings">
+      <Panel title={t('Image settings')}>
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
             <div>
-              <Label>Format</Label>
+              <Label>{t('Format')}</Label>
               <Segmented
-                label="Format"
+                label={t('Format')}
                 value={format}
                 onChange={setFormat}
                 options={[
                   { value: 'png', label: 'PNG' },
                   { value: 'jpeg', label: 'JPEG' },
-                  ...(webpOk ? [{ value: 'webp' as const, label: 'WebP' }] : []),
+                  ...(webpOk ? [{ value: 'webp' as const, label: t('WebP') }] : []),
                 ]}
               />
             </div>
             {format !== 'png' && (
               <div className="w-56">
-                <Label htmlFor={qualityId}>Quality: {Math.round(quality * 100)}%</Label>
+                <Label htmlFor={qualityId}>{t('Quality: {round}%', { round: Math.round(quality * 100) })}</Label>
                 <input
                   id={qualityId}
                   type="range"
@@ -158,18 +159,18 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
               </div>
             )}
             <div>
-              <Label>Resolution (DPI)</Label>
+              <Label>{t('Resolution (DPI)')}</Label>
               <div className="flex flex-wrap items-center gap-2">
                 <Segmented
-                  label="Resolution"
+                  label={t('Resolution')}
                   value={preset}
                   onChange={setPreset}
-                  options={DPI_PRESETS.map((d) => ({ value: d, label: d === 'custom' ? 'Custom' : d }))}
+                  options={DPI_PRESETS.map((d) => ({ value: d, label: d === 'custom' ? t('Custom') : d }))}
                 />
                 {preset === 'custom' && (
                   <div className="w-24">
                     <label htmlFor={dpiId} className="sr-only">
-                      Custom DPI
+                      {t('Custom DPI')}
                     </label>
                     <NumberInput
                       id={dpiId}
@@ -189,21 +190,20 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
           <ErrorMessage error={dpiError} />
           {estimate && !dpiError && (
             <p className="text-[12.5px] text-fg-muted">
-              {pluralize(scope.pages.length, 'image')} at {dpi} DPI · about {(estimate.pixels / 1e6).toFixed(estimate.pixels > 1e8 ? 0 : 1)} megapixels in total ·
-              output up to about {formatBytes(estimate.bytes)}
+              {t('{count} at {dpi} DPI · about {pixels} megapixels in total · output up to about {size}', { count: pluralize(scope.pages.length, t('image'), t('images')), dpi, pixels: (estimate.pixels / 1e6).toFixed(estimate.pixels > 1e8 ? 0 : 1), size: formatBytes(estimate.bytes) })}
             </p>
           )}
           {heavy && !dpiError && (
-            <Alert tone="warning" title="This will use a lot of memory">
-              High resolution times many pages produces very large images{estimate!.largest > 40e6 ? ' (the largest page is over 40 megapixels)' : ''}.
-              Pages are rendered one at a time, but all images are kept in memory until you download them. Consider a lower DPI,
-              JPEG, or fewer pages if your browser struggles.
+            <Alert tone="warning" title={t('This will use a lot of memory')}>
+              {estimate!.largest > 40e6
+                ? t('High resolution times many pages produces very large images (the largest page is over 40 megapixels).')
+                : t('High resolution times many pages produces very large images.')}{' '}
+              {t('Pages are rendered one at a time, but all images are kept in memory until you download them. Consider a lower DPI, JPEG, or fewer pages if your browser struggles.')}
             </Alert>
           )}
           {estimate && estimate.clamped > 0 && !dpiError && (
             <Alert tone="info">
-              {pluralize(estimate.clamped, 'page')} would exceed the browser's maximum canvas size and will be rendered at the largest
-              size the browser allows.
+              {t('{count} would exceed the browser\'s maximum canvas size and will be rendered at the largest size the browser allows.', { count: pluralize(estimate.clamped, t('page'), t('pages')) })}
             </Alert>
           )}
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
@@ -214,13 +214,13 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => void run()}
             >
-              Convert {scope.pages.length ? pluralize(scope.pages.length, 'page') : 'pages'}
+              {t('Convert')}{' '}{scope.pages.length ? pluralize(scope.pages.length, t('page'), t('pages')) : 'pages'}
             </Button>
           </div>
         </div>
       </Panel>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Conversion failed" />
+      <ErrorMessage error={job.error} title={t('Conversion failed')} />
       <ResultFiles files={result.value ?? []} zipName={outputName(pdf.file.name, EXT[format], 'zip')} />
     </>
   );

@@ -25,17 +25,18 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { PositionGrid } from './components/PositionGrid';
+import { t } from '@/lib/i18n';
 
 const POSITIONS: Array<{ value: Position; label: string }> = [
-  { value: 'top-left', label: 'Top left' },
-  { value: 'top-center', label: 'Top center' },
-  { value: 'top-right', label: 'Top right' },
-  { value: 'middle-left', label: 'Middle left' },
-  { value: 'center', label: 'Center' },
-  { value: 'middle-right', label: 'Middle right' },
-  { value: 'bottom-left', label: 'Bottom left' },
-  { value: 'bottom-center', label: 'Bottom center' },
-  { value: 'bottom-right', label: 'Bottom right' },
+  { value: 'top-left', label: t('Top left') },
+  { value: 'top-center', label: t('Top center') },
+  { value: 'top-right', label: t('Top right') },
+  { value: 'middle-left', label: t('Middle left') },
+  { value: 'center', label: t('Center') },
+  { value: 'middle-right', label: t('Middle right') },
+  { value: 'bottom-left', label: t('Bottom left') },
+  { value: 'bottom-center', label: t('Bottom center') },
+  { value: 'bottom-right', label: t('Bottom right') },
 ];
 
 let measureCtx: CanvasRenderingContext2D | null = null;
@@ -50,7 +51,7 @@ export default function AddWatermark() {
   const controller = usePdfFile();
   return (
     <ToolStack>
-      <PdfInput controller={controller} title="Drop a PDF to watermark">
+      <PdfInput controller={controller} title={t('Drop a PDF to watermark')}>
         {(pdf) => <WatermarkWorkspace key={docId(pdf.doc)} pdf={pdf} />}
       </PdfInput>
     </ToolStack>
@@ -137,32 +138,32 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
     <>
       {gate.notice}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Panel title="Watermark">
+        <Panel title={t('Watermark')}>
           <div className="flex flex-col gap-4">
             <Segmented
               className="self-start"
-              label="Watermark type"
+              label={t('Watermark type')}
               value={kind}
               onChange={setKind}
               options={[
-                { value: 'text', label: 'Text', icon: Type },
-                { value: 'image', label: 'Image', icon: ImageIcon },
+                { value: 'text', label: t('Text'), icon: Type },
+                { value: 'image', label: t('Image'), icon: ImageIcon },
               ]}
             />
             {kind === 'text' ? (
               <>
                 <div>
-                  <Label htmlFor={ids.text}>Text</Label>
+                  <Label htmlFor={ids.text}>{t('Text')}</Label>
                   <Input id={ids.text} value={text} maxLength={200} onChange={(e) => setText(e.target.value)} />
-                  <p className="mt-1.5 text-[12.5px] text-fg-muted">Uses the standard Helvetica font: Latin letters, digits and common symbols.</p>
+                  <p className="mt-1.5 text-[12.5px] text-fg-muted">{t('Uses the standard Helvetica font: Latin letters, digits and common symbols.')}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   <div>
-                    <Label htmlFor={ids.size}>Font size (pt)</Label>
+                    <Label htmlFor={ids.size}>{t('Font size (pt)')}</Label>
                     <NumberInput id={ids.size} min={4} max={400} value={fontSize} onChange={setFontSize} />
                   </div>
                   <div>
-                    <Label htmlFor={ids.color}>Color</Label>
+                    <Label htmlFor={ids.color}>{t('Color')}</Label>
                     <input
                       id={ids.color}
                       type="color"
@@ -171,7 +172,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                       className="h-9 w-full cursor-pointer rounded-lg border border-line-strong bg-surface-sunken p-1"
                     />
                   </div>
-                  <Checkbox label="Bold" checked={bold} onChange={setBold} className="self-end pb-2" />
+                  <Checkbox label={t('Bold')} checked={bold} onChange={setBold} className="self-end pb-2" />
                 </div>
               </>
             ) : (
@@ -183,9 +184,9 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium text-fg">{imageFile.name}</p>
-                      <p className="text-[12.5px] text-fg-muted">{image ? `${image.width} × ${image.height} px` : imageError ? 'Unreadable' : 'Reading…'}</p>
+                      <p className="text-[12.5px] text-fg-muted">{image ? t('{width} × {height} px', { width: image.width, height: image.height }) : imageError ? t('Unreadable') : t('Reading…')}</p>
                     </div>
-                    <IconButton icon={X} label="Remove image" size="sm" onClick={() => setImageFile(null)} />
+                    <IconButton icon={X} label={t('Remove image')} size="sm" onClick={() => setImageFile(null)} />
                   </div>
                 ) : (
                   <FileDrop
@@ -193,12 +194,12 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                     accept="image/png,image/jpeg,image/webp,image/gif,image/avif,.png,.jpg,.jpeg,.webp,.gif,.avif"
                     onFiles={(files) => setImageFile(files[0])}
                     icon={ImageIcon}
-                    title="Drop a logo or image"
-                    hint="PNG with transparency works best."
+                    title={t('Drop a logo or image')}
+                    hint={t('PNG with transparency works best.')}
                   />
                 )}
                 <div>
-                  <Label htmlFor={ids.scale}>Width: {Math.round(imageScale * 100)}% of the page</Label>
+                  <Label htmlFor={ids.scale}>{t('Width: {round}% of the page', { round: Math.round(imageScale * 100) })}</Label>
                   <input
                     id={ids.scale}
                     type="range"
@@ -214,7 +215,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor={ids.opacity}>Opacity: {Math.round(opacity * 100)}%</Label>
+                <Label htmlFor={ids.opacity}>{t('Opacity: {round}%', { round: Math.round(opacity * 100) })}</Label>
                 <input
                   id={ids.opacity}
                   type="range"
@@ -227,7 +228,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 />
               </div>
               <div>
-                <Label htmlFor={ids.angle}>Rotation: {angle}°</Label>
+                <Label htmlFor={ids.angle}>{t('Rotation: {angle}°', { angle })}</Label>
                 <input
                   id={ids.angle}
                   type="range"
@@ -242,9 +243,9 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
             </div>
             <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
               <div>
-                <Label>Position</Label>
+                <Label>{t('Position')}</Label>
                 <PositionGrid
-                  label="Position"
+                  label={t('Position')}
                   value={position}
                   onChange={setPosition}
                   options={POSITIONS}
@@ -255,8 +256,8 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 />
               </div>
               <Checkbox
-                label="Tile across the page"
-                description="Repeat the watermark in a staggered grid."
+                label={t('Tile across the page')}
+                description={t('Repeat the watermark in a staggered grid.')}
                 checked={tile}
                 onChange={setTile}
                 className="pt-6"
@@ -274,12 +275,12 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 loading={job.running}
                 onClick={() => void run()}
               >
-                Add watermark
+                {t('Add watermark')}
               </Button>
             </div>
           </div>
         </Panel>
-        <Panel title="Preview" description={previewPage !== undefined ? `Page ${previewPage + 1}` : undefined} className="h-fit">
+        <Panel title={t('Preview')} description={previewPage !== undefined ? t('Page {previewPage}', { previewPage: previewPage + 1 }) : undefined} className="h-fit">
           {previewPage !== undefined ? (
             <div className="flex justify-center">
               <PreviewPage doc={pdf.doc} pageIndex={previewPage} width={300}>
@@ -304,12 +305,12 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
               </PreviewPage>
             </div>
           ) : (
-            <p className="text-[13px] text-fg-muted">Select pages to see a preview.</p>
+            <p className="text-[13px] text-fg-muted">{t('Select pages to see a preview.')}</p>
           )}
         </Panel>
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not add the watermark" />
+      <ErrorMessage error={job.error} title={t('Could not add the watermark')} />
       {result.value && <ResultFiles files={[result.value]} />}
     </>
   );

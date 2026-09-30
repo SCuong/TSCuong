@@ -5,6 +5,7 @@ import { ProgressBar } from '@/components/ui/Feedback';
 import { toast } from '@/components/ui/Toast';
 import { downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { zipFiles, type OutputFile } from '../lib/files';
+import { t } from '@/lib/i18n';
 
 function toBlob(file: OutputFile): Blob {
   return file.data instanceof Blob ? file.data : new Blob([file.data as Uint8Array<ArrayBuffer>], { type: file.type });
@@ -23,7 +24,7 @@ function openInTab(file: OutputFile) {
   const url = URL.createObjectURL(toBlob(file));
   const win = window.open(url, '_blank');
   if (win) win.opener = null;
-  else toast('Your browser blocked the new tab. Use Download instead.', 'info');
+  else toast(t('Your browser blocked the new tab. Use Download instead.'), 'info');
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
@@ -69,7 +70,7 @@ export function ResultFiles({
       const blob = await zipFiles(files);
       downloadBlob(blob, zipName ?? 'files.zip');
     } catch (error) {
-      toast(errorMessage(error, 'Could not create the ZIP file.'), 'error');
+      toast(errorMessage(error, t('Could not create the ZIP file.')), 'error');
     } finally {
       setZipping(false);
     }
@@ -91,7 +92,7 @@ export function ResultFiles({
             <FileCheck size={18} aria-hidden />
           </div>
           <div className="min-w-0 flex-1 basis-40">
-            <p className="text-[13px] font-medium text-fg">{title ?? 'Your file is ready'}</p>
+            <p className="text-[13px] font-medium text-fg">{title ?? t('Your file is ready')}</p>
             <p className="truncate text-[12.5px] text-fg-secondary" title={file.name}>
               {file.name} · {formatBytes(sizeOf(file))}
             </p>
@@ -99,11 +100,11 @@ export function ResultFiles({
           <div className="flex flex-wrap gap-2">
             {canOpen && (
               <Button variant="secondary" icon={ExternalLink} onClick={() => openInTab(file)}>
-                Open
+                {t('Open')}
               </Button>
             )}
             <Button variant="primary" icon={Download} onClick={() => downloadOutput(file)}>
-              Download
+              {t('Download')}
             </Button>
           </div>
         </div>
@@ -116,18 +117,18 @@ export function ResultFiles({
     <section ref={ref} className="flex flex-col rounded-xl border border-line bg-surface shadow-card" aria-live="polite">
       <header className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${showList || children ? 'border-b border-line' : ''}`}>
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-fg">{title ?? `${pluralize(files.length, 'file')} ready`}</p>
+          <p className="text-[13px] font-semibold text-fg">{title ?? t('{count} ready', { count: pluralize(files.length, t('file'), t('files')) })}</p>
           <p className="text-[12.5px] text-fg-muted">
-            {pluralize(files.length, 'file')} · {formatBytes(total)} total
+            {t('{count} · {size} total', { count: pluralize(files.length, t('file'), t('files')), size: formatBytes(total) })}
           </p>
         </div>
         <Button variant="primary" icon={FileArchive} loading={zipping} onClick={() => void downloadZip()}>
-          Download all (ZIP)
+          {t('Download all (ZIP)')}
         </Button>
       </header>
       {children && <div className="border-b border-line px-4 py-3">{children}</div>}
       {showList && (
-      <ul className="max-h-80 divide-y divide-line overflow-y-auto" aria-label="Output files">
+      <ul className="max-h-80 divide-y divide-line overflow-y-auto" aria-label={t('Output files')}>
         {files.map((file, i) => (
           <li key={`${file.name}-${i}`} className="flex min-w-0 items-center gap-3 px-4 py-2">
             <span className="w-7 shrink-0 text-right font-mono text-[11.5px] text-fg-muted tabular-nums">{i + 1}</span>
@@ -135,7 +136,7 @@ export function ResultFiles({
               {file.name}
             </span>
             <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">{formatBytes(sizeOf(file))}</span>
-            <IconButton icon={Download} label={`Download ${file.name}`} size="sm" onClick={() => downloadOutput(file)} />
+            <IconButton icon={Download} label={t('Download {name}', { name: file.name })} size="sm" onClick={() => downloadOutput(file)} />
           </li>
         ))}
       </ul>
@@ -159,7 +160,7 @@ export function JobProgress({
   if (!running) return null;
   return (
     <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-      <ProgressBar value={progress} label={label || 'Working…'} onCancel={onCancel} />
+      <ProgressBar value={progress} label={label || t('Working…')} onCancel={onCancel} />
     </div>
   );
 }

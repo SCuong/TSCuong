@@ -20,6 +20,7 @@ import { arrayMove } from './components/PageGrid';
 import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
+import { t } from '@/lib/i18n';
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp,.jpg,.jpeg,.png,.webp,.gif,.avif,.bmp';
 
@@ -120,9 +121,9 @@ export default function ImagesToPdf() {
           accept={IMAGE_ACCEPT}
           multiple
           onFiles={(files) => void addFiles(files)}
-          title="Drop images to turn into a PDF"
+          title={t('Drop images to turn into a PDF')}
           icon={FileImage}
-          hint="JPG, PNG, WebP, GIF (first frame), BMP and AVIF where your browser can decode it. Nothing is uploaded."
+          hint={t('JPG, PNG, WebP, GIF (first frame), BMP and AVIF where your browser can decode it. Nothing is uploaded.')}
         />
       </ToolStack>
     );
@@ -132,11 +133,11 @@ export default function ImagesToPdf() {
     <ToolStack>
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
-          title={`Images (${entries.length})`}
-          description="One page per image, in this order."
+          title={t('Images ({count})', { count: entries.length })}
+          description={t('One page per image, in this order.')}
           actions={
             <Button size="sm" variant="ghost" icon={Trash} onClick={clearAll}>
-              Clear all
+              {t('Clear all')}
             </Button>
           }
           bodyClassName="p-0"
@@ -145,7 +146,7 @@ export default function ImagesToPdf() {
             items={entries}
             getKey={(e) => e.id}
             getLabel={(e) => e.file.name}
-            ariaLabel="Images in page order"
+            ariaLabel={t('Images in page order')}
             className="divide-y divide-line"
             onMove={(from, to) => setEntries((list) => arrayMove(list, from, to))}
             renderItem={(entry, index, sortable) => (
@@ -170,9 +171,9 @@ export default function ImagesToPdf() {
                   ) : (
                     <p className="text-[12.5px] text-fg-muted">
                       {entry.status === 'loading' ? (
-                        <Spinner size={12} label="Reading…" />
+                        <Spinner size={12} label={t('Reading…')} />
                       ) : (
-                        `${entry.width} × ${entry.height} px · ${formatBytes(entry.file.size)}`
+                        t('{width} × {height} px · {size}', { width: entry.width, height: entry.height, size: formatBytes(entry.file.size) })
                       )}
                     </p>
                   )}
@@ -182,7 +183,7 @@ export default function ImagesToPdf() {
                     {sortable.moveUp}
                     {sortable.moveDown}
                   </span>
-                  <IconButton icon={Trash} label={`Remove ${entry.file.name}`} size="sm" onClick={() => remove(entry.id)} />
+                  <IconButton icon={Trash} label={t('Remove {name}', { name: entry.file.name })} size="sm" onClick={() => remove(entry.id)} />
                 </div>
               </div>
             )}
@@ -194,60 +195,60 @@ export default function ImagesToPdf() {
               accept={IMAGE_ACCEPT}
               onFiles={(files) => void addFiles(files)}
               icon={ImagePlus}
-              title="Add more images"
-              hint="Added to the end of the list."
+              title={t('Add more images')}
+              hint={t('Added to the end of the list.')}
             />
           </div>
         </Panel>
 
-        <Panel title="Page setup" className="h-fit lg:sticky lg:top-16">
+        <Panel title={t('Page setup')} className="h-fit lg:sticky lg:top-16">
           <div className="flex flex-col gap-4">
             <div>
-              <Label>Page size</Label>
+              <Label>{t('Page size')}</Label>
               <Segmented
-                label="Page size"
+                label={t('Page size')}
                 value={pageSize}
                 onChange={setPageSize}
                 options={[
-                  { value: 'fit', label: 'Fit image' },
+                  { value: 'fit', label: t('Fit image') },
                   { value: 'a4', label: 'A4' },
-                  { value: 'letter', label: 'Letter' },
+                  { value: 'letter', label: t('Letter') },
                 ]}
               />
             </div>
             {pageSize === 'fit' ? (
-              <p className="-mt-2 text-[12.5px] text-fg-muted">Each page takes the size of its image (at 96 DPI).</p>
+              <p className="-mt-2 text-[12.5px] text-fg-muted">{t('Each page takes the size of its image (at 96 DPI).')}</p>
             ) : (
               <div>
-                <Label>Orientation</Label>
+                <Label>{t('Orientation')}</Label>
                 <Segmented
-                  label="Orientation"
+                  label={t('Orientation')}
                   value={orientation}
                   onChange={setOrientation}
                   options={[
-                    { value: 'auto', label: 'Auto' },
-                    { value: 'portrait', label: 'Portrait' },
-                    { value: 'landscape', label: 'Landscape' },
+                    { value: 'auto', label: t('Auto') },
+                    { value: 'portrait', label: t('Portrait') },
+                    { value: 'landscape', label: t('Landscape') },
                   ]}
                 />
               </div>
             )}
             <div>
-              <Label>Margin</Label>
+              <Label>{t('Margin')}</Label>
               <Segmented
-                label="Margin"
+                label={t('Margin')}
                 value={margin}
                 onChange={setMargin}
                 options={[
-                  { value: 'none', label: 'None' },
-                  { value: 'small', label: 'Small' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'large', label: 'Large' },
+                  { value: 'none', label: t('None') },
+                  { value: 'small', label: t('Small') },
+                  { value: 'medium', label: t('Medium') },
+                  { value: 'large', label: t('Large') },
                 ]}
               />
             </div>
             <div>
-              <Label htmlFor={nameId}>Output file name</Label>
+              <Label htmlFor={nameId}>{t('Output file name')}</Label>
               <Input id={nameId} value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} />
             </div>
             <Button
@@ -257,16 +258,16 @@ export default function ImagesToPdf() {
               loading={job.running}
               onClick={() => void convert()}
             >
-              Create PDF ({pluralize(ready.length, 'page')})
+              {t('Create PDF ({count})', { count: pluralize(ready.length, t('page'), t('pages')) })}
             </Button>
             {entries.some((e) => e.status === 'error') && (
-              <p className="text-[12.5px] text-fg-muted">Images that could not be read are skipped.</p>
+              <p className="text-[12.5px] text-fg-muted">{t('Images that could not be read are skipped.')}</p>
             )}
           </div>
         </Panel>
       </div>
       <JobProgress running={job.running} progress={job.progress} label={job.label} onCancel={job.cancel} />
-      <ErrorMessage error={job.error} title="Could not create the PDF" />
+      <ErrorMessage error={job.error} title={t('Could not create the PDF')} />
       {result.value && (
         <ResultFiles files={[{ name: ensureExtension(name || 'images', 'pdf'), data: result.value, type: 'application/pdf' }]} />
       )}
