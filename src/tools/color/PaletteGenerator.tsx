@@ -6,7 +6,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
 import { DownloadButton } from '@/components/ui/Actions';
 import { useToolState } from '@/lib/hooks';
-import { errorMessage } from '@/lib/utils';
+import { cn, errorMessage } from '@/lib/utils';
 import { formatColor, parseAny } from './lib/color';
 import { HARMONIES, SCALE_STEPS, exportHarmony, exportScale, harmony, slugify, tintScale, type ExportFormat, type HarmonyId, type ScaleStep } from './lib/palette';
 import { SwatchButton } from './components/Swatch';
@@ -67,9 +67,12 @@ export default function PaletteGenerator() {
                 onChange={(e) => setBaseText(e.target.value)}
                 spellCheck={false}
                 aria-invalid={Boolean(parsed.error) || undefined}
+                aria-describedby="pg-base-error"
               />
             </div>
-            {parsed.error && <p className="mt-1 text-[12px] text-danger">{parsed.error}</p>}
+            <p id="pg-base-error" aria-live="polite" className={cn('text-[12px] text-danger', parsed.error && 'mt-1')}>
+              {parsed.error}
+            </p>
           </div>
           <Field label="Palette name" hint="Used for variable names in the export.">
             {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} value={name} onChange={(e) => setName(e.target.value)} />}
@@ -117,6 +120,12 @@ export default function PaletteGenerator() {
                 />
               ))}
             </div>
+            {swatches.length > 1 && new Set(swatches.map((s) => s.hex)).size === 1 && (
+              <p className="text-[12.5px] text-fg-secondary">
+                This color is gray (it has no hue), so rotating its hue gives the same color every time. Pick a more
+                saturated base color, or use Monochromatic.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {(['css', 'json', 'svg'] as const).map((f) => (
                 <DownloadHarmony key={f} format={f} name={name} swatches={swatches} />
@@ -150,7 +159,14 @@ export default function PaletteGenerator() {
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="text-[13px] font-medium text-fg-secondary">Export scale as</span>
-              <Segmented label="Export format" size="sm" value={format} onChange={setFormat} options={EXPORTS.map((e) => ({ value: e.value, label: e.label }))} />
+              <Segmented
+                label="Export format"
+                size="sm"
+                value={format}
+                onChange={setFormat}
+                options={EXPORTS.map((e) => ({ value: e.value, label: e.label }))}
+                className="flex-wrap"
+              />
             </div>
             <EditorPanel
               title={`${exportInfo.label} · ${SCALE_STEPS.length} colors`}

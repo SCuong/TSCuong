@@ -17,7 +17,11 @@ export function simplifyRatio(w: number, h: number): Ratio | null {
     const d = gcd(w, h);
     return { w: w / d, h: h / d };
   }
-  return approximate(w / h);
+  const value = w / h;
+  const r = approximate(value);
+  // A small fraction cannot express extreme ratios (0.5 : 1280 would become 0:1): keep the numbers as given.
+  if (r.w <= 0 || r.h <= 0 || Math.abs(r.w / r.h - value) / value > 0.001) return { w, h };
+  return r;
 }
 
 /** Best rational approximation with denominator ≤ maxDen (continued fractions). */

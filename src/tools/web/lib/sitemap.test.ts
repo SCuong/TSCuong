@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSitemap, depthPriority, escapeXml, isValidW3cDate, todayIso, toXml, MAX_URLS, type SitemapOptions } from './sitemap';
+import { buildSitemap, depthPriority, escapeXml, formatPriority, isValidW3cDate, todayIso, toXml, MAX_URLS, type SitemapOptions } from './sitemap';
 
 const opts = (o: Partial<SitemapOptions> = {}): SitemapOptions => ({
   baseUrl: '',
@@ -111,8 +111,31 @@ describe('buildSitemap', () => {
   it('validates options', () => {
     expect(buildSitemap('https://e.com/', opts({ lastmod: 'date', lastmodValue: '2026-13-01' })).errors[0]).toMatch(/W3C date/);
     expect(buildSitemap('https://e.com/', opts({ priority: 'fixed', priorityValue: 1.5 })).errors[0]).toMatch(/between/);
+    // Regression: 0.75 was silently rounded to 0.8; the protocol allows any value from 0.0 to 1.0.
     const fixed = buildSitemap('https://e.com/', opts({ priority: 'fixed', priorityValue: 0.75 }));
-    expect(fixed.xml).toContain('<priority>0.8</priority>');
+    expect(fixed.xml).toContain('<priority>0.75</priority>');
+    expect(formatPriority(1)).toBe('1.0');
+    expect(formatPriority(0.5)).toBe('0.5');
+    expect(formatPriority(0.333)).toBe('0.33');
+  });
+
+  // Regression: the protocol requires fewer than 2,048 characters, but exactly 2,048 was accepted.
+  it('rejects URLs of 2,048 characters or more', () => {
+    const exact = `https://e.com/${'x'.repeat(2048 - 14)}`;
+    expect(exact).toHaveLength(2048);
+    expect(buildSitemap(exact, opts()).issues[0].message).toMatch(/must be shorter than 2,048/);
+    expect(buildSitemap(exact.slice(0, -1), opts()).entries).toHaveLength(1);
+  });
+
+  // Regression: the URL parser silently deleted tabs ("url<TAB>date" became one wrong URL) and encoded spaces.
+  it('rejects lines with spaces or tabs instead of silently changing the URL', () => {
+    const r = buildSitemap('https://e.com/a\t2026-01-01\nhttps://e.com/b https://e.com/c\n  https://e.com/d  ', opts());
+    expect(r.entries.map((e) => e.loc)).toEqual(['https://e.com/d']);
+    expect(r.issues.map((i) => [i.line, i.level])).toEqual([
+      [1, 'error'],
+      [2, 'error'],
+    ]);
+    expect(r.issues[0].message).toMatch(/spaces or tabs/);
   });
 
   it('returns empty output for empty input', () => {

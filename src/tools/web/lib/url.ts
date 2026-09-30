@@ -58,19 +58,37 @@ export const DEFAULT_PORTS: Record<string, string> = {
   'ftp:': '21',
 };
 
-/** Percent-decodes without throwing on malformed sequences (they are left as written). */
+/** Decodes a run of %XX escapes: valid UTF-8 sequences become text, invalid bytes stay as written. */
+function decodeEscapes(run: string): string {
+  const parts = run.match(/%[0-9a-f]{2}/gi) ?? [];
+  let out = '';
+  let i = 0;
+  while (i < parts.length) {
+    const b = parseInt(parts[i].slice(1), 16);
+    const len = b < 0x80 ? 1 : b >= 0xc2 && b <= 0xdf ? 2 : b >= 0xe0 && b <= 0xef ? 3 : b >= 0xf0 && b <= 0xf4 ? 4 : 0;
+    if (len && i + len <= parts.length) {
+      try {
+        // decodeURIComponent rejects bad continuation bytes, overlong forms and surrogates.
+        out += decodeURIComponent(parts.slice(i, i + len).join(''));
+        i += len;
+        continue;
+      } catch {
+        /* keep this byte as written */
+      }
+    }
+    out += parts[i];
+    i++;
+  }
+  return out;
+}
+
+/** Percent-decodes without throwing: valid escapes are decoded, malformed ones are left as written. */
 export function safeDecode(value: string, plusAsSpace = false): string {
   const text = plusAsSpace ? value.replace(/\+/g, ' ') : value;
   try {
     return decodeURIComponent(text);
   } catch {
-    return text.replace(/(?:%[0-9a-f]{2})+/gi, (run) => {
-      try {
-        return decodeURIComponent(run);
-      } catch {
-        return run;
-      }
-    });
+    return text.replace(/(?:%[0-9a-f]{2})+/gi, decodeEscapes);
   }
 }
 

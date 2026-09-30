@@ -5,10 +5,12 @@ import { Alert } from '@/components/ui/Alert';
 import { Label, Textarea } from '@/components/ui/Field';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { EmptyState } from '@/components/ui/Feedback';
-import { Eye } from 'lucide-react';
+import { Segmented } from '@/components/ui/Segmented';
+import { Eye, Image as ImageIcon, Palette } from 'lucide-react';
 import { useToolState } from '@/lib/hooks';
-import { formatColor, parseAny } from './lib/color';
+import { formatColor, parseAny, readableTextOn } from './lib/color';
 import { CONFUSION_THRESHOLD, VISION_TYPES, confusablePairs, extractColorTokens, simulate } from './lib/cvd';
+import { ImageSimulator } from './components/ImageSimulator';
 
 const TOOL = 'color-blindness-simulator';
 const MAX_COLORS = 24;
@@ -21,9 +23,29 @@ const SAMPLES = [
 ];
 
 export default function ColorBlindnessSimulator() {
+  const [mode, setMode] = useToolState<'palette' | 'image'>(TOOL, 'mode', 'palette');
+  return (
+    <ToolStack>
+      <div>
+        <Segmented
+          label="Simulate"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'palette', label: 'Palette', icon: Palette },
+            { value: 'image', label: 'Image', icon: ImageIcon },
+          ]}
+        />
+      </div>
+      {mode === 'palette' ? <PaletteSimulator /> : <ImageSimulator />}
+    </ToolStack>
+  );
+}
+
+function PaletteSimulator() {
   const [text, setText] = useToolState(TOOL, 'colors', SAMPLES[0].value);
 
-  const { colors, invalid } = useMemo(() => {
+  const { colors, invalid, total } = useMemo(() => {
     const colors: Array<{ source: string; color: Color; hex: string }> = [];
     const invalid: string[] = [];
     for (const token of extractColorTokens(text)) {
@@ -34,7 +56,7 @@ export default function ColorBlindnessSimulator() {
         invalid.push(token);
       }
     }
-    return { colors: colors.slice(0, MAX_COLORS), invalid, truncated: colors.length > MAX_COLORS };
+    return { colors: colors.slice(0, MAX_COLORS), invalid, total: colors.length };
   }, [text]);
 
   const rows = useMemo(
@@ -82,9 +104,14 @@ export default function ColorBlindnessSimulator() {
         </div>
         {invalid.length > 0 && (
           <Alert tone="warning">
-            Ignored {invalid.length === 1 ? 'a value that is' : `${invalid.length} values that are`} not colors:{' '}
+            Ignored {invalid.length === 1 ? 'a value that is not a color' : `${invalid.length} values that are not colors`}:{' '}
             <span className="font-mono">{invalid.slice(0, 6).join(', ')}</span>
             {invalid.length > 6 && '…'}
+          </Alert>
+        )}
+        {total > MAX_COLORS && (
+          <Alert tone="info">
+            Showing the first {MAX_COLORS} of {total} colors.
           </Alert>
         )}
       </Panel>
@@ -113,9 +140,10 @@ export default function ColorBlindnessSimulator() {
                       key={i}
                       title={`${colors[i].source} → ${hex}`}
                       className="flex h-14 w-16 items-end rounded-md p-1 ring-1 ring-black/5 ring-inset sm:w-20 dark:ring-white/10"
-                      style={{ background: hex }}
+                      // Black or white, whichever contrasts more: at least 4.5:1 on any color.
+                      style={{ background: hex, color: readableTextOn(parseAny(hex)) }}
                     >
-                      <span className="rounded bg-black/45 px-1 font-mono text-[10.5px] text-white">{hex}</span>
+                      <span className="px-0.5 font-mono text-[10.5px] font-medium">{hex}</span>
                     </div>
                   ))}
                 </div>

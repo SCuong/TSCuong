@@ -52,6 +52,75 @@ describe('parseAny', () => {
     expect(() => parseAny('🎨')).toThrow(/not a color/);
     expect(() => parseAny('rgb(1,2)')).toThrow();
   });
+
+  // Regression: out-of-range legacy channels were gamut-mapped (rgb(300 0 0) became #ff604f) instead of
+  // being clamped at parse time as browsers do (it renders as #ff0000).
+  it('clamps rgb(), hsl() and hwb() channels like browsers', () => {
+    expect(formatColor(c('rgb(300 0 0)'), 'hex')).toBe('#ff0000');
+    expect(inSrgb(c('rgb(300 -20 0)'))).toBe(true);
+    expect(formatColor(c('rgba(0, 0, 0, 1.5)'), 'rgb')).toBe('rgb(0 0 0)');
+    expect(formatColor(c('hsl(0 150% 50%)'), 'hex')).toBe('#ff0000');
+    expect(formatColor(c('hwb(0 -10% 0%)'), 'hex')).toBe('#ff0000');
+    // color(srgb …) may legitimately be out of gamut and is not clamped.
+    expect(inSrgb(c('color(srgb 1.2 0 0)'))).toBe(false);
+  });
+});
+
+/** Independent CSS Color 4 reference math (sample code from the spec), to check the library's results. */
+function referenceLabAndOklch(hex: string) {
+  const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const n = parseInt(hex.slice(1), 16);
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => lin(v / 255));
+  const mul = (m: number[][], v: number[]) => m.map((r) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+  const xyz65 = mul(
+    [
+      [506752 / 1228815, 87881 / 245763, 12673 / 70218],
+      [87098 / 409605, 175762 / 245763, 12673 / 175545],
+      [7918 / 409605, 87881 / 737289, 1001167 / 1053270],
+    ],
+    rgb,
+  );
+  const xyz50 = mul(
+    [
+      [1.0479297925449969, 0.022946870601609652, -0.05019226628920524],
+      [0.02962780877005599, 0.9904344267538799, -0.017073799063418826],
+      [-0.009243040646204504, 0.015055191490298152, 0.7518742814281371],
+    ],
+    xyz65,
+  );
+  const white = [0.3457 / 0.3585, 1, (1 - 0.3457 - 0.3585) / 0.3585];
+  const f = xyz50.map((v, i) => v / white[i]).map((v) => (v > 216 / 24389 ? Math.cbrt(v) : ((24389 / 27) * v + 16) / 116));
+  const lms = mul(
+    [
+      [0.4122214708, 0.5363325363, 0.0514459929],
+      [0.2119034982, 0.6806995451, 0.1073969566],
+      [0.0883024619, 0.2817188376, 0.6299787005],
+    ],
+    rgb,
+  ).map(Math.cbrt);
+  const [L, a, b] = mul(
+    [
+      [0.2104542553, 0.793617785, -0.0040720468],
+      [1.9779984951, -2.428592205, 0.4505937099],
+      [0.0259040371, 0.7827717662, -0.808675766],
+    ],
+    lms,
+  );
+  return { lab: [116 * f[1] - 16, 500 * (f[0] - f[1]), 200 * (f[1] - f[2])], oklch: [L * 100, Math.hypot(a, b)] };
+}
+
+describe('conversions against the CSS Color 4 reference formulas', () => {
+  it.each(['#ff0000', '#00ff00', '#0000ff', '#2563eb', '#777777', '#123456', '#abcdef', '#f0e442', '#663399'])('%s', (hex) => {
+    const numbers = (s: string) => (s.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const ref = referenceLabAndOklch(hex);
+    const [l, a, b] = numbers(formatColor(c(hex), 'lab'));
+    expect(l).toBeCloseTo(ref.lab[0], 1);
+    expect(a).toBeCloseTo(ref.lab[1], 1);
+    expect(b).toBeCloseTo(ref.lab[2], 1);
+    const [ol, oc] = numbers(formatColor(c(hex), 'oklch'));
+    expect(ol).toBeCloseTo(ref.oklch[0], 1);
+    expect(oc).toBeCloseTo(ref.oklch[1], 3);
+  });
 });
 
 describe('formatColor', () => {
@@ -186,7 +255,18 @@ describe('contrast', () => {
 
   it('formats without rounding a fail up to a pass', () => {
     expect(formatRatio(4.4999)).toBe('4.49:1');
+    expect(formatRatio(2.996)).toBe('2.99:1');
+    expect(formatRatio(6.999)).toBe('6.99:1');
     expect(formatRatio(21)).toBe('21.00:1');
+  });
+
+  // Regression: ratios were always truncated, so #777 on white showed 4.47:1 (reference checkers: 4.48:1).
+  it('rounds like reference checkers otherwise', () => {
+    expect(formatRatio(contrastRatio(c('#777777'), c('#ffffff')))).toBe('4.48:1');
+    expect(formatRatio(contrastRatio(c('#ff0000'), c('#ffffff')))).toBe('4.00:1');
+    expect(formatRatio(contrastRatio(c('#767676'), c('#ffffff')))).toBe('4.54:1');
+    expect(formatRatio(contrastRatio(c('#0000ff'), c('#ffffff')))).toBe('8.59:1');
+    expect(formatRatio(contrastRatio(c('#595959'), c('#ffffff')))).toBe('7.00:1');
   });
 
   it.each([
@@ -330,6 +410,18 @@ describe('color vision deficiency', () => {
       'red',
       'oklch(50% 0.1 20)',
       '#12345678',
+    ]);
+  });
+
+  // Regression: hex codes without "#" (as copied from many palette sites) were silently ignored.
+  it('extracts bare hex codes and reports everything else', () => {
+    expect(extractColorTokens('1f77b4, ff7f0e;2ca02c cmyk(0% 100% 100% 0%) 12345 #zz')).toEqual([
+      '1f77b4',
+      'ff7f0e',
+      '2ca02c',
+      'cmyk(0% 100% 100% 0%)',
+      '12345',
+      '#zz',
     ]);
   });
 });

@@ -7,6 +7,7 @@ import {
   escapeAttr,
   generateMetaTags,
   isAbsoluteHttpUrl,
+  isLoadableImageUrl,
   isValidColor,
   lengthStatus,
   normalizeHandle,
@@ -43,6 +44,20 @@ describe('helpers', () => {
     expect(normalizeHandle('https://twitter.com/localkit/')).toBe('@localkit');
     expect(normalizeHandle('  ')).toBe('');
   });
+  // Regression: the previews requested every half-typed URL ("https://i/", "https://im/", …).
+  it('only loads preview images from complete URLs', () => {
+    expect(isLoadableImageUrl('https://images.example.com/og.png')).toBe(true);
+    expect(isLoadableImageUrl('http://localhost:8080/a.png')).toBe(true);
+    expect(isLoadableImageUrl('https://127.0.0.1/a.png')).toBe(true);
+    expect(isLoadableImageUrl('https://[::1]/a.png')).toBe(true);
+    expect(isLoadableImageUrl('https://bücher.example/a.png')).toBe(true);
+    expect(isLoadableImageUrl('https://i')).toBe(false);
+    expect(isLoadableImageUrl('https://images')).toBe(false);
+    expect(isLoadableImageUrl('https://images.')).toBe(false);
+    expect(isLoadableImageUrl('https://images.e')).toBe(false);
+    expect(isLoadableImageUrl('/og.png')).toBe(false);
+  });
+
   it('checks URLs and colors', () => {
     expect(isAbsoluteHttpUrl('https://e.com/x')).toBe(true);
     expect(isAbsoluteHttpUrl('/x')).toBe(false);

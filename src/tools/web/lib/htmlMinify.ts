@@ -4,11 +4,15 @@ import { lineColumn } from './sizes';
  * A conservative HTML minifier built on a small tokenizer.
  *
  * - Comments are removed, except conditional comments (`<!--[if IE]>…<![endif]-->`,
- *   downlevel-revealed forms) and, optionally, comments starting with `!`.
+ *   downlevel-revealed forms), server-side include directives (`<!--#include …-->`),
+ *   Knockout bindings (`<!-- ko … -->`) and, optionally, comments starting with `!`.
  * - Whitespace is collapsed to a single space; whitespace next to block-level
  *   elements is removed. Inline boundaries keep one space so text never merges.
- * - Content of <pre>, <textarea>, <script> and <style> is never re-flowed.
- * - Optionally minifies <style>/style="" with CSSO and <script> with Terser.
+ * - Content of <pre>, <textarea>, <script>, <style> and of elements whose inline style
+ *   sets `white-space: pre | pre-wrap | pre-line | break-spaces` is never re-flowed.
+ * - Optionally minifies <style>/style="" with CSSO and <script> with Terser. A block that
+ *   cannot be minified (e.g. a template placeholder in a script) is kept as written and
+ *   reported as a warning.
  */
 
 export interface HtmlMinifyOptions {
@@ -45,7 +49,7 @@ type Token =
   | { type: 'raw'; value: string } // doctype, CDATA, processing instructions: emitted as-is
   | { type: 'open'; name: string; attrs: Attr[]; selfClosing: boolean }
   | { type: 'close'; name: string }
-  | { type: 'rawtext'; parent: string; value: string; attrs: Attr[] };
+  | { type: 'rawtext'; parent: string; value: string; attrs: Attr[]; /** Offset of the content in the source. */ offset: number };
 
 export interface Attr {
   name: string;
@@ -68,6 +72,11 @@ const BLOCK = new Set([
 
 function isConditional(body: string): boolean {
   return /^\[if\b/i.test(body) || /^<!\[endif\]/i.test(body) || /<!\[endif\]$/i.test(body) || /^\s*<!\[endif\]/i.test(body);
+}
+
+/** Comments that do something: server-side include directives and Knockout.js containerless bindings. */
+function isFunctional(body: string): boolean {
+  return /^#[a-z]/i.test(body) || /^\s*\/?ko(?:\s|$)/.test(body);
 }
 
 function parseAttrs(src: string, start: number, fullText: string): { attrs: Attr[]; end: number; selfClosing: boolean } {
@@ -135,7 +144,7 @@ export function tokenize(html: string): Token[] {
       }
       flushText();
       const body = html.slice(i + 4, end);
-      tokens.push({ type: 'comment', value: html.slice(i, end + 3), keep: isConditional(body) });
+      tokens.push({ type: 'comment', value: html.slice(i, end + 3), keep: isConditional(body) || isFunctional(body) });
       i = end + 3;
       continue;
     }
@@ -179,7 +188,7 @@ export function tokenize(html: string): Token[] {
       const m = re.exec(html.slice(i));
       const contentEnd = m ? i + m.index : n;
       tokens.push({ type: 'open', name: rawName, attrs, selfClosing });
-      tokens.push({ type: 'rawtext', parent: name, value: html.slice(i, contentEnd), attrs });
+      tokens.push({ type: 'rawtext', parent: name, value: html.slice(i, contentEnd), attrs, offset: i });
       if (m) tokens.push({ type: 'close', name: m[1] });
       i = m ? contentEnd + m[0].length : n;
       continue;
@@ -219,11 +228,73 @@ export interface MinifyHooks {
   js?: (js: string, module: boolean) => Promise<string>;
 }
 
+/** A script or style block that could not be minified and was kept as written. */
+export interface HtmlMinifyWarning {
+  line: number;
+  column: number;
+  block: 'script' | 'style';
+  /** What the minifier reported, e.g. "Unexpected token: punc (;)". */
+  message: string;
+}
+
+export interface HtmlMinifyResult {
+  html: string;
+  warnings: HtmlMinifyWarning[];
+}
+
+/** Thrown by a hook for a syntax error; `line`/`column` are relative to the block (1-based). */
+export class InlineCodeError extends Error {
+  override name = 'InlineCodeError';
+  constructor(
+    message: string,
+    public line: number | null,
+    public column: number | null,
+  ) {
+    super(message);
+  }
+}
+
 const JS_TYPES = /^(|text\/javascript|application\/javascript|application\/ecmascript|text\/ecmascript|module)$/i;
 const JSON_TYPES = /^(application\/(ld\+)?json|importmap|speculationrules)$/i;
+const CSS_TYPES = /^(|text\/css)$/i;
+
+/** Elements that never have content or an end tag. */
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+/** Elements that render their whitespace as written. */
+const PREFORMATTED = new Set(['pre', 'listing']);
+const PRESERVING_STYLE = /(?:^|[;\s])white-space(?:-collapse)?\s*:\s*(?:pre|pre-wrap|pre-line|break-spaces|preserve|preserve-breaks|preserve-spaces)\b/i;
+
+function preservesWhitespace(name: string, attrs: Attr[]): boolean {
+  if (PREFORMATTED.has(name)) return true;
+  const style = attrs.find((a) => a.name.toLowerCase() === 'style')?.value;
+  return Boolean(style && PRESERVING_STYLE.test(style));
+}
+
+const CDATA = /^\s*<!\[CDATA\[([\s\S]*)\]\]>\s*$/;
+
+/**
+ * Minifies a <style>/<script> body. A body wrapped in a CDATA section (inline SVG) is minified inside the
+ * wrapper; any other use of CDATA is left alone because a minifier would read the markers as code.
+ */
+async function minifyBlock(value: string, run: (code: string) => Promise<string>): Promise<string> {
+  const cdata = CDATA.exec(value);
+  if (cdata) return `<![CDATA[${await run(cdata[1])}]]>`;
+  if (value.includes('<![CDATA[')) return value;
+  return run(value);
+}
 
 export async function minifyHtml(html: string, options: HtmlMinifyOptions = DEFAULT_HTML_OPTIONS, hooks: MinifyHooks = {}): Promise<string> {
+  return (await minifyHtmlDetailed(html, options, hooks)).html;
+}
+
+/** Minifies HTML and reports script/style blocks that had to be kept as written. */
+export async function minifyHtmlDetailed(
+  html: string,
+  options: HtmlMinifyOptions = DEFAULT_HTML_OPTIONS,
+  hooks: MinifyHooks = {},
+): Promise<HtmlMinifyResult> {
   let tokens = tokenize(html);
+  const warnings: HtmlMinifyWarning[] = [];
 
   // Drop removable comments, then merge text that becomes adjacent.
   if (options.removeComments) {
@@ -236,8 +307,22 @@ export async function minifyHtml(html: string, options: HtmlMinifyOptions = DEFA
     else merged.push(t.type === 'text' ? { ...t } : t);
   }
 
+  const warn = (offset: number, block: HtmlMinifyWarning['block'], error: unknown) => {
+    const at = lineColumn(html, offset);
+    const e = error instanceof InlineCodeError ? error : null;
+    const line = e?.line ? at.line + e.line - 1 : at.line;
+    const column = e?.line ? (e.line === 1 ? at.column + (e.column ?? 1) - 1 : (e.column ?? 1)) : at.column;
+    const detail = (error instanceof Error ? error.message : String(error)).replace(/\.$/, '') || 'It could not be minified';
+    warnings.push({ line, column, block, message: `${detail.charAt(0).toUpperCase()}${detail.slice(1)}.` });
+  };
+
   let out = '';
-  let preDepth = 0;
+  // Open elements that keep their whitespace; `depth` counts nested elements with the same name.
+  const preserve: Array<{ name: string; depth: number }> = [];
+  const innermost = (name: string) => {
+    for (let k = preserve.length - 1; k >= 0; k--) if (preserve[k].name === name) return k;
+    return -1;
+  };
   for (let idx = 0; idx < merged.length; idx++) {
     const t = merged[idx];
     switch (t.type) {
@@ -266,21 +351,41 @@ export async function minifyHtml(html: string, options: HtmlMinifyOptions = DEFA
         const last = attrs[attrs.length - 1];
         const slash = t.selfClosing ? (last && last.value !== null && last.quote === '' ? ' /' : '/') : '';
         out += `<${t.name}${renderAttrs(attrs, options.collapseWhitespace)}${slash}>`;
-        if (name === 'pre' && !t.selfClosing) preDepth++;
+        if (!t.selfClosing && !VOID.has(name)) {
+          if (preservesWhitespace(name, t.attrs)) preserve.push({ name, depth: 0 });
+          else {
+            const k = innermost(name);
+            if (k >= 0) preserve[k].depth++;
+          }
+        }
         break;
       }
-      case 'close':
+      case 'close': {
         out += `</${t.name}>`;
-        if (t.name.toLowerCase() === 'pre' && preDepth > 0) preDepth--;
+        const k = innermost(t.name.toLowerCase());
+        if (k >= 0) {
+          if (preserve[k].depth > 0) preserve[k].depth--;
+          else preserve.splice(k, 1);
+        }
         break;
+      }
       case 'rawtext': {
         let value = t.value;
         const type = (t.attrs.find((a) => a.name.toLowerCase() === 'type')?.value ?? '').trim();
-        if (t.parent === 'style' && options.minifyCss && hooks.css && value.trim()) {
-          value = await hooks.css(value);
+        if (t.parent === 'style' && options.minifyCss && hooks.css && value.trim() && CSS_TYPES.test(type)) {
+          try {
+            value = await minifyBlock(value, hooks.css);
+          } catch (error) {
+            warn(t.offset, 'style', error);
+          }
         } else if (t.parent === 'script' && value.trim()) {
           if (options.minifyJs && hooks.js && JS_TYPES.test(type)) {
-            value = await hooks.js(value, type.toLowerCase() === 'module');
+            const js = hooks.js;
+            try {
+              value = await minifyBlock(value, (code) => js(code, type.toLowerCase() === 'module'));
+            } catch (error) {
+              warn(t.offset, 'script', error);
+            }
           } else if (JSON_TYPES.test(type)) {
             try {
               value = JSON.stringify(JSON.parse(value)).replace(/</g, '\\u003c');
@@ -293,7 +398,7 @@ export async function minifyHtml(html: string, options: HtmlMinifyOptions = DEFA
         break;
       }
       case 'text': {
-        if (!options.collapseWhitespace || preDepth > 0) {
+        if (!options.collapseWhitespace || preserve.length > 0) {
           out += t.value;
           break;
         }
@@ -305,10 +410,10 @@ export async function minifyHtml(html: string, options: HtmlMinifyOptions = DEFA
       }
     }
   }
-  return out;
+  return { html: out, warnings };
 }
 
-/** Hooks that use CSSO and Terser, loaded on demand. Errors carry line numbers relative to the block. */
+/** Hooks that use CSSO and Terser, loaded on demand. Syntax errors are {@link InlineCodeError}s. */
 export function defaultHooks(): MinifyHooks {
   return {
     css: async (css) => (await import('csso')).minify(css, { restructure: false }).css,
@@ -320,7 +425,8 @@ export function defaultHooks(): MinifyHooks {
         return r.code ?? js;
       } catch (error) {
         const e = error as { message?: string; line?: number; col?: number };
-        throw new Error(`Inline script error${e.line ? ` (script line ${e.line}, column ${(e.col ?? 0) + 1})` : ''}: ${e.message ?? 'could not be minified'}.`, { cause: error });
+        const message = (e.message ?? 'it could not be minified').replace(/\s*\(line: \d+, col: \d+, pos: \d+\)$/, '');
+        throw new InlineCodeError(message, typeof e.line === 'number' ? e.line : null, typeof e.col === 'number' ? e.col + 1 : null);
       }
     },
   };

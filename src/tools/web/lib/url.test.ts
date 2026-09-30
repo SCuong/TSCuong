@@ -135,6 +135,15 @@ describe('splitQuery / safeDecode', () => {
   it('decodes partial runs', () => {
     expect(safeDecode('%C3%A9 %E2')).toBe('é %E2');
   });
+
+  // Regression: one bad byte kept a whole run encoded, so valid escapes next to it were not decoded.
+  it('decodes every valid sequence and keeps only the malformed bytes', () => {
+    expect(safeDecode('caf%C3%A9%FF%20ok')).toBe('café%FF ok');
+    expect(safeDecode('%C3%A9%E0%A4')).toBe('é%E0%A4');
+    expect(safeDecode('%c3%28%41')).toBe('%c3(A');
+    expect(safeDecode('%F0%9F%98%80%ED%A0%80')).toBe('😀%ED%A0%80');
+    expect(safeDecode('a+b%2Bc%zz', true)).toBe('a b+c%zz');
+  });
 });
 
 describe('buildUrl', () => {

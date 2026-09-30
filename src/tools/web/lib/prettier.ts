@@ -113,7 +113,8 @@ export function describeFormatError(error: unknown): FormatError {
     line = Number(m[1]);
     column = Number(m[2]);
   }
-  let message = first.replace(/\s*\(\d+:\d+\)\s*$/, '').replace(/^SyntaxError:\s*/, '');
+  // "SyntaxError: …", "CssSyntaxError: …": the heading already says it is a syntax error.
+  let message = first.replace(/\s*\(\d+:\d+\)\s*$/, '').replace(/^\w*SyntaxError:\s*/, '');
   if (!message) message = 'The code could not be parsed.';
   message = message.charAt(0).toUpperCase() + message.slice(1);
   if (!/[.!?]$/.test(message)) message += '.';

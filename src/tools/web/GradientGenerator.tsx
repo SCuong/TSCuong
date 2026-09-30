@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { ToolStack } from '@/components/tool/EditorPanel';
 import { Panel } from '@/components/ui/Panel';
 import { Segmented } from '@/components/ui/Segmented';
@@ -48,13 +48,31 @@ export default function GradientGenerator() {
     return clamp(((clientX - rect.left) / rect.width) * 100);
   };
 
-  const onBarPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.target !== bar.current) return;
-    const position = positionFromEvent(e.clientX);
+  const insertStop = (position: number) => {
     const { color, alpha } = colorAt(g.stops, position);
     const stop = { id: stopId(), color, alpha, position };
     setG((prev) => ({ ...prev, stops: [...prev.stops, stop] }));
     setSelectedId(stop.id);
+  };
+
+  const onBarPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.target !== bar.current) return;
+    insertStop(positionFromEvent(e.clientX));
+  };
+
+  /** Keyboard-friendly alternative to clicking the bar: a new stop in the middle of the widest gap. */
+  const addStop = () => {
+    const positions = [0, ...sortStops(g.stops).map((s) => s.position), 100];
+    let at = 50;
+    let widest = -1;
+    for (let i = 0; i < positions.length - 1; i++) {
+      const gap = positions[i + 1] - positions[i];
+      if (gap > widest) {
+        widest = gap;
+        at = positions[i] + gap / 2;
+      }
+    }
+    insertStop(clamp(at));
   };
 
   const onHandleKey = (e: KeyboardEvent, stop: GradientStop) => {
@@ -80,7 +98,15 @@ export default function GradientGenerator() {
           <div className="lk-checker h-64 overflow-hidden rounded-xl border border-line sm:h-80" role="img" aria-label="Gradient preview">
             <div className="size-full" style={{ backgroundImage: css }} />
           </div>
-          <Panel title="Color stops" description="Click the bar to add a stop. Drag handles, or focus one and use the arrow keys (Shift for 10%). Delete removes it.">
+          <Panel
+            title="Color stops"
+            description="Click the bar or use Add stop to add a stop. Drag handles, or focus one and use the arrow keys (Shift for 10%). Delete removes it."
+            actions={
+              <Button size="sm" icon={Plus} onClick={addStop}>
+                Add stop
+              </Button>
+            }
+          >
             <div className="px-2 pt-2 pb-7">
               <div
                 ref={bar}

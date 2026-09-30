@@ -102,7 +102,7 @@ export default function SitemapGenerator() {
                 aria-label="Priority value"
                 min={0}
                 max={1}
-                step={0.1}
+                step={0.05}
                 value={s.priorityValue}
                 onChange={(v) => set('priorityValue', v === '' ? 0 : v)}
                 className="w-20"
@@ -170,7 +170,7 @@ export default function SitemapGenerator() {
       </SplitPanes>
       {build.issues.length > 0 && (
         <Panel title={`Problems (${build.issues.length})`} description="Lines with errors are left out of the sitemap." bodyClassName="p-0">
-          <div className="max-h-[360px] overflow-auto">
+          <div className="max-h-[360px] overflow-auto" tabIndex={0} role="region" aria-label="Problems by line">
             <table className="w-full min-w-[480px] text-left text-[13px]">
               <thead className="sticky top-0 bg-surface text-[12px] text-fg-muted">
                 <tr className="border-b border-line">

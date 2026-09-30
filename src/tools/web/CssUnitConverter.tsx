@@ -117,7 +117,7 @@ export default function CssUnitConverter() {
             <Label htmlFor="cu-batch">Values (one per line or comma-separated; bare numbers are px)</Label>
             <Textarea id="cu-batch" rows={10} value={batch} onChange={(e) => setBatch(e.target.value)} />
           </div>
-          <div className="min-w-0 overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto" tabIndex={0} role="region" aria-label="Converted values">
             <table className="w-full text-left text-[13px]">
               <thead className="text-[12px] text-fg-muted">
                 <tr className="border-b border-line">

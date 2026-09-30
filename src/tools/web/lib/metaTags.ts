@@ -108,6 +108,18 @@ export function isAbsoluteHttpUrl(value: string): boolean {
   }
 }
 
+/**
+ * Whether a preview may load this image: an absolute http(s) URL whose host looks complete (has a dot, or is
+ * localhost or an IP literal). Half-typed URLs such as "https://im" would otherwise contact random hosts.
+ */
+export function isLoadableImageUrl(value: string): boolean {
+  if (!isAbsoluteHttpUrl(value)) return false;
+  const host = new URL(value.trim()).hostname;
+  if (host === 'localhost' || host.startsWith('[') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
+  const labels = host.split('.');
+  return labels.length >= 2 && labels.every(Boolean) && /^[a-z0-9-]{2,}$/i.test(labels[labels.length - 1]);
+}
+
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const FUNC = /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\)$/i;
 

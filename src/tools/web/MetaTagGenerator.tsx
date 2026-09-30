@@ -1,12 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ImageOff, RotateCcw } from 'lucide-react';
+import { Eraser, FlaskConical, ImageOff } from 'lucide-react';
 import { EditorPanel, ToolStack } from '@/components/tool/EditorPanel';
 import { Panel } from '@/components/ui/Panel';
 import { Field, Input, Label, Select, Switch, Textarea } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Segmented } from '@/components/ui/Segmented';
-import { useToolState } from '@/lib/hooks';
+import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import {
   DEFAULT_META,
@@ -14,7 +14,7 @@ import {
   breadcrumbUrl,
   charCount,
   generateMetaTags,
-  isAbsoluteHttpUrl,
+  isLoadableImageUrl,
   isValidColor,
   lengthStatus,
   truncate,
@@ -24,6 +24,20 @@ import {
 } from './lib/metaTags';
 
 const TOOL = 'meta-tag-generator';
+
+/** "Clear" empties every text field and keeps the switches and choices. */
+const EMPTY_TEXT = {
+  title: '',
+  description: '',
+  url: '',
+  siteName: '',
+  image: '',
+  imageAlt: '',
+  locale: '',
+  twitterSite: '',
+  twitterCreator: '',
+  themeColor: '',
+} satisfies Partial<MetaInput>;
 
 function Counter({ text, guide }: { text: string; guide: LengthGuide }) {
   const status = lengthStatus(text, guide);
@@ -37,14 +51,19 @@ function Counter({ text, guide }: { text: string; guide: LengthGuide }) {
   );
 }
 
-function PreviewImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+function PreviewImage({ src: typed, alt, className }: { src: string; alt: string; className?: string }) {
   const [failed, setFailed] = useState<string | null>(null);
-  const valid = isAbsoluteHttpUrl(src);
+  // Load only once typing pauses and the URL looks complete: half-typed URLs ("https://im") would
+  // otherwise send a request to a different host on every keystroke.
+  const src = useDebouncedValue(typed, 600);
+  const settled = src === typed;
+  const valid = isLoadableImageUrl(src);
   if (!valid || failed === src) {
+    const note = !typed.trim() ? 'No image' : !settled ? 'Waiting for you to finish typing…' : valid ? 'Image failed to load' : 'Enter a complete image URL';
     return (
       <div className={cn('flex flex-col items-center justify-center gap-1 bg-surface-hover text-fg-muted', className)}>
         <ImageOff size={20} aria-hidden />
-        <span className="px-2 text-center text-[11.5px]">{src.trim() && valid ? 'Image failed to load' : 'No image'}</span>
+        <span className="px-2 text-center text-[11.5px]">{note}</span>
       </div>
     );
   }
@@ -145,9 +164,14 @@ export default function MetaTagGenerator() {
         <Panel
           title="Page details"
           actions={
-            <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => setM(DEFAULT_META)}>
-              Reset
-            </Button>
+            <>
+              <Button size="sm" variant="ghost" icon={FlaskConical} onClick={() => setM(DEFAULT_META)}>
+                Load sample
+              </Button>
+              <Button size="sm" variant="ghost" icon={Eraser} onClick={() => setM({ ...meta, ...EMPTY_TEXT })}>
+                Clear
+              </Button>
+            </>
           }
           bodyClassName="flex flex-col gap-6"
         >

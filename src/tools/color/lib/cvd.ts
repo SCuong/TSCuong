@@ -112,10 +112,14 @@ export function confusablePairs(colors: Color[], type: VisionType, threshold = C
   return pairs.sort((x, y) => x.distance - y.distance);
 }
 
-/** Extracts colors from free text: hex codes, CSS color functions and names, separated by commas, spaces or new lines. */
+/**
+ * Extracts colors from free text: hex codes (with or without #), CSS color functions (and cmyk()) and names,
+ * separated by commas, spaces or new lines. Anything else that looks like a word or number is returned too,
+ * so the caller can report it instead of silently dropping it.
+ */
 export function extractColorTokens(text: string): string[] {
   const tokens: string[] = [];
-  const re = /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^)]*\)|\b[a-z]{3,}\b/gi;
+  const re = /#[0-9a-z]+|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|device-cmyk|cmyk)\([^)]*\)|[0-9a-z%.+-]+/gi;
   for (const m of text.matchAll(re)) tokens.push(m[0]);
   return tokens;
 }

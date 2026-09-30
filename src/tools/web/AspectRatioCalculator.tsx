@@ -103,7 +103,8 @@ export default function AspectRatioCalculator() {
           </Field>
           <IconButton
             icon={s.locked ? Lock : LockOpen}
-            label={s.locked ? 'Ratio locked: editing one side solves the other' : 'Ratio unlocked: editing a side changes the ratio'}
+            // A toggle keeps one name; aria-pressed tells whether it is on (the text below explains the effect).
+            label="Lock aspect ratio"
             variant="secondary"
             active={s.locked}
             aria-pressed={s.locked}

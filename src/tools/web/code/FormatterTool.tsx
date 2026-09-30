@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import type { EditorLanguage } from '@/components/editor/languages';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { Alert } from '@/components/ui/Alert';
 import { Label, Select, Switch } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
-import { Spinner } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { formatBytes } from '@/lib/utils';
-import { DEFAULT_OPTIONS, describeFormatError, formatCode, formatErrorText, type FormatError, type FormatOptions, type PrettierParser } from '../lib/prettier';
+import { DEFAULT_OPTIONS, formatErrorText, type FormatOptions, type PrettierParser } from '../lib/prettier';
+import { useCodeJob } from './codeRunner';
+import { JobStatus, settledOutcome, useByteSize } from './shared';
 
 export interface ParserOption {
   value: PrettierParser;
@@ -34,30 +35,24 @@ export function FormatterTool({
 }) {
   const [input, setInput] = useToolState(toolId, 'input', '');
   const [parser, setParser] = useToolState<PrettierParser>(toolId, 'parser', parsers[0].value);
-  const [opts, setOpts] = useToolState<FormatOptions>(toolId, 'options', DEFAULT_OPTIONS);
-  const debounced = useDebouncedValue(input, 250);
-  const [state, setState] = useState<{ output: string; error: FormatError | null; key: string }>({ output: '', error: null, key: '' });
+  const [stored, setOpts] = useToolState<FormatOptions>(toolId, 'options', DEFAULT_OPTIONS);
+  const opts = { ...DEFAULT_OPTIONS, ...stored };
+  const debounced = useDebouncedValue(input, input.length > 200_000 ? 500 : 250);
   const current = parsers.find((p) => p.value === parser) ?? parsers[0];
-  const set = <K extends keyof FormatOptions>(key: K, value: FormatOptions[K]) => setOpts((o) => ({ ...o, [key]: value }));
+  const set = <K extends keyof FormatOptions>(key: K, value: FormatOptions[K]) => setOpts((o) => ({ ...DEFAULT_OPTIONS, ...o, [key]: value }));
 
-  const jobKey = JSON.stringify([debounced, current.value, opts]);
-  useEffect(() => {
-    if (!debounced.trim()) return;
-    let cancelled = false;
-    formatCode(debounced, current.value, opts)
-      .then((output) => !cancelled && setState({ output, error: null, key: jobKey }))
-      .catch((error: unknown) => !cancelled && setState({ output: '', error: describeFormatError(error), key: jobKey }));
-    return () => {
-      cancelled = true;
-    };
-    // jobKey captures every input of the job.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobKey]);
+  // Prettier runs in a worker: megabytes of input never freeze the page, and a newer edit cancels the old job.
+  const jobKey = debounced.trim() ? JSON.stringify([debounced, current.value, opts]) : null;
+  const job = useCodeJob<'format'>(jobKey, () => ({ kind: 'format', code: debounced, parser: current.value, options: opts }));
 
   const empty = !input.trim();
-  const pending = !empty && state.key !== jobKey;
-  const output = empty ? '' : state.output;
-  const error = empty ? null : state.error;
+  const settled = empty ? null : settledOutcome(job.state, job.previous);
+  const output = settled?.status === 'done' ? settled.value : '';
+  const error = settled?.status === 'error' ? settled.error : null;
+  const inputBytes = useByteSize(input);
+  const outputBytes = useByteSize(output);
+  const outputLines = useMemo(() => (output ? output.split('\n').length - 1 : 0), [output]);
+  const status = empty ? 'idle' : job.state.status;
 
   return (
     <ToolStack>
@@ -152,7 +147,7 @@ export function FormatterTool({
           invalid={Boolean(error)}
           height="520px"
           lineWrapping={false}
-          footer={input ? <span>{formatBytes(new Blob([input]).size)}</span> : undefined}
+          footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <EditorPanel
           title="Formatted"
@@ -164,13 +159,13 @@ export function FormatterTool({
           height="520px"
           lineWrapping={false}
           footer={
-            pending ? (
-              <Spinner size={13} label="Formatting…" />
+            status === 'pending' || status === 'cancelled' ? (
+              <JobStatus status={status} busyLabel="Formatting…" onCancel={job.cancel} />
             ) : output ? (
               <>
                 <span className="text-success">Formatted with Prettier</span>
-                <span>{output.split('\n').length - 1} lines</span>
-                <span>{formatBytes(new Blob([output]).size)}</span>
+                <span>{outputLines.toLocaleString()} lines</span>
+                <span>{formatBytes(outputBytes)}</span>
               </>
             ) : undefined
           }

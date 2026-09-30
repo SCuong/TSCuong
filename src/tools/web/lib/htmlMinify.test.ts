@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_HTML_OPTIONS, HtmlMinifyError, defaultHooks, minifyHtml, tokenize, type HtmlMinifyOptions } from './htmlMinify';
+import { DEFAULT_HTML_OPTIONS, HtmlMinifyError, defaultHooks, minifyHtml, minifyHtmlDetailed, tokenize, type HtmlMinifyOptions } from './htmlMinify';
 import { byteLength, lineColumn, sizeSavings } from './sizes';
 
 const plain: HtmlMinifyOptions = { ...DEFAULT_HTML_OPTIONS, minifyCss: false, minifyJs: false };
@@ -160,8 +160,60 @@ describe('script and style', () => {
     expect(await full(tpl)).toBe(tpl);
   });
 
-  it('reports inline script errors', async () => {
-    await expect(full('<script>let = ;</script>')).rejects.toThrow(/Inline script error/);
+  // Regression: one broken inline script (or a template placeholder in it) failed the whole page.
+  it('keeps a script that cannot be minified and reports where it is', async () => {
+    const html = '<p>a</p>\n<script>\nvar ok = 1;\nlet = ;\n</script>\n<p>b</p>';
+    const r = await minifyHtmlDetailed(html, DEFAULT_HTML_OPTIONS, defaultHooks());
+    expect(r.html).toBe('<p>a</p><script>\nvar ok = 1;\nlet = ;\n</script><p>b</p>');
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toMatchObject({ line: 4, column: 5, block: 'script' });
+    expect(r.warnings[0].message).toBe('Name expected.');
+    const sameLine = await minifyHtmlDetailed('<div><script>let = ;</script></div>', DEFAULT_HTML_OPTIONS, defaultHooks());
+    expect(sameLine.warnings[0]).toMatchObject({ line: 1, column: 18 });
+  });
+
+  // Regression: CSSO deleted the rules of an inline SVG <style> wrapped in CDATA; Terser failed on CDATA scripts.
+  it('minifies inside CDATA sections of inline SVG', async () => {
+    expect(await full('<svg><style><![CDATA[\n  .a { fill: rgb(255, 0, 0); }\n]]></style></svg>')).toBe('<svg><style><![CDATA[.a{fill:red}]]></style></svg>');
+    const script = await minifyHtmlDetailed('<svg><script><![CDATA[\n  var a = 1 < 2;\n]]></script></svg>', DEFAULT_HTML_OPTIONS, defaultHooks());
+    expect(script.warnings).toEqual([]);
+    expect(script.html).toMatch(/^<svg><script><!\[CDATA\[.*\]\]><\/script><\/svg>$/);
+    // Other uses of CDATA are left alone rather than handed to a parser that would misread them.
+    const odd = '<style>a{}<![CDATA[ b{} ]]></style>';
+    expect(await full(odd)).toBe(odd);
+  });
+
+  it('only minifies CSS in <style> elements that hold CSS', async () => {
+    const less = '<style type="text/less">@c: red; .a { color: @c; }</style>';
+    expect(await full(less)).toBe(less);
+    expect(await full('<style type="text/css">a { color: #ff0000 }</style>')).toBe('<style type="text/css">a{color:red}</style>');
+  });
+});
+
+describe('whitespace-preserving styles', () => {
+  // Regression: whitespace inside elements styled with white-space: pre* was collapsed, changing the rendering.
+  it('keeps whitespace in elements whose inline style preserves it', async () => {
+    expect(await m('<div style="white-space: pre-wrap">  a\n    b  </div>')).toBe('<div style="white-space: pre-wrap">  a\n    b  </div>');
+    expect(await m('<p style="color:red;white-space:pre-line"> x\n y </p>')).toBe('<p style="color:red;white-space:pre-line"> x\n y </p>');
+    expect(await m('<span style="white-space: nowrap">  a   b  </span>')).toBe('<span style="white-space: nowrap"> a b </span>');
+    expect(await m('<listing>  a\n  b</listing>')).toBe('<listing>  a\n  b</listing>');
+  });
+
+  it('tracks nested elements with the same name', async () => {
+    expect(await m('<div style="white-space:pre"><div> x </div>  y  </div>\n<p>  z  </p>')).toBe('<div style="white-space:pre"><div> x </div>  y  </div><p>z</p>');
+    expect(await m('<pre> a <pre> b </pre> c </pre>\n<p>  d  </p>')).toBe('<pre> a <pre> b </pre> c </pre><p>d</p>');
+    expect(await m('<div style="white-space:pre"> a <br> b <img src="x.png"> c </div><p>  e  </p>')).toBe(
+      '<div style="white-space:pre"> a <br> b <img src="x.png"> c </div><p>e</p>',
+    );
+  });
+});
+
+describe('functional comments', () => {
+  // Regression: server-side include directives were removed, so the server no longer included the file.
+  it('keeps server-side includes and Knockout bindings', async () => {
+    expect(await m('<!--#include virtual="/footer.html" --><p>x</p>')).toBe('<!--#include virtual="/footer.html" --><p>x</p>');
+    expect(await m('<ul><!-- ko foreach: items --><li>x</li><!-- /ko --></ul>')).toBe('<ul><!-- ko foreach: items --><li>x</li><!-- /ko --></ul>');
+    expect(await m('<!-- kosher note --><p>x</p>')).toBe('<p>x</p>');
   });
 });
 

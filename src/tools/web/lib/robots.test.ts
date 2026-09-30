@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   AI_CRAWLERS,
   generateRobots,
+  groupToken,
   isAllowed,
+  matchesPattern,
   normalizePath,
   parseRobots,
   patternToRegExp,
@@ -191,5 +193,42 @@ describe('matching', () => {
     expect(r.groups[0].rules).toHaveLength(5000);
     expect(isAllowed(r, 'x', '/p4999/x').allowed).toBe(false);
     expect(isAllowed(r, 'x', '/q').allowed).toBe(true);
+  });
+
+  // Regression: patterns were compiled to backtracking regular expressions, so a pattern with many
+  // wildcards froze the tab (catastrophic backtracking) when tested against a long path.
+  it('matches pathological wildcard patterns in linear time', () => {
+    const r = parseRobots(`User-agent: *\nDisallow: /${'*a'.repeat(30)}b\n`);
+    const started = Date.now();
+    expect(isAllowed(r, 'x', `/${'a'.repeat(5000)}`).allowed).toBe(true);
+    expect(isAllowed(r, 'x', `/${'a'.repeat(40)}b`).allowed).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('matches wildcards and end anchors like the reference parser', () => {
+    expect(matchesPattern('/fish*', '/fish.html')).toBe(true);
+    expect(matchesPattern('/*.php$', '/a/b.php')).toBe(true);
+    expect(matchesPattern('/*.php$', '/a/b.php?x=1')).toBe(false);
+    expect(matchesPattern('/a$b', '/a$b/c')).toBe(true);
+    expect(matchesPattern('/$', '/')).toBe(true);
+    expect(matchesPattern('/$', '/x')).toBe(false);
+    expect(matchesPattern('*', '')).toBe(true);
+    expect(matchesPattern('/a**b', '/ab')).toBe(true);
+  });
+
+  // Regression (RFC 9309 §2.2.2): escaped unreserved characters must be decoded before comparing.
+  it('decodes percent-encoded unreserved characters', () => {
+    expect(normalizePath('/foo/bar/%62%61%7A')).toBe('/foo/bar/baz');
+    expect(normalizePath('/a%2Fb%2a%7e')).toBe('/a%2Fb%2A~');
+    expect(allowed('User-agent: *\nDisallow: /foo/bar/baz', 'x', '/foo/bar/%62%61%7A')).toBe(false);
+    expect(allowed('User-agent: *\nDisallow: /foo/bar/%62az', 'x', '/foo/bar/baz')).toBe(false);
+  });
+
+  // Regression: a group line such as "User-agent: Googlebot/2.1" did not apply to Googlebot.
+  it('matches group lines by product token', () => {
+    expect(groupToken('Googlebot/2.1')).toBe('googlebot');
+    expect(groupToken(' * ')).toBe('*');
+    expect(allowed('User-agent: Googlebot/2.1\nDisallow: /g\n\nUser-agent: *\nDisallow: /s', 'Googlebot', '/g')).toBe(false);
+    expect(allowed('User-agent: Googlebot/2.1\nDisallow: /g\n\nUser-agent: *\nDisallow: /s', 'Googlebot', '/s')).toBe(true);
   });
 });

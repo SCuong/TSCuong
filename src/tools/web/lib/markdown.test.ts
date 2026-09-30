@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, firstHeading, markdownToHtml, standaloneDocument } from './markdown';
+import { escapeHtml, firstHeading, markdownToHtml, previewDocument, standaloneDocument } from './markdown';
 import { DEFAULT_TURNDOWN, htmlToMarkdown } from './turndown';
 
 describe('markdownToHtml', () => {
@@ -36,6 +36,33 @@ describe('markdownToHtml', () => {
     expect(escapeHtml('<&>')).toBe('&lt;&amp;&gt;');
   });
 
+  it('builds an isolated preview document', () => {
+    const palette = {
+      scheme: 'dark' as const,
+      background: '#10141c',
+      text: '#e6eaf2',
+      textSecondary: '#a7b1c2',
+      textMuted: '#8d98ab',
+      border: '#1f2633',
+      borderStrong: '#2d3646',
+      soft: '#1b2130',
+      sunken: '#0d1118',
+      link: '#7aa7ff',
+      accent: '#2563eb;} body{display:none',
+    };
+    const doc = previewDocument('<p><a href="https://x.test">x</a> <a href="#top">top</a></p><pre><code>a</code></pre>', palette, false);
+    // Every request is blocked, remote images included; styles only inline.
+    expect(doc).toContain(
+      `content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; form-action 'none'; base-uri 'none'"`,
+    );
+    expect(doc).toContain('<a href="https://x.test" target="_blank" rel="noopener noreferrer">x</a>');
+    expect(doc).toContain('<a href="#top">top</a>');
+    expect(doc).toContain('<pre tabindex="0">');
+    expect(doc).toContain('color-scheme:dark');
+    expect(doc).not.toContain('body{display:none');
+    expect(previewDocument('', palette, true)).toContain('img-src data: blob: https: http:;');
+  });
+
   it('finds the first heading', () => {
     expect(firstHeading('intro\n\n## **Big** title ##\n# Other')).toBe('Big title');
     expect(firstHeading('no headings')).toBeNull();
@@ -58,8 +85,36 @@ describe('htmlToMarkdown', () => {
     );
     expect(md).toContain('| A | B |');
     expect(md).toContain('| --- | --- |');
-    expect(md).toContain('~old~');
+    expect(md).toContain('~~old~~');
     expect(md).toContain('[x]');
+  });
+
+  // Regression: a "|" in a cell split it in two, and paragraphs in a cell broke the table.
+  it('keeps tables intact when cells contain pipes or several paragraphs', () => {
+    const md = htmlToMarkdown(
+      '<table><thead><tr><th>a|b</th><th>c</th></tr></thead><tbody><tr><td>x | y</td><td><p>one</p><p>two</p></td></tr><tr><td><code>p|q</code></td><td>l1<br>l2</td></tr></tbody></table>',
+      DEFAULT_TURNDOWN,
+    );
+    expect(md).toBe('| a\\|b | c |\n| --- | --- |\n| x \\| y | one<br><br>two |\n| `p\\|q` | l1<br>l2 |\n');
+    // Round trip: the Markdown renders back to the same cells.
+    const html = markdownToHtml(md, { breaks: false });
+    expect(html).toContain('<th>a|b</th>');
+    expect(html).toContain('<td>x | y</td>');
+    expect(html).toContain('<td><code>p|q</code></td>');
+  });
+
+  // Regression: text such as "<div>" or "&amp;" came out unescaped and rendered as markup.
+  it('escapes text that would be read as HTML or entities', () => {
+    const md = htmlToMarkdown('<p>Use &lt;div&gt; and &amp;amp; but not AT&amp;T or a &lt; b</p>', DEFAULT_TURNDOWN);
+    expect(md).toBe('Use \\<div> and \\&amp; but not AT&T or a < b\n');
+    const back = markdownToHtml(md, { breaks: false });
+    expect(back).toContain('Use &lt;div&gt; and &amp;amp; but not AT&amp;T or a &lt; b');
+  });
+
+  it('round-trips GFM through HTML', () => {
+    const source = '# Title\n\nSome **bold**, *em*, ~~del~~ and `code`.\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n```js\nconst a = 1;\n```\n';
+    const md = htmlToMarkdown(markdownToHtml(source, { breaks: false }), DEFAULT_TURNDOWN);
+    expect(md).toBe(source);
   });
 
   it('applies style options', () => {

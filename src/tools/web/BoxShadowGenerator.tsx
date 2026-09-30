@@ -118,10 +118,17 @@ export default function BoxShadowGenerator() {
                         type="button"
                         onClick={() => setSelectedId(l.id)}
                         aria-pressed={l.id === selected?.id}
-                        className={cn('flex min-w-0 flex-1 items-center gap-2 px-1 text-left', !l.visible && 'opacity-50')}
+                        className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left"
                       >
-                        <span className="size-4 shrink-0 rounded ring-1 ring-line-strong" style={{ background: l.color, opacity: Math.max(0.15, l.opacity) }} />
-                        <span className="truncate font-mono text-[12px] text-fg">{layerCss(l)}</span>
+                        <span
+                          className="size-4 shrink-0 rounded ring-1 ring-line-strong"
+                          style={{ background: l.color, opacity: l.visible ? Math.max(0.15, l.opacity) : 0.15 }}
+                        />
+                        {/* Hidden layers are struck through (not faded: faded text would fail contrast). */}
+                        <span className={cn('truncate font-mono text-[12px]', l.visible ? 'text-fg' : 'text-fg-secondary line-through')}>
+                          {layerCss(l)}
+                          {!l.visible && <span className="sr-only"> (hidden)</span>}
+                        </span>
                       </button>
                       <IconButton icon={l.visible ? Eye : EyeOff} label={l.visible ? 'Hide layer' : 'Show layer'} size="sm" onClick={() => update(l.id, { visible: !l.visible })} />
                       <IconButton icon={ArrowUp} label="Move up" size="sm" disabled={i === 0} onClick={() => move(l.id, -1)} />

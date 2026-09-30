@@ -43,10 +43,14 @@ function ColorInput({ label, value, onChange, error }: { label: string; value: s
           spellCheck={false}
           autoComplete="off"
           aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
           className="lk-field font-mono text-[13px]"
         />
       </div>
-      {error && <p className="mt-1 text-[12px] text-danger">{error}</p>}
+      {/* Always present so screen readers announce errors politely as they appear while typing. */}
+      <p id={`${id}-error`} aria-live="polite" className={cn('text-[12px] text-danger', error && 'mt-1')}>
+        {error}
+      </p>
     </div>
   );
 }
@@ -204,7 +208,9 @@ export default function ContrastChecker() {
                     lightness
                   </div>
                 </div>
+                {/* Deliberately in the suggested colors, which may only meet 3:1 (excluded from axe like the main sample). */}
                 <div
+                  data-contrast-sample
                   className="rounded-md px-3 py-1.5 text-[13px] font-medium"
                   style={
                     adjust === 'fg'

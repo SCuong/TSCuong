@@ -23,6 +23,9 @@ export function SliderRow({
   className?: string;
 }) {
   const id = useId();
+  // The text being typed. "-" or "1." are steps towards a number but not numbers yet: without a draft the
+  // controlled field would snap back to the old value, making negative numbers impossible to type.
+  const [draft, setDraft] = useState<string | null>(null);
   return (
     <div className={cn('grid grid-cols-[minmax(0,1fr)_88px] items-center gap-x-3 gap-y-1', className)}>
       <label htmlFor={id} className="col-span-2 text-[12.5px] font-medium text-fg-secondary">
@@ -44,15 +47,18 @@ export function SliderRow({
           type="number"
           inputMode="decimal"
           className={cn('lk-field h-8 py-1 pr-7 text-right text-[13px] tabular-nums', !unit && 'pr-2')}
-          value={value}
+          value={draft ?? value}
           min={min}
           max={max}
           step={step}
           onChange={(e) => {
-            if (e.target.value === '') return;
-            const n = Number(e.target.value);
+            const text = e.target.value;
+            setDraft(text);
+            if (text === '') return;
+            const n = Number(text);
             if (Number.isFinite(n)) onChange(n);
           }}
+          onBlur={() => setDraft(null)}
         />
         {unit && <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[11.5px] text-fg-muted">{unit}</span>}
       </div>

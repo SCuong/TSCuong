@@ -84,6 +84,20 @@ export function parseCmyk(text: string): Rgb | null {
   return { mode: 'rgb', r, g, b };
 }
 
+const unit = (v: number | undefined) => (v === undefined || Number.isNaN(v) ? v : Math.min(1, Math.max(0, v)));
+
+/**
+ * CSS clamps the channels of the legacy sRGB functions when it parses them (CSS Color 4): `rgb(300 0 0)`
+ * is plain red and `hsl(0 150% 50%)` is `hsl(0 100% 50%)`. `color(srgb …)` is not clamped (it may be out of gamut).
+ */
+function clampLegacy(text: string, c: Color): Color {
+  const alpha = c.alpha === undefined ? {} : { alpha: unit(c.alpha) };
+  if (c.mode === 'rgb' && /^rgba?\(/i.test(text)) return { ...c, r: unit(c.r)!, g: unit(c.g)!, b: unit(c.b)!, ...alpha };
+  if (c.mode === 'hsl' && /^hsla?\(/i.test(text)) return { ...c, s: unit(c.s)!, l: unit(c.l)!, ...alpha };
+  if (c.mode === 'hwb' && /^hwb\(/i.test(text)) return { ...c, w: unit(c.w)!, b: unit(c.b)!, ...alpha };
+  return { ...c, ...alpha } as Color;
+}
+
 /** Parses any CSS color (plus CMYK) or throws a ColorError. */
 export function parseAny(text: string): Color {
   const s = text.trim();
@@ -93,7 +107,7 @@ export function parseAny(text: string): Color {
   else if (/^(device-)?cmyk/i.test(s)) c = parseCmyk(s) ?? undefined;
   else c = parse(s);
   if (!c) throw new ColorError(`“${s.length > 40 ? `${s.slice(0, 40)}…` : s}” is not a color this tool understands.`);
-  return c;
+  return clampLegacy(s, c);
 }
 
 /** The sRGB color used for hex/rgb output (gamut-mapped in OKLCH when needed). */

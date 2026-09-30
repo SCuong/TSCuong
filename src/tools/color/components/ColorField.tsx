@@ -65,11 +65,10 @@ export function ColorField({
         />
         <CopyButton value={value} iconOnly label={`Copy ${label}`} />
       </div>
-      {error && (
-        <p id={`${id}-err`} className="mt-1 text-[12px] text-danger">
-          {error}
-        </p>
-      )}
+      {/* Always present so screen readers announce errors politely as they appear while typing. */}
+      <p id={`${id}-err`} aria-live="polite" className={cn('text-[12px] text-danger', error && 'mt-1')}>
+        {error}
+      </p>
     </div>
   );
 }

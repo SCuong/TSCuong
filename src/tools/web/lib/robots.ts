@@ -263,7 +263,10 @@ export function productToken(userAgent: string): string {
   return (/^[A-Za-z0-9_-]+/.exec(t)?.[0] ?? '').toLowerCase();
 }
 
-/** Normalizes a path for comparison: uppercase percent-escapes, encode non-ASCII and spaces as UTF-8. */
+/**
+ * Normalizes a path for comparison (RFC 9309 §2.2.2): non-ASCII characters and spaces are percent-encoded
+ * as UTF-8, escapes are upper-cased, and escaped unreserved characters are decoded (`%62%61%7A` → `baz`).
+ */
 export function normalizePath(path: string): string {
   let out = '';
   for (const ch of path) {
@@ -272,7 +275,35 @@ export function normalizePath(path: string): string {
       out += Array.from(new TextEncoder().encode(ch), (b) => `%${b.toString(16).toUpperCase().padStart(2, '0')}`).join('');
     } else out += ch;
   }
-  return out.replace(/%[0-9a-f]{2}/gi, (m) => m.toUpperCase());
+  return out.replace(/%[0-9a-f]{2}/gi, (m) => {
+    const ch = String.fromCharCode(parseInt(m.slice(1), 16));
+    return /[A-Za-z0-9\-._~]/.test(ch) ? ch : m.toUpperCase();
+  });
+}
+
+/**
+ * Whether a normalized path matches a normalized robots.txt pattern: `*` matches any run of characters and a
+ * trailing `$` anchors the end. Runs in O(pattern × path) like Google's reference parser, so patterns such as
+ * `/*a*a*a*a*b` cannot hang the page the way a backtracking regular expression would.
+ */
+export function matchesPattern(pattern: string, path: string): boolean {
+  // Every position in `path` where the pattern read so far can end, in ascending order.
+  let positions = [0];
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '$' && i === pattern.length - 1) return positions[positions.length - 1] === path.length;
+    if (c === '*') {
+      const from = positions[0];
+      positions = [];
+      for (let p = from; p <= path.length; p++) positions.push(p);
+      continue;
+    }
+    const next: number[] = [];
+    for (const p of positions) if (p < path.length && path[p] === c) next.push(p + 1);
+    if (!next.length) return false;
+    positions = next;
+  }
+  return true;
 }
 
 /** Compiles a robots.txt path pattern (* wildcard, $ end anchor) into a RegExp anchored at the start. */
@@ -313,6 +344,16 @@ export interface MatchResult {
   reason: string;
 }
 
+/**
+ * The product token a `User-agent:` line names, lower-cased: `Googlebot/2.1` names `googlebot` (crawlers
+ * compare only the token, as Google's parser does). `*` stays `*`.
+ */
+export function groupToken(value: string): string {
+  const v = value.trim();
+  if (v === '*' || /^\*\s/.test(v)) return '*';
+  return (/^[A-Za-z0-9_-]+/.exec(v)?.[0] ?? '').toLowerCase();
+}
+
 /** Picks the groups for a crawler: the most specific user-agent match, else `*`. All groups with that value are combined. */
 export function selectGroups(robots: ParsedRobots, userAgent: string): ParsedGroup[] {
   const token = productToken(userAgent);
@@ -320,7 +361,7 @@ export function selectGroups(robots: ParsedRobots, userAgent: string): ParsedGro
   if (token) {
     for (const g of robots.groups) {
       for (const a of g.userAgents) {
-        const v = a.toLowerCase();
+        const v = groupToken(a);
         // Exact product token, or a more general token of the same family (googlebot-news → googlebot).
         const matches = token === v || token.startsWith(`${v}-`);
         if (v !== '*' && matches && v.length > best.length) best = v;
@@ -328,7 +369,7 @@ export function selectGroups(robots: ParsedRobots, userAgent: string): ParsedGro
     }
   }
   const wanted = best || '*';
-  return robots.groups.filter((g) => g.userAgents.some((a) => a.toLowerCase() === wanted));
+  return robots.groups.filter((g) => g.userAgents.some((a) => groupToken(a) === wanted));
 }
 
 /**
@@ -349,8 +390,9 @@ export function isAllowed(robots: ParsedRobots, userAgent: string, urlOrPath: st
   for (const g of groups) {
     for (const r of g.rules) {
       if (!r.path) continue;
-      if (!patternToRegExp(r.path).test(target)) continue;
-      const len = normalizePath(r.path).length;
+      const pattern = normalizePath(r.path);
+      if (!matchesPattern(pattern, target)) continue;
+      const len = pattern.length;
       if (len > winnerLen || (len === winnerLen && r.type === 'allow' && winner?.type === 'disallow')) {
         winner = r;
         winnerLen = len;

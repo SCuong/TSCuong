@@ -2,6 +2,7 @@
 
 export const MAX_URLS = 50_000;
 export const MAX_BYTES = 50 * 1024 * 1024;
+/** A <loc> must be shorter than this (sitemaps.org: "less than 2,048 characters"). */
 export const MAX_URL_LENGTH = 2048;
 
 export const CHANGEFREQS = ['always', 'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'] as const;
@@ -71,8 +72,10 @@ export function depthPriority(url: URL): number {
   return Math.max(0.1, Math.round((1 - depth * 0.2) * 10) / 10);
 }
 
+/** 0.5 → "0.5", 1 → "1.0", 0.25 → "0.25" (at most two decimals). */
 export function formatPriority(p: number): string {
-  return (Math.round(p * 10) / 10).toFixed(1);
+  const r = Math.round(p * 100) / 100;
+  return Number.isInteger(r * 10) ? r.toFixed(1) : r.toFixed(2);
 }
 
 export function buildSitemap(text: string, options: SitemapOptions): SitemapBuild {
@@ -107,6 +110,12 @@ export function buildSitemap(text: string, options: SitemapOptions): SitemapBuil
     const line = i + 1;
     const input = raw.trim();
     if (!input || input.startsWith('#')) return;
+    // The URL parser would silently delete tabs and encode spaces, turning "url<TAB>date" or two URLs on
+    // one line into a single wrong URL.
+    if (/\s/.test(input)) {
+      issues.push({ line, input, level: 'error', message: 'Contains spaces or tabs. Put one URL per line and encode spaces as %20.' });
+      return;
+    }
     let url: URL;
     const absolute = /^[a-z][a-z0-9+.-]*:/i.test(input);
     try {
@@ -127,8 +136,8 @@ export function buildSitemap(text: string, options: SitemapOptions): SitemapBuil
     }
     if (options.stripFragments) url.hash = '';
     const loc = url.href;
-    if (loc.length > MAX_URL_LENGTH) {
-      issues.push({ line, input, level: 'error', message: `Longer than ${MAX_URL_LENGTH} characters.` });
+    if (loc.length >= MAX_URL_LENGTH) {
+      issues.push({ line, input, level: 'error', message: `${loc.length.toLocaleString('en-US')} characters long; sitemap URLs must be shorter than ${MAX_URL_LENGTH.toLocaleString('en-US')}.` });
       return;
     }
     if (seen.has(loc)) {

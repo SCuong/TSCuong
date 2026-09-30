@@ -39,9 +39,16 @@ export function contrastRatio(fg: Color, bg: Color): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** Display rounding that never rounds a failing ratio up to a passing one. */
+const THRESHOLDS = [3, 4.5, 7];
+
+/**
+ * Rounds to two decimals like other checkers (#777 on white shows 4.48:1), except that a failing ratio is
+ * never rounded up to a threshold it does not meet (4.499 shows 4.49:1, not 4.50:1).
+ */
 export function formatRatio(ratio: number): string {
-  return `${(Math.floor(ratio * 100) / 100).toFixed(2)}:1`;
+  const rounded = Math.round(ratio * 100) / 100;
+  const crosses = THRESHOLDS.some((t) => ratio < t && rounded >= t);
+  return `${(crosses ? Math.floor(ratio * 100) / 100 : rounded).toFixed(2)}:1`;
 }
 
 export interface Criterion {

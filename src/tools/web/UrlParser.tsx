@@ -149,7 +149,7 @@ function Params({ url }: { url: ParsedUrl }) {
       {url.params.length === 0 ? (
         <p className="text-[13px] text-fg-muted">This URL has no query string.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Query parameters">
           <table className="w-full min-w-[420px] text-left text-[13px]">
             <thead className="text-[12px] text-fg-muted">
               <tr className="border-b border-line">

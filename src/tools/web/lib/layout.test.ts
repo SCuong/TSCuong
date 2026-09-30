@@ -81,6 +81,14 @@ describe('aspect ratio', () => {
     expect(approximate(1.7777778)).toEqual({ w: 16, h: 9 });
   });
 
+  // Regression: an unlocked width of 0.5 next to a height of 1280 produced the invalid ratio "0:1".
+  it('keeps extreme decimal ratios instead of approximating them to zero', () => {
+    expect(simplifyRatio(0.5, 1280)).toEqual({ w: 0.5, h: 1280 });
+    expect(ratioLabel(simplifyRatio(0.5, 1280)!)).toBe('0.5:1280');
+    expect(parseRatio('0.5:1280')).toEqual({ w: 0.5, h: 1280 });
+    expect(simplifyRatio(1000.5, 1)).toEqual({ w: 2001, h: 2 });
+  });
+
   it('solves missing sides', () => {
     expect(solveHeight(1920, { w: 16, h: 9 })).toBe(1080);
     expect(solveWidth(1080, { w: 9, h: 16 })).toBe(607.5);

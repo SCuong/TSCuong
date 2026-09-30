@@ -343,7 +343,7 @@ export default function RobotsTxtGenerator() {
                 <tbody className="divide-y divide-line">
                   {AI_CRAWLERS.map((c) => (
                     <tr key={c.token} className="align-top">
-                      <td className="py-1.5 pr-3 font-mono text-[12.5px] text-fg">{c.token}</td>
+                      <td className="py-1.5 pr-3 font-mono text-[12.5px] whitespace-nowrap text-fg">{c.token}</td>
                       <td className="py-1.5 pr-3 text-fg-secondary">{c.owner}</td>
                       <td className="py-1.5 text-fg-secondary">
                         {c.purpose}

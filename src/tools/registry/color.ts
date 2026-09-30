@@ -39,12 +39,12 @@ export const colorTools: ToolDefinition[] = [
   {
     id: 'color-blindness-simulator',
     name: 'Color Blindness Simulator',
-    description: 'Preview how a palette looks with protanopia, deuteranopia, tritanopia and achromatopsia.',
+    description: 'Preview how a palette, image or screenshot looks with protanopia, deuteranopia, tritanopia and achromatopsia.',
     category: 'color',
     icon: Eye,
     route: 'color/blindness-simulator',
-    keywords: ['color blindness', 'colorblind', 'cvd', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia', 'accessibility', 'simulate', 'palette'],
-    aliases: ['colorblind simulator', 'color vision deficiency', 'daltonism simulator'],
+    keywords: ['color blindness', 'colorblind', 'cvd', 'protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia', 'accessibility', 'simulate', 'palette', 'image', 'photo', 'screenshot', 'red green'],
+    aliases: ['colorblind simulator', 'color vision deficiency', 'daltonism simulator', 'color blind image test', 'simulate color blindness on image'],
     load: () => import('../color/ColorBlindnessSimulator'),
   },
 ];

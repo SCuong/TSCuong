@@ -7,7 +7,7 @@ import { IconButton } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Panel';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { buildPreviewDocument } from './lib/preview';
+import { buildPreviewDocument, type ConsoleMessage } from './lib/preview';
 
 const TOOL = 'html-preview';
 
@@ -82,8 +82,12 @@ export default function HtmlPreview() {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return;
-      const data = event.data as { __lk?: string; level?: string; text?: string } | null;
+      const data = event.data as Partial<ConsoleMessage> | null;
       if (!data || data.__lk !== token || typeof data.text !== 'string') return;
+      if (data.level === 'clear') {
+        setLogs([]);
+        return;
+      }
       const line = { id: ++seq.current, level: String(data.level ?? 'log'), text: data.text.slice(0, 2000) };
       setLogs((prev) => [...prev.slice(-199), line]);
     };
@@ -154,14 +158,17 @@ export default function HtmlPreview() {
               <IconButton icon={RotateCw} label="Reload preview" size="sm" onClick={() => { setLogs([]); setReloadKey((k) => k + 1); }} />
             </div>
           </header>
-          <div className="lk-checker h-[460px] overflow-auto">
+          <div className="lk-checker h-[460px] overflow-auto" tabIndex={0} role="region" aria-label="Preview area">
             <iframe
-              key={reloadKey}
+              // A new frame whenever the sandbox changes: browsers apply sandbox flags when a document loads, so
+              // reusing the frame would load the next document with the previous flags (scripts still running
+              // after "Run JavaScript" is turned off, or not running after it is turned on).
+              key={`${reloadKey}-${runScripts ? 'js' : 'nojs'}`}
               ref={frame}
               title="Live preview"
-              srcDoc={doc}
               // Never allow-same-origin: the page runs in an opaque origin, isolated from LocalKit.
               sandbox={runScripts ? 'allow-scripts' : ''}
+              srcDoc={doc}
               referrerPolicy="no-referrer"
               className="mx-auto block h-full border-0 bg-white"
               style={{ width: frameWidth, minWidth: width === 'full' ? undefined : frameWidth }}
@@ -172,7 +179,7 @@ export default function HtmlPreview() {
               <span className="text-[12.5px] font-medium text-fg-secondary">Console {logs.length > 0 && <Badge>{logs.length}</Badge>}</span>
               <IconButton icon={Trash2} label="Clear console" size="sm" disabled={!logs.length} onClick={() => setLogs([])} />
             </div>
-            <div className="h-24 overflow-auto px-3 pb-2 font-mono text-[12px]" aria-live="polite">
+            <div className="h-24 overflow-auto px-3 pb-2 font-mono text-[12px]" role="log" aria-label="Console output" tabIndex={0}>
               {!runScripts && <p className="text-fg-muted">Console output appears here when JavaScript is running.</p>}
               {runScripts && logs.length === 0 && <p className="text-fg-muted">No output yet.</p>}
               {logs.map((l) => (

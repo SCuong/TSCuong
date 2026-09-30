@@ -1,11 +1,11 @@
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
-import { ErrorMessage } from '@/components/ui/Alert';
+import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { Switch } from '@/components/ui/Field';
-import { Spinner } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
-import { errorMessage, formatBytes } from '@/lib/utils';
-import { DEFAULT_HTML_OPTIONS, defaultHooks, minifyHtml, type HtmlMinifyOptions } from './lib/htmlMinify';
-import { SizeSavingsBar, useAsyncResult } from './code/shared';
+import { formatBytes, pluralize } from '@/lib/utils';
+import { DEFAULT_HTML_OPTIONS, type HtmlMinifyOptions } from './lib/htmlMinify';
+import { useCodeJob } from './code/codeRunner';
+import { JobStatus, SizeSavingsBar, settledOutcome, useByteSize } from './code/shared';
 
 const SAMPLE = `<!doctype html>
 <html lang="en">
@@ -45,15 +45,22 @@ const SAMPLE = `<!doctype html>
 
 export default function HtmlMinifier() {
   const [input, setInput] = useToolState('html-minifier', 'input', '');
-  const [opts, setOpts] = useToolState<HtmlMinifyOptions>('html-minifier', 'options', DEFAULT_HTML_OPTIONS);
-  const debounced = useDebouncedValue(input, 250);
-  const set = <K extends keyof HtmlMinifyOptions>(k: K, v: HtmlMinifyOptions[K]) => setOpts((o) => ({ ...o, [k]: v }));
+  const [stored, setOpts] = useToolState<HtmlMinifyOptions>('html-minifier', 'options', DEFAULT_HTML_OPTIONS);
+  const opts = { ...DEFAULT_HTML_OPTIONS, ...stored };
+  const debounced = useDebouncedValue(input, input.length > 200_000 ? 500 : 250);
+  const set = <K extends keyof HtmlMinifyOptions>(k: K, v: HtmlMinifyOptions[K]) => setOpts((o) => ({ ...DEFAULT_HTML_OPTIONS, ...o, [k]: v }));
 
-  const result = useAsyncResult(debounced.trim() ? JSON.stringify([debounced, opts]) : null, () =>
-    minifyHtml(debounced, opts, defaultHooks()),
-  );
-  const output = input.trim() && result.status === 'done' ? result.value : '';
-  const error = input.trim() && result.status === 'error' ? errorMessage(result.error) : null;
+  // Runs in a worker: large pages with inline scripts never freeze the page.
+  const key = debounced.trim() ? JSON.stringify([debounced, opts]) : null;
+  const job = useCodeJob<'minify-html'>(key, () => ({ kind: 'minify-html', code: debounced, options: opts }));
+  const empty = !input.trim();
+  const settled = empty ? null : settledOutcome(job.state, job.previous);
+  const output = settled?.status === 'done' ? settled.value.html : '';
+  const warnings = settled?.status === 'done' ? settled.value.warnings : [];
+  const error = settled?.status === 'error' ? settled.error.message : null;
+  const inputBytes = useByteSize(input);
+  const outputBytes = useByteSize(output);
+  const status = empty ? 'idle' : job.state.status;
 
   return (
     <ToolStack>
@@ -65,6 +72,18 @@ export default function HtmlMinifier() {
         <Switch label="Minify inline JS" checked={opts.minifyJs} onChange={(v) => set('minifyJs', v)} />
       </ToolBar>
       <ErrorMessage error={error} title="Could not minify" />
+      {warnings.length > 0 && (
+        <Alert tone="warning" title={`${pluralize(warnings.length, 'block')} could not be minified and ${warnings.length === 1 ? 'was' : 'were'} kept as written`}>
+          <ul className="list-disc space-y-0.5 pl-4">
+            {warnings.slice(0, 8).map((w, n) => (
+              <li key={n}>
+                Line {w.line}, column {w.column} (&lt;{w.block}&gt;): {w.message}
+              </li>
+            ))}
+          </ul>
+          {warnings.length > 8 && <p className="mt-1">…and {warnings.length - 8} more.</p>}
+        </Alert>
+      )}
       {output && <SizeSavingsBar before={input} after={output} />}
       <SplitPanes>
         <EditorPanel
@@ -74,10 +93,10 @@ export default function HtmlMinifier() {
           language="html"
           placeholder="Paste HTML here…"
           sample={SAMPLE}
-          fileAccept=".html,.htm,text/html,text/plain"
+          fileAccept=".html,.htm,.xhtml,text/html,text/plain"
           invalid={Boolean(error)}
           height="480px"
-          footer={input ? <span>{formatBytes(new Blob([input]).size)}</span> : undefined}
+          footer={input ? <span>{formatBytes(inputBytes)}</span> : undefined}
         />
         <EditorPanel
           title="Minified"
@@ -87,12 +106,19 @@ export default function HtmlMinifier() {
           downloadName="index.min.html"
           downloadType="text/html"
           height="480px"
-          footer={result.status === 'pending' && input.trim() ? <Spinner size={13} label="Minifying…" /> : undefined}
+          footer={
+            status === 'pending' || status === 'cancelled' ? (
+              <JobStatus status={status} busyLabel="Minifying…" onCancel={job.cancel} />
+            ) : output ? (
+              <span>{formatBytes(outputBytes)}</span>
+            ) : undefined
+          }
         />
       </SplitPanes>
       <p className="text-[12.5px] leading-relaxed text-fg-muted">
-        Conditional comments and the contents of &lt;pre&gt;, &lt;textarea&gt;, &lt;script&gt; and &lt;style&gt; are never
-        reflowed. Whitespace next to inline elements is kept as a single space so words never merge. Scripts with an unknown
+        Conditional comments, server-side include directives (<code className="font-mono">&lt;!--#include …--&gt;</code>) and
+        Knockout bindings are kept. The contents of &lt;pre&gt;, &lt;textarea&gt;, &lt;script&gt;, &lt;style&gt; and of elements
+        styled with <code className="font-mono">white-space: pre</code> are never reflowed. Whitespace next to inline elements is kept as a single space so words never merge. Scripts with an unknown
         type (templates) are left untouched; JSON and JSON-LD scripts are compacted.
       </p>
     </ToolStack>

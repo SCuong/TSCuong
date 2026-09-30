@@ -24,6 +24,26 @@ export const DEFAULT_TURNDOWN: HtmlToMarkdownOptions = {
   gfm: true,
 };
 
+/**
+ * Escapes text that Markdown renderers would otherwise read as markup: `<div>` written as text would
+ * become an HTML tag and `&amp;` an entity, so the rendered Markdown would lose or change it.
+ */
+export function escapeHtmlLikeText(text: string): string {
+  return text.replace(/<(?=[A-Za-z/!?])/g, '\\<').replace(/&(?=#?[A-Za-z0-9]+;)/g, '\\&');
+}
+
+/**
+ * Content for one GFM table cell: a `|` would end the cell and a line break would end the row,
+ * so pipes are escaped and line breaks become `<br>` (paragraphs `<br><br>`).
+ */
+export function tableCellContent(content: string): string {
+  return content
+    .trim()
+    .replace(/\|/g, '\\|')
+    .replace(/[ \t]*\n[ \t]*\n\s*/g, '<br><br>')
+    .replace(/[ \t]*\n[ \t]*/g, '<br>');
+}
+
 /** Sanitizes HTML (dropping scripts, styles and event handlers) and converts it to Markdown. */
 export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions): string {
   if (!html.trim()) return '';
@@ -38,6 +58,20 @@ export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions): st
     linkStyle: options.linkStyle,
     hr: '---',
   });
-  if (options.gfm) service.use(gfm);
+  const escape = service.escape.bind(service);
+  service.escape = (text: string) => escapeHtmlLikeText(escape(text));
+  if (options.gfm) {
+    service.use(gfm);
+    // Rules added later take precedence over the plugin's.
+    // GFM strikethrough is ~~text~~; single tildes are subscript in Pandoc and unsupported by many renderers.
+    service.addRule('strikethrough', { filter: (node) => ['DEL', 'S', 'STRIKE'].includes(node.nodeName), replacement: (content) => `~~${content}~~` });
+    service.addRule('tableCell', {
+      filter: ['th', 'td'],
+      replacement: (content, node) => {
+        const index = Array.prototype.indexOf.call(node.parentNode?.childNodes ?? [], node);
+        return `${index === 0 ? '| ' : ' '}${tableCellContent(content)} |`;
+      },
+    });
+  }
   return service.turndown(clean).trim() + '\n';
 }

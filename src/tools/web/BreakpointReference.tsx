@@ -96,7 +96,7 @@ export default function BreakpointReference() {
         }
         bodyClassName="p-0"
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`${framework.name} breakpoints`}>
           <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead className="text-[12px] text-fg-muted">
               <tr className="border-b border-line">
@@ -253,7 +253,7 @@ export default function BreakpointReference() {
           }
           bodyClassName="p-0"
         >
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Common device viewports">
             <table className="w-full min-w-[340px] text-left text-[13px]">
               <thead className="text-[12px] text-fg-muted">
                 <tr className="border-b border-line">

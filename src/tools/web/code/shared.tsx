@@ -1,37 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Feedback';
 import { cn, formatBytes } from '@/lib/utils';
-import { sizeSavings } from '../lib/sizes';
+import { byteLength, sizeSavings } from '../lib/sizes';
+import type { CodeJobState, CodeOutcome } from './codeRunner';
 
-export type AsyncResult<T> = { status: 'idle' } | { status: 'pending' } | { status: 'done'; value: T } | { status: 'error'; error: unknown };
+/** The outcome to display: the current one, or the previous one while a new job runs. */
+export function settledOutcome<T>(state: CodeJobState<T>, previous: CodeOutcome<T> | null): CodeOutcome<T> | null {
+  if (state.status === 'idle') return null;
+  if (state.status === 'pending') return previous?.status === 'cancelled' ? null : previous;
+  return state;
+}
 
-/**
- * Runs an async transform whenever `key` changes, ignoring stale results.
- * `key` must capture every input of `run`; pass null to reset to idle.
- */
-export function useAsyncResult<T>(key: string | null, run: () => Promise<T>): AsyncResult<T> {
-  const [state, setState] = useState<{ key: string | null; result: AsyncResult<T> }>({ key: null, result: { status: 'idle' } });
-  useEffect(() => {
-    if (key === null) return;
-    let cancelled = false;
-    run().then(
-      (value) => !cancelled && setState({ key, result: { status: 'done', value } }),
-      (error: unknown) => !cancelled && setState({ key, result: { status: 'error', error } }),
+/** Footer content for a running or stopped worker job. Returns null when there is nothing to say. */
+export function JobStatus({ status, busyLabel, onCancel }: { status: CodeJobState<unknown>['status']; busyLabel: string; onCancel: () => void }) {
+  if (status === 'pending') {
+    return (
+      <span className="flex items-center gap-2">
+        <Spinner size={13} label={busyLabel} />
+        <Button size="sm" variant="ghost" onClick={onCancel} className="h-7">
+          Cancel
+        </Button>
+      </span>
     );
-    return () => {
-      cancelled = true;
-    };
-    // `key` captures the inputs of `run` by contract.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  if (key === null) return { status: 'idle' };
-  if (state.key !== key) return { status: 'pending' };
-  return state.result;
+  }
+  if (status === 'cancelled') return <span role="status">Stopped. Edit the input or change an option to run it again.</span>;
+  return null;
+}
+
+/** UTF-8 size of a text, memoized (inputs can be megabytes). */
+export function useByteSize(text: string): number {
+  return useMemo(() => byteLength(text), [text]);
 }
 
 /** Original → minified sizes with the percentage saved. */
 export function SizeSavingsBar({ before, after }: { before: string; after: string }) {
-  const s = sizeSavings(before, after);
+  const s = useMemo(() => sizeSavings(before, after), [before, after]);
   const pct = s.ratio * 100;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
