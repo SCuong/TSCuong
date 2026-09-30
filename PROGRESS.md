@@ -20,13 +20,14 @@ Committed since 14:11 (all verified: tsc, eslint, vitest, audit crawler with --a
     palette quick actions (4a4db6d); EditorPanel extensions/onReady, CodePanel removed (a1b9041);
     catalog generator npm run docs:tools (93e8005); docs ARCHITECTURE/TESTING
 Background agents (they own these files; do NOT start duplicates; resume with SendMessage):
-  - audit-web: src/tools/web/**, color/**, e2e/audit-web.spec.ts
+  - audit-data: src/tools/data/**, json/**, e2e/audit-data.spec.ts
   - audit-workspaces-a: src/tools/notes/**, diagrams/**, snippets/**, e2e/audit-workspaces-a.spec.ts
   - audit-workspaces-b: src/tools/sqlite/**, filesearch/**, api/**, companion/**, e2e/audit-workspaces-b.spec.ts
   - audit-utilities: src/tools/math/**, network/**, generators/**, files/**, e2e/audit-utilities.spec.ts
 Done in session 4 (Sep 30 morning): text/encoding audit (8b81f11), image/QR audit 27 fixes (f9d3231),
 Trojan-source guard check:invisible (31306d3), shared error/large-output/ToolBar fixes (e3149eb).
-Still to launch: audit data+json (data.ts, json.ts) and security+git+datetime (security.ts, git.ts, datetime.ts).
+Done: web/color audit (7ab4415), drop guard + remote-content hardening (059b6f8).
+Still to launch: audit security+git+datetime (security.ts, git.ts, datetime.ts).
 Held uncommitted by the lead until security is verified: docs/PRIVACY.md, docs/BROWSER_SUPPORT.md, docs/TOOLS.md.
 Briefs: scratchpad agent-brief.md (builders), audit-brief.md (auditors).
 
