@@ -6,13 +6,14 @@
 //   node scripts/audit-tools.mjs [--base=http://localhost:5173] [--filter=pdf/]
 //        [--files=pdf.ts,image.ts] [--skip-files=web.ts]
 //        [--themes=dark,light] [--viewports=desktop,mobile] [--shots=dir]
-//        [--concurrency=4] [--json=report.json] [--axe]
+//        [--concurrency=4] [--json=report.json] [--locale=en|vi] [--axe]
 //
 // --axe additionally runs axe-core (WCAG 2.1 A/AA) on each tool's <main> and reports violations.
 import { chromium } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 
 const args = Object.fromEntries(
   process.argv.slice(2).map((a) => {
@@ -21,6 +22,20 @@ const args = Object.fromEntries(
   }),
 );
 const base = args.base ?? 'http://localhost:5173';
+const locale = args.locale ?? 'en';
+if (!['en', 'vi'].includes(locale)) throw new Error('--locale must be en or vi');
+const localizedNames = new Map();
+if (locale === 'vi') {
+  const source = ts.createSourceFile('tools.ts', readFileSync('src/i18n/vi/tools.ts', 'utf8'), ts.ScriptTarget.Latest, true);
+  const visit = (node) => {
+    if (ts.isPropertyAssignment(node) && ts.isStringLiteral(node.initializer)) {
+      const key = ts.isStringLiteral(node.name) || ts.isIdentifier(node.name) ? node.name.text : null;
+      if (key) localizedNames.set(key, node.initializer.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
 const themes = (args.themes ?? 'dark,light').split(',');
 const viewports = (args.viewports ?? 'desktop,mobile').split(',');
 const concurrency = Number(args.concurrency ?? 4);
@@ -44,7 +59,7 @@ const selected = tools.filter(
     (!onlyFiles || onlyFiles.includes(t.file)) &&
     !skipFiles.includes(t.file),
 );
-console.log(`Auditing ${selected.length} of ${tools.length} tools × ${themes.length} themes × ${viewports.length} viewports`);
+console.log(`Auditing ${selected.length} of ${tools.length} tools × ${themes.length} themes × ${viewports.length} viewports (${locale})`);
 
 const PLACEHOLDER = /coming soon|not (?:yet )?implemented|\bTODO\b|\bFIXME\b|\bstub\b|lorem placeholder/i;
 /** Tools whose legitimate content matches the placeholder pattern (e.g. HTTP 501 "Not Implemented"). */
@@ -72,7 +87,7 @@ async function auditOne(context, tool, theme, viewport) {
       .waitForFunction(
         () =>
           ![...document.querySelectorAll('main [role="status"]')].some((el) =>
-            /^\s*Loading/i.test(el.textContent ?? ''),
+            /^\s*(Loading|Đang tải)/i.test(el.textContent ?? ''),
           ),
         null,
         { timeout: 25_000 },
@@ -85,14 +100,15 @@ async function auditOne(context, tool, theme, viewport) {
       return {
         h1: document.querySelector('h1')?.textContent ?? '',
         overflow: document.documentElement.scrollWidth - window.innerWidth,
-        crashed: /This tool ran into a problem|This tool could not be loaded/.test(text),
-        notFound: /Page not found/.test(text),
+        crashed: /This tool ran into a problem|This tool could not be loaded|Công cụ này gặp lỗi|Không thể tải công cụ/.test(text),
+        notFound: /Page not found|Không tìm thấy trang/.test(text),
         text: text.slice(0, 20_000),
       };
     });
     if (info.notFound) problems.push('not found');
     if (info.crashed) problems.push('ERROR BOUNDARY');
-    if (info.h1.trim() !== tool.name) problems.push(`h1 "${info.h1}" != "${tool.name}"`);
+    const expectedName = localizedNames.get(tool.name) ?? tool.name;
+    if (info.h1.trim() !== expectedName) problems.push(`h1 "${info.h1}" != "${expectedName}"`);
     if (info.overflow > 1) problems.push(`horizontal overflow ${info.overflow}px`);
     const ph = info.text.match(PLACEHOLDER);
     if (ph && !/lorem/i.test(tool.id) && !PLACEHOLDER_EXCEPTIONS[tool.id]?.test(ph[0]))
@@ -122,7 +138,7 @@ async function auditOne(context, tool, theme, viewport) {
   }
   await page.close();
   const all = [...problems, ...new Set(logs)];
-  results.push({ route: tool.route, id: tool.id, theme, viewport, ms: Date.now() - started, problems: all });
+  results.push({ route: tool.route, id: tool.id, theme, viewport, locale, ms: Date.now() - started, problems: all });
   process.stdout.write(all.length ? 'x' : '.');
 }
 
@@ -135,13 +151,14 @@ for (const viewport of viewports) {
       isMobile: viewport === 'mobile',
       hasTouch: viewport === 'mobile',
     });
-    await context.addInitScript((t) => {
+    await context.addInitScript(({ theme, locale }) => {
       try {
-        localStorage.setItem('localkit:theme', t);
+        localStorage.setItem('localkit:theme', theme);
+        localStorage.setItem('localkit:locale', locale);
       } catch {
         // sandboxed frames have no storage
       }
-    }, theme);
+    }, { theme, locale });
     const queue = [...selected];
     await Promise.all(
       Array.from({ length: concurrency }, async () => {
