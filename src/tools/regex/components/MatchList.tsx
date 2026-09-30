@@ -3,14 +3,15 @@ import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn, formatNumber } from '@/lib/utils';
 import type { MatchResult } from '../lib/match';
+import { t } from '@/lib/i18n';
 
 const PAGE = 100;
 const MAX_SHOWN_CHARS = 240;
 
 /** Show invisible characters (line breaks, tabs, empty strings) so matches are unambiguous. */
 export function VisibleText({ text, className }: { text: string | undefined; className?: string }) {
-  if (text === undefined) return <span className="text-fg-muted italic">did not participate</span>;
-  if (text === '') return <span className="text-fg-muted italic">empty</span>;
+  if (text === undefined) return <span className="text-fg-muted italic">{t('did not participate')}</span>;
+  if (text === '') return <span className="text-fg-muted italic">{t('empty')}</span>;
   const shown = text.length > MAX_SHOWN_CHARS ? text.slice(0, MAX_SHOWN_CHARS) : text;
   const parts: ReactNode[] = [];
   let buf = '';
@@ -23,7 +24,7 @@ export function VisibleText({ text, className }: { text: string | undefined; cla
     if (symbol) {
       flush();
       parts.push(
-        <span key={parts.length} className="text-fg-muted" title={ch === '\n' ? 'line feed' : ch === '\r' ? 'carriage return' : 'tab'}>
+        <span key={parts.length} className="text-fg-muted" title={ch === '\n' ? t('line feed') : ch === '\r' ? t('carriage return') : 'tab'}>
           {symbol}
         </span>,
       );
@@ -33,7 +34,7 @@ export function VisibleText({ text, className }: { text: string | undefined; cla
   return (
     <span className={cn('whitespace-pre-wrap break-all', className)}>
       {parts}
-      {shown.length < text.length && <span className="text-fg-muted">… (+{formatNumber(text.length - shown.length, 0)} chars)</span>}
+      {shown.length < text.length && <span className="text-fg-muted">{t('… (+{count} chars)', { count: formatNumber(text.length - shown.length, 0) })}</span>}
     </span>
   );
 }
@@ -54,7 +55,7 @@ export function MatchList({
 
   return (
     <div className="flex flex-col gap-2">
-      <ol className="flex flex-col gap-2" aria-label="Matches">
+      <ol className="flex flex-col gap-2" aria-label={t('Matches')}>
         {shown.map((m, i) => (
           <li key={`${m.index}-${i}`}>
             <button
@@ -74,10 +75,10 @@ export function MatchList({
                     aria-hidden
                     className={cn('inline-block size-2 rounded-full', i % 2 ? 'lk-hl-match-alt' : 'lk-hl-match')}
                   />
-                  Match {formatNumber(i + 1, 0)}
+                  {t('Match {i}', { i: formatNumber(i + 1, 0) })}
                 </span>
                 <span className="tabular-nums">
-                  index {formatNumber(m.index, 0)}–{formatNumber(m.end, 0)} · length {formatNumber(m.end - m.index, 0)}
+                  {t('index {index}–{end} · length {end2}', { index: formatNumber(m.index, 0), end: formatNumber(m.end, 0), end2: formatNumber(m.end - m.index, 0) })}
                 </span>
               </div>
               <div className="mt-1 font-mono text-[13px] text-fg">
@@ -115,7 +116,7 @@ export function MatchList({
       </ol>
       {matches.length > limit && (
         <Button size="sm" variant="ghost" className="self-center" onClick={() => setLimit((l) => l + PAGE * 2)}>
-          Show more ({formatNumber(matches.length - limit, 0)} left)
+          {t('Show more ({count} left)', { count: formatNumber(matches.length - limit, 0) })}
         </Button>
       )}
     </div>

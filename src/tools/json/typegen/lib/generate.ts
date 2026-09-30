@@ -7,6 +7,7 @@ import { emitRust } from './emit/rust';
 import { emitPython } from './emit/python';
 import { emitCSharp, emitKotlin } from './emit/csharp';
 import { emitJsonSchema } from './emit/jsonSchema';
+import { t } from '@/lib/i18n';
 
 export type TargetId =
   | 'typescript'
@@ -36,17 +37,17 @@ export interface TargetInfo {
 }
 
 export const TARGETS: TargetInfo[] = [
-  { id: 'typescript', label: 'TypeScript interfaces', language: 'typescript', filename: 'types.ts', options: ['export', 'readonly'], formatsHint: 'Dates stay strings (JSON has no date type).' },
-  { id: 'typescript-type', label: 'TypeScript type aliases', language: 'typescript', filename: 'types.ts', options: ['export', 'readonly'], formatsHint: 'Dates stay strings (JSON has no date type).' },
-  { id: 'zod', label: 'Zod schemas', language: 'typescript', filename: 'schemas.ts', options: ['export'], formatsHint: 'Adds .datetime(), .email(), .url() and .uuid() checks.' },
-  { id: 'go', label: 'Go structs', language: 'go', filename: 'types.go', options: ['goPackage'], formatsHint: 'Date-time strings become time.Time.' },
-  { id: 'rust', label: 'Rust structs (serde)', language: 'rust', filename: 'types.rs', options: ['names'], formatsHint: 'Date-time strings become chrono::DateTime<Utc>.' },
-  { id: 'python-dataclass', label: 'Python dataclasses', language: 'python', filename: 'models.py', options: ['names'], formatsHint: 'Dates stay str in dataclasses.' },
-  { id: 'python-typeddict', label: 'Python TypedDict', language: 'python', filename: 'models.py', options: [], formatsHint: 'TypedDicts describe raw JSON, so dates stay str.' },
-  { id: 'python-pydantic', label: 'Python Pydantic models', language: 'python', filename: 'models.py', options: ['names'], formatsHint: 'Date-time strings become datetime.' },
-  { id: 'csharp', label: 'C# (System.Text.Json)', language: 'csharp', filename: 'Models.cs', options: ['csharpStyle', 'names'], formatsHint: 'Date-time strings become DateTimeOffset.' },
-  { id: 'kotlin', label: 'Kotlin (kotlinx.serialization)', language: 'kotlin', filename: 'Models.kt', options: ['names'], formatsHint: 'Dates stay String (kotlinx has no built-in date serializer).' },
-  { id: 'json-schema', label: 'JSON Schema (2020-12)', language: 'json', filename: 'schema.json', options: [], formatsHint: 'Adds "format" for date-time, date, time, email, URI and UUID strings.' },
+  { id: 'typescript', label: t('TypeScript interfaces'), language: 'typescript', filename: 'types.ts', options: ['export', 'readonly'], formatsHint: t('Dates stay strings (JSON has no date type).') },
+  { id: 'typescript-type', label: t('TypeScript type aliases'), language: 'typescript', filename: 'types.ts', options: ['export', 'readonly'], formatsHint: t('Dates stay strings (JSON has no date type).') },
+  { id: 'zod', label: t('Zod schemas'), language: 'typescript', filename: 'schemas.ts', options: ['export'], formatsHint: t('Adds .datetime(), .email(), .url() and .uuid() checks.') },
+  { id: 'go', label: t('Go structs'), language: 'go', filename: 'types.go', options: ['goPackage'], formatsHint: t('Date-time strings become time.Time.') },
+  { id: 'rust', label: t('Rust structs (serde)'), language: 'rust', filename: 'types.rs', options: ['names'], formatsHint: t('Date-time strings become chrono::DateTime<Utc>.') },
+  { id: 'python-dataclass', label: t('Python dataclasses'), language: 'python', filename: 'models.py', options: ['names'], formatsHint: t('Dates stay str in dataclasses.') },
+  { id: 'python-typeddict', label: t('Python TypedDict'), language: 'python', filename: 'models.py', options: [], formatsHint: t('TypedDicts describe raw JSON, so dates stay str.') },
+  { id: 'python-pydantic', label: t('Python Pydantic models'), language: 'python', filename: 'models.py', options: ['names'], formatsHint: t('Date-time strings become datetime.') },
+  { id: 'csharp', label: t('C# (System.Text.Json)'), language: 'csharp', filename: 'Models.cs', options: ['csharpStyle', 'names'], formatsHint: t('Date-time strings become DateTimeOffset.') },
+  { id: 'kotlin', label: t('Kotlin (kotlinx.serialization)'), language: 'kotlin', filename: 'Models.kt', options: ['names'], formatsHint: t('Dates stay String (kotlinx has no built-in date serializer).') },
+  { id: 'json-schema', label: t('JSON Schema (2020-12)'), language: 'json', filename: 'schema.json', options: [], formatsHint: t('Adds "format" for date-time, date, time, email, URI and UUID strings.') },
 ];
 
 export function targetInfo(id: TargetId): TargetInfo {

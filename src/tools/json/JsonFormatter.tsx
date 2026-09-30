@@ -6,6 +6,7 @@ import { Label, Switch } from '@/components/ui/Field';
 import { useToolState } from '@/lib/hooks';
 import { formatBytes } from '@/lib/utils';
 import { formatJson, formatJsonError, minifyJson, type Indent } from './lib/json';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `{"name":"LocalKit","version":"1.0.0","private":true,"tags":["pdf","json","images"],"author":{"name":"You","url":null},"stats":{"tools":100,"uploads":0}}`;
 
@@ -27,44 +28,44 @@ export default function JsonFormatter() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Mode</Label>
+          <Label>{t('Mode')}</Label>
           <Segmented
-            label="Mode"
+            label={t('Mode')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'format', label: 'Format' },
-              { value: 'minify', label: 'Minify' },
+              { value: 'format', label: t('Format') },
+              { value: 'minify', label: t('Minify') },
             ]}
           />
         </div>
         {mode === 'format' && (
           <>
             <div>
-              <Label>Indent</Label>
+              <Label>{t('Indent')}</Label>
               <Segmented
-                label="Indent"
+                label={t('Indent')}
                 value={indent}
                 onChange={setIndent}
                 options={[
-                  { value: '2', label: '2 spaces' },
-                  { value: '4', label: '4 spaces' },
+                  { value: '2', label: t('2 spaces') },
+                  { value: '4', label: t('4 spaces') },
                   { value: 'tab', label: 'Tab' },
                 ]}
               />
             </div>
-            <Switch label="Sort keys" checked={sortKeys} onChange={setSortKeys} className="h-8" />
+            <Switch label={t('Sort keys')} checked={sortKeys} onChange={setSortKeys} className="h-8" />
           </>
         )}
       </ToolBar>
-      <ErrorMessage error={error} title="Invalid JSON" />
+      <ErrorMessage error={error} title={t('Invalid JSON')} />
       <SplitPanes>
         <EditorPanel
-          title="Input JSON"
+          title={t('Input JSON')}
           value={input}
           onChange={setInput}
           language="json"
-          placeholder="Paste JSON here…"
+          placeholder={t('Paste JSON here…')}
           sample={SAMPLE}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(error)}
@@ -72,17 +73,17 @@ export default function JsonFormatter() {
           footer={input ? <span>{formatBytes(new Blob([input]).size)}</span> : undefined}
         />
         <EditorPanel
-          title={mode === 'minify' ? 'Minified' : 'Formatted'}
+          title={mode === 'minify' ? t('Minified') : t('Formatted')}
           value={output}
           language="json"
           downloadName={mode === 'minify' ? 'data.min.json' : 'data.json'}
           downloadType="application/json"
-          placeholder="Result appears here"
+          placeholder={t('Result appears here')}
           height="480px"
           footer={
             output ? (
               <>
-                <span className="text-success">Valid JSON</span>
+                <span className="text-success">{t('Valid JSON')}</span>
                 <span>{formatBytes(new Blob([output]).size)}</span>
               </>
             ) : undefined

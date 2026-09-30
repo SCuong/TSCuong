@@ -12,6 +12,7 @@ import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, formatNumber } from '@/lib/utils';
 import { formatJsonError, parseJson } from './lib/json';
 import { diffJson, normalizeForText, sideBySide, summarize, type AlignedRow, type DiffEntry, type DiffKind } from './lib/jsonDiff';
+import { t } from '@/lib/i18n';
 
 const SAMPLE_A = JSON.stringify(
   { id: 7, name: 'Widget', price: 9.99, tags: ['tools', 'sale'], stock: { warehouse: 12, store: 3 }, legacy: true },
@@ -38,16 +39,16 @@ const KIND_TONE: Record<DiffKind, 'success' | 'danger' | 'warning'> = { added: '
 function DiffTable({ entries, filter }: { entries: DiffEntry[]; filter: 'all' | DiffKind }) {
   const list = filter === 'all' ? entries : entries.filter((e) => e.kind === filter);
   const shown = list.slice(0, MAX_TABLE_ROWS);
-  if (list.length === 0) return <EmptyState title="No differences of this kind" />;
+  if (list.length === 0) return <EmptyState title={t('No differences of this kind')} />;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-left text-[12.5px]">
         <thead>
           <tr className="border-b border-line text-[12px] text-fg-muted">
-            <th className="px-3 py-2 font-medium">Path</th>
-            <th className="px-3 py-2 font-medium">Change</th>
-            <th className="px-3 py-2 font-medium">Before</th>
-            <th className="px-3 py-2 font-medium">After</th>
+            <th className="px-3 py-2 font-medium">{t('Path')}</th>
+            <th className="px-3 py-2 font-medium">{t('Change')}</th>
+            <th className="px-3 py-2 font-medium">{t('Before')}</th>
+            <th className="px-3 py-2 font-medium">{t('After')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line font-mono">
@@ -65,7 +66,7 @@ function DiffTable({ entries, filter }: { entries: DiffEntry[]; filter: 'all' | 
       </table>
       {list.length > MAX_TABLE_ROWS && (
         <p className="border-t border-line px-3 py-2 text-[12.5px] text-fg-muted">
-          Showing the first {formatNumber(MAX_TABLE_ROWS)} of {formatNumber(list.length)} differences.
+          {t('Showing the first {MAX_TABLE_ROWS} of {count} differences.', { MAX_TABLE_ROWS: formatNumber(MAX_TABLE_ROWS), count: formatNumber(list.length) })}
         </p>
       )}
     </div>
@@ -136,44 +137,44 @@ export default function JsonDiff() {
     <ToolStack>
       <SplitPanes>
         <EditorPanel code
-          title="Original"
+          title={t('Original')}
           value={left}
           onChange={setLeft}
           language="json"
-          placeholder="Paste the original JSON…"
+          placeholder={t('Paste the original JSON…')}
           sample={SAMPLE_A}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(pa && !pa.ok)}
           height="300px"
         />
         <EditorPanel code
-          title="Modified"
+          title={t('Modified')}
           value={right}
           onChange={setRight}
           language="json"
-          placeholder="Paste the modified JSON…"
+          placeholder={t('Paste the modified JSON…')}
           sample={SAMPLE_B}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(pb && !pb.ok)}
           height="300px"
         />
       </SplitPanes>
-      {pa && !pa.ok && <ErrorMessage title="Original is not valid JSON" error={formatJsonError(pa.error)} />}
-      {pb && !pb.ok && <ErrorMessage title="Modified is not valid JSON" error={formatJsonError(pb.error)} />}
+      {pa && !pa.ok && <ErrorMessage title={t('Original is not valid JSON')} error={formatJsonError(pa.error)} />}
+      {pb && !pb.ok && <ErrorMessage title={t('Modified is not valid JSON')} error={formatJsonError(pb.error)} />}
       <ToolBar>
         <div>
-          <Label>View</Label>
+          <Label>{t('View')}</Label>
           <Segmented
-            label="View"
+            label={t('View')}
             value={view}
             onChange={setView}
             options={[
-              { value: 'table', label: 'Changes table' },
-              { value: 'text', label: 'Side by side' },
+              { value: 'table', label: t('Changes table') },
+              { value: 'text', label: t('Side by side') },
             ]}
           />
         </div>
-        <Switch label="Ignore array order" checked={ignoreOrder} onChange={setIgnoreOrder} className="h-8" />
+        <Switch label={t('Ignore array order')} checked={ignoreOrder} onChange={setIgnoreOrder} className="h-8" />
         <Button
           size="sm"
           variant="ghost"
@@ -185,42 +186,42 @@ export default function JsonDiff() {
             setRight(left);
           }}
         >
-          Swap sides
+          {t('Swap sides')}
         </Button>
         {stats && (
           <div className="ml-auto flex flex-wrap items-center gap-1.5 self-center">
-            <Badge tone="success">+{formatNumber(stats.added)} added</Badge>
-            <Badge tone="danger">−{formatNumber(stats.removed)} removed</Badge>
-            <Badge tone="warning">~{formatNumber(stats.changed)} changed</Badge>
+            <Badge tone="success">{t('+{added} added', { added: formatNumber(stats.added) })}</Badge>
+            <Badge tone="danger">{t('−{removed} removed', { removed: formatNumber(stats.removed) })}</Badge>
+            <Badge tone="warning">{t('~{changed} changed', { changed: formatNumber(stats.changed) })}</Badge>
           </div>
         )}
       </ToolBar>
 
       {!ready ? (
         <Panel>
-          <EmptyState icon={GitCompare} title="Compare two JSON documents">
-            Paste or open both documents. Keys are compared structurally, so formatting and key order never count as changes.
+          <EmptyState icon={GitCompare} title={t('Compare two JSON documents')}>
+            {t('Paste or open both documents. Keys are compared structurally, so formatting and key order never count as changes.')}
           </EmptyState>
         </Panel>
       ) : stats?.total === 0 ? (
-        <Alert tone="success" title="No differences">
-          Both documents are semantically equal{ignoreOrder ? ' (ignoring array order)' : ''}.
+        <Alert tone="success" title={t('No differences')}>
+          {t('Both documents are semantically equal')}{ignoreOrder ? ' ' + t('(ignoring array order)') : ''}.
         </Alert>
       ) : view === 'table' ? (
         <Panel
-          title="Changes"
+          title={t('Changes')}
           bodyClassName="p-0"
           actions={
             <Segmented
-              label="Filter changes"
+              label={t('Filter changes')}
               size="sm"
               value={filter}
               onChange={setFilter}
               options={[
-                { value: 'all', label: 'All' },
-                { value: 'added', label: 'Added' },
-                { value: 'removed', label: 'Removed' },
-                { value: 'changed', label: 'Changed' },
+                { value: 'all', label: t('All') },
+                { value: 'added', label: t('Added') },
+                { value: 'removed', label: t('Removed') },
+                { value: 'changed', label: t('Changed') },
               ]}
             />
           }
@@ -228,10 +229,10 @@ export default function JsonDiff() {
           <DiffTable entries={entries!} filter={filter} />
         </Panel>
       ) : (
-        <Panel title="Side-by-side (keys sorted)" bodyClassName="p-0">
+        <Panel title={t('Side-by-side (keys sorted)')} bodyClassName="p-0">
           {aligned === null ? (
             <p className="p-4 text-[13px] text-fg-muted">
-              These documents are too different to lay out line by line in reasonable time. Use the changes table instead.
+              {t('These documents are too different to lay out line by line in reasonable time. Use the changes table instead.')}
             </p>
           ) : (
             <SideBySide rows={aligned ?? []} />

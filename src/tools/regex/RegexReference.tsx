@@ -23,6 +23,7 @@ import {
 } from './lib/patterns';
 import { REPLACEMENT_TOKENS } from './lib/replace';
 import { VisibleText } from './components/MatchList';
+import { t } from '@/lib/i18n';
 
 const ID = 'regex-reference';
 
@@ -69,26 +70,26 @@ export default function RegexReference() {
     <ToolStack>
       <ToolBar>
         <div>
-          <Label>Show</Label>
+          <Label>{t('Show')}</Label>
           <Segmented
-            label="Show"
+            label={t('Show')}
             value={view}
             onChange={setView}
             options={[
-              { value: 'patterns', label: 'Common patterns' },
-              { value: 'cheatsheet', label: 'Cheat sheet' },
+              { value: 'patterns', label: t('Common patterns') },
+              { value: 'cheatsheet', label: t('Cheat sheet') },
             ]}
           />
         </div>
         <div className="min-w-0 flex-1 basis-56">
-          <Label htmlFor="regex-ref-search">Search</Label>
+          <Label htmlFor="regex-ref-search">{t('Search')}</Label>
           <div className="relative">
             <Search size={15} aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-muted" />
             <Input
               id="regex-ref-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={view === 'patterns' ? 'email, date, ipv6…' : 'lookahead, \\b, lazy…'}
+              placeholder={view === 'patterns' ? t('email, date, ipv6…') : t('lookahead, \\b, lazy…')}
               className="pl-8"
               type="search"
             />
@@ -96,14 +97,14 @@ export default function RegexReference() {
         </div>
         {view === 'patterns' && (
           <div className="min-w-0 max-w-full">
-            <Label>Category</Label>
+            <Label>{t('Category')}</Label>
             <Segmented
-              label="Category"
+              label={t('Category')}
               size="sm"
               value={category}
               onChange={setCategory}
               className="h-9"
-              options={[{ value: 'all' as const, label: 'All' }, ...PATTERN_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+              options={[{ value: 'all' as const, label: t('All') }, ...PATTERN_CATEGORIES.map((c) => ({ value: c, label: c }))]}
             />
           </div>
         )}
@@ -118,8 +119,8 @@ export default function RegexReference() {
           </div>
         ) : (
           <Panel>
-            <EmptyState icon={Search} title="No patterns match your search">
-              Try a broader word, or switch the category to All.
+            <EmptyState icon={Search} title={t('No patterns match your search')}>
+              {t('Try a broader word, or switch the category to All.')}
             </EmptyState>
           </Panel>
         )
@@ -141,12 +142,12 @@ function PatternCard({ pattern: p }: { pattern: CommonPattern }) {
       bodyClassName="flex flex-col gap-3"
       actions={
         <>
-          <CopyButton value={literal} label="Copy" variant="ghost" />
+          <CopyButton value={literal} label={t('Copy')} variant="ghost" />
           <Link
             to={testerHref(p.pattern, patternTesterFlags(p), patternSampleText(p))}
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface-raised px-2.5 text-[13px] font-medium text-fg shadow-card hover:bg-surface-hover"
           >
-            Open in tester
+            {t('Open in tester')}
             <ArrowUpRight size={14} aria-hidden />
           </Link>
         </>
@@ -157,7 +158,7 @@ function PatternCard({ pattern: p }: { pattern: CommonPattern }) {
         {literal}
       </code>
       {needsUnsupported ? (
-        <p className="text-[12.5px] text-warning">This pattern needs a flag your browser does not support.</p>
+        <p className="text-[12.5px] text-warning">{t('This pattern needs a flag your browser does not support.')}</p>
       ) : p.kind === 'validate' ? (
         <ExampleList pattern={p} />
       ) : (
@@ -176,7 +177,7 @@ function ExampleList({ pattern: p }: { pattern: CommonPattern }) {
     ...(p.examples?.noMatch ?? []).map((s) => ({ s, expected: false })),
   ];
   return (
-    <ul className="flex flex-wrap gap-1.5" aria-label="Examples">
+    <ul className="flex flex-wrap gap-1.5" aria-label={t('Examples')}>
       {rows.map(({ s, expected }) => {
         const ok = re.test(s);
         return (
@@ -187,7 +188,7 @@ function ExampleList({ pattern: p }: { pattern: CommonPattern }) {
               ok ? 'border-transparent bg-success-soft text-success' : 'border-line bg-surface-sunken text-fg-muted',
             )}
           >
-            {ok ? <Check size={12} aria-label="matches" className="shrink-0" /> : <X size={12} aria-label="no match" className="shrink-0" />}
+            {ok ? <Check size={12} aria-label="matches" className="shrink-0" /> : <X size={12} aria-label={t('no match')} className="shrink-0" />}
             <span className="min-w-0 break-all">{s}</span>
           </li>
         );
@@ -215,7 +216,7 @@ function FindSample({ pattern: p }: { pattern: CommonPattern }) {
   return (
     <div>
       <p className="mb-1 text-[12px] text-fg-muted">
-        {matches.length} {matches.length === 1 ? 'match' : 'matches'} in the sample:
+        {(matches.length === 1) ? t('{count} match in the sample:', { count: matches.length }) : t('{count} matches in the sample:', { count: matches.length })}
       </p>
       <p className="rounded-lg border border-line bg-surface-sunken px-3 py-2 font-mono text-[12.5px] leading-relaxed text-fg">
         {parts}
@@ -230,7 +231,7 @@ function CheatSheet({ sections, query }: { sections: typeof CHEAT_SHEET; query: 
   if (!sections.length && !flags.length && !tokens.length) {
     return (
       <Panel>
-        <EmptyState icon={Search} title="Nothing in the cheat sheet matches your search" />
+        <EmptyState icon={Search} title={t('Nothing in the cheat sheet matches your search')} />
       </Panel>
     );
   }
@@ -242,7 +243,7 @@ function CheatSheet({ sections, query }: { sections: typeof CHEAT_SHEET; query: 
         </Panel>
       ))}
       {flags.length > 0 && (
-        <Panel title="Flags" bodyClassName="p-0">
+        <Panel title={t('Flags')} bodyClassName="p-0">
           <table className="w-full text-[13px]">
             <tbody className="divide-y divide-line">
               {flags.map((f) => (
@@ -252,7 +253,7 @@ function CheatSheet({ sections, query }: { sections: typeof CHEAT_SHEET; query: 
                   </td>
                   <td className="py-2 pr-4 text-fg-secondary">
                     <span className="text-fg">{f.name}</span> · {f.description}
-                    {!isFlagSupported(f.flag) && <Badge tone="warning" className="ml-2">Not supported here</Badge>}
+                    {!isFlagSupported(f.flag) && <Badge tone="warning" className="ml-2">{t('Not supported here')}</Badge>}
                   </td>
                 </tr>
               ))}
@@ -261,7 +262,7 @@ function CheatSheet({ sections, query }: { sections: typeof CHEAT_SHEET; query: 
         </Panel>
       )}
       {tokens.length > 0 && (
-        <Panel title="Replacement tokens" bodyClassName="p-0">
+        <Panel title={t('Replacement tokens')} bodyClassName="p-0">
           <table className="w-full text-[13px]">
             <tbody className="divide-y divide-line">
               {tokens.map((t) => (
@@ -298,8 +299,8 @@ function CheatTable({ rows }: { rows: CheatRow[] }) {
                 {usable && (
                   <Link
                     to={testerHref(example, flags ? `g${flags}` : 'g')}
-                    aria-label={`Try ${example} in the tester`}
-                    title="Try in the tester"
+                    aria-label={t('Try {example} in the tester', { example })}
+                    title={t('Try in the tester')}
                     className="inline-flex size-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg"
                   >
                     <ArrowUpRight size={15} aria-hidden />

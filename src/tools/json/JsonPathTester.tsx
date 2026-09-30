@@ -12,15 +12,16 @@ import { cn, formatNumber, pluralize } from '@/lib/utils';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { formatJsonError, parseJson } from './lib/json';
 import { JSONPATH_EXAMPLES, runJsonPath } from './lib/jsonpath';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = JSON.stringify(
   {
     store: {
       book: [
-        { category: 'reference', author: 'Nigel Rees', title: 'Sayings of the Century', price: 8.95, tags: ['quotes'] },
-        { category: 'fiction', author: 'Evelyn Waugh', title: 'Sword of Honour', price: 12.99, tags: [] },
-        { category: 'fiction', author: 'Herman Melville', title: 'Moby Dick', isbn: '0-553-21311-3', price: 8.99, tags: ['sea'] },
-        { category: 'fiction', author: 'J. R. R. Tolkien', title: 'The Lord of the Rings', isbn: '0-395-19395-8', price: 22.99, tags: ['fantasy', 'epic'] },
+        { category: 'reference', author: 'Nigel Rees', title: t('Sayings of the Century'), price: 8.95, tags: ['quotes'] },
+        { category: 'fiction', author: 'Evelyn Waugh', title: t('Sword of Honour'), price: 12.99, tags: [] },
+        { category: 'fiction', author: 'Herman Melville', title: t('Moby Dick'), isbn: '0-553-21311-3', price: 8.99, tags: ['sea'] },
+        { category: 'fiction', author: 'J. R. R. Tolkien', title: t('The Lord of the Rings'), isbn: '0-395-19395-8', price: 22.99, tags: ['fantasy', 'epic'] },
       ],
       bicycle: { color: 'red', price: 399 },
     },
@@ -61,7 +62,7 @@ export default function JsonPathTester() {
     <ToolStack>
       <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
         <label htmlFor="jsonpath-expr" className="mb-1.5 block text-[13px] font-medium text-fg-secondary">
-          JSONPath expression <span className="font-normal text-fg-muted">(RFC 9535)</span>
+          {t('JSONPath expression')}{' '}<span className="font-normal text-fg-muted">(RFC 9535)</span>
         </label>
         <Input
           id="jsonpath-expr"
@@ -89,11 +90,11 @@ export default function JsonPathTester() {
 
       <SplitPanes>
         <EditorPanel code
-          title="JSON document"
+          title={t('JSON document')}
           value={input}
           onChange={setInput}
           language="json"
-          placeholder="Paste JSON to query…"
+          placeholder={t('Paste JSON to query…')}
           sample={SAMPLE}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(parsed && !parsed.ok)}
@@ -102,57 +103,57 @@ export default function JsonPathTester() {
         <section className="flex min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card">
           <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line py-1.5 pr-2 pl-4">
             <h2 className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-fg">
-              Result
-              {result?.ok && <Badge tone={result.matches.length ? 'accent' : 'neutral'}>{pluralize(result.matches.length, 'match', 'matches')}</Badge>}
+              {t('Result')}
+              {result?.ok && <Badge tone={result.matches.length ? 'accent' : 'neutral'}>{pluralize(result.matches.length, t('match'), t('matches'))}</Badge>}
             </h2>
             <div className="flex flex-wrap items-center gap-1.5">
               <Segmented
-                label="Result view"
+                label={t('Result view')}
                 size="sm"
                 value={view}
                 onChange={setView}
                 options={[
-                  { value: 'values', label: 'Values' },
-                  { value: 'paths', label: 'Paths' },
+                  { value: 'values', label: t('Values') },
+                  { value: 'paths', label: t('Paths') },
                 ]}
               />
-              <CopyButton value={view === 'values' ? valuesText : pathsText} iconOnly label={view === 'values' ? 'Copy values' : 'Copy paths'} />
+              <CopyButton value={view === 'values' ? valuesText : pathsText} iconOnly label={view === 'values' ? t('Copy values') : t('Copy paths')} />
             </div>
           </header>
           <div className="min-h-0 flex-1 p-2" style={{ height: 460 }}>
             {parsed && !parsed.ok ? (
               <div className="p-2">
-                <ErrorMessage title="Invalid JSON" error={formatJsonError(parsed.error)} />
+                <ErrorMessage title={t('Invalid JSON')} error={formatJsonError(parsed.error)} />
               </div>
             ) : !result ? (
-              <EmptyState icon={Route} title="Paste a JSON document">
-                Results update live as you type the expression.
+              <EmptyState icon={Route} title={t('Paste a JSON document')}>
+                {t('Results update live as you type the expression.')}
               </EmptyState>
             ) : !result.ok ? (
-              <EmptyState title="Fix the expression to see results" />
+              <EmptyState title={t('Fix the expression to see results')} />
             ) : result.matches.length === 0 ? (
-              <EmptyState title="No matches">The expression is valid but selects nothing in this document.</EmptyState>
+              <EmptyState title={t('No matches')}>{t('The expression is valid but selects nothing in this document.')}</EmptyState>
             ) : view === 'values' ? (
               <CodePanelInline value={valuesText} />
             ) : (
               <div className="flex h-full flex-col">
                 <div className="mb-2 flex items-center gap-2 px-1">
                   <Segmented
-                    label="Path format"
+                    label={t('Path format')}
                     size="sm"
                     value={pathForm}
                     onChange={setPathForm}
                     options={[
-                      { value: 'pretty', label: 'Shorthand' },
-                      { value: 'path', label: 'Normalized' },
-                      { value: 'pointer', label: 'JSON Pointer' },
+                      { value: 'pretty', label: t('Shorthand') },
+                      { value: 'path', label: t('Normalized') },
+                      { value: 'pointer', label: t('JSON Pointer') },
                     ]}
                   />
                 </div>
                 <ul className="min-h-0 flex-1 divide-y divide-line overflow-auto rounded-lg border border-line-strong bg-surface-sunken font-mono text-[12.5px]">
                   {result.matches.map((m, i) => (
                     <li key={i} className="px-3 py-1.5">
-                      <div className="break-all text-accent-text">{pathForm === 'path' ? m.path : pathForm === 'pointer' ? m.pointer || '(root)' : m.pretty}</div>
+                      <div className="break-all text-accent-text">{pathForm === 'path' ? m.path : pathForm === 'pointer' ? m.pointer || t('(root)') : m.pretty}</div>
                       <div className="truncate text-fg-secondary">{preview(m.value)}</div>
                     </li>
                   ))}
@@ -162,7 +163,7 @@ export default function JsonPathTester() {
           </div>
           {result?.ok && result.truncated && (
             <footer className="border-t border-line px-4 py-1.5 text-[12.5px] text-fg-muted">
-              Showing the first {formatNumber(result.matches.length)} matches.
+              {t('Showing the first {count} matches.', { count: formatNumber(result.matches.length) })}
             </footer>
           )}
         </section>
@@ -171,10 +172,10 @@ export default function JsonPathTester() {
       <Panel
         title={
           <span className="inline-flex items-center gap-1.5">
-            <BookOpen size={14} aria-hidden className="text-fg-muted" /> Cheat sheet
+            <BookOpen size={14} aria-hidden className="text-fg-muted" />{' '}{t('Cheat sheet')}
           </span>
         }
-        description="Click an example to try it (they match the sample document)."
+        description={t('Click an example to try it (they match the sample document).')}
         bodyClassName="p-2"
       >
         <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-3">
@@ -200,5 +201,5 @@ export default function JsonPathTester() {
 }
 
 function CodePanelInline({ value }: { value: string }) {
-  return <CodeEditor value={value} language="json" readOnly ariaLabel="Query result" className="h-full" />;
+  return <CodeEditor value={value} language="json" readOnly ariaLabel={t('Query result')} className="h-full" />;
 }

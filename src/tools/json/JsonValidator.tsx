@@ -10,6 +10,7 @@ import { cn, formatBytes, formatNumber, pluralize } from '@/lib/utils';
 import { problemMarkers, revealPosition, type EditorProblem } from './shared/errorMarkers';
 import { scanJson } from './lib/jsonScan';
 import { jsonStats, stripBom } from './lib/json';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = `{
   "id": 42,
@@ -56,7 +57,7 @@ export default function JsonValidator() {
       const { error, duplicates } = result.scan;
       if (error) problems.push({ line: error.line, column: error.column, length: error.length || 1, message: error.message });
       for (const d of duplicates) {
-        problems.push({ line: d.line, column: d.column, length: d.key.length + 2, severity: 'warning', message: `Duplicate key "${d.key}"` });
+        problems.push({ line: d.line, column: d.column, length: d.key.length + 2, severity: 'warning', message: t('Duplicate key "{key}"', { key: d.key }) });
       }
     }
     return [problemMarkers(problems)];
@@ -73,7 +74,7 @@ export default function JsonValidator() {
           value={input}
           onChange={setInput}
           language="json"
-          placeholder="Paste or type JSON to validate…"
+          placeholder={t('Paste or type JSON to validate…')}
           sample={SAMPLE}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(error)}
@@ -84,16 +85,16 @@ export default function JsonValidator() {
             result ? (
               <>
                 <span>{formatBytes(result.bytes)}</span>
-                <span>{pluralize(result.lines, 'line')}</span>
+                <span>{pluralize(result.lines, t('line'), t('lines'))}</span>
               </>
             ) : undefined
           }
         />
         <div className="flex min-w-0 flex-col gap-4">
           {!result ? (
-            <Panel title="Result">
-              <EmptyState icon={FileCheck} title="Nothing to validate yet">
-                Paste JSON, open a file or load the sample. Errors are pinpointed to the exact line and column.
+            <Panel title={t('Result')}>
+              <EmptyState icon={FileCheck} title={t('Nothing to validate yet')}>
+                {t('Paste JSON, open a file or load the sample. Errors are pinpointed to the exact line and column.')}
               </EmptyState>
             </Panel>
           ) : (
@@ -111,23 +112,23 @@ export default function JsonValidator() {
                   ) : (
                     <CircleCheck size={18} className="shrink-0 text-success" aria-hidden />
                   )}
-                  <p className="text-sm font-semibold text-fg">{error ? 'Invalid JSON' : 'Valid JSON'}</p>
+                  <p className="text-sm font-semibold text-fg">{error ? t('Invalid JSON') : t('Valid JSON')}</p>
                 </div>
                 {error ? (
                   <>
                     <p className="mt-1.5 text-[13px] break-words text-fg">{error.message}</p>
                     <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
                       <span className="font-mono text-[12.5px] text-fg-secondary">
-                        Line {error.line}, column {error.column}
+                        {t('Line {line}, column {column}', { line: error.line, column: error.column })}
                       </span>
                       <Button size="sm" icon={Crosshair} onClick={() => revealPosition(viewRef.current, error.line, error.column)}>
-                        Go to error
+                        {t('Go to error')}
                       </Button>
                     </div>
                   </>
                 ) : (
                   <p className="mt-1 text-[13px] text-fg-secondary">
-                    Root is {rootType(result.value)}.
+                    {t('Root is {rootType}.', { rootType: rootType(result.value) })}
                     {duplicates.length === 0 && ' No duplicate keys.'}
                   </p>
                 )}
@@ -138,10 +139,10 @@ export default function JsonValidator() {
                   title={
                     <span className="inline-flex items-center gap-1.5">
                       <TriangleAlert size={14} className="text-warning" aria-hidden />
-                      {pluralize(duplicates.length, 'duplicate key')}
+                      {pluralize(duplicates.length, t('duplicate key'), t('duplicate keys'))}
                     </span>
                   }
-                  description="JSON.parse keeps only the last value for each."
+                  description={t('JSON.parse keeps only the last value for each.')}
                   bodyClassName="p-0"
                 >
                   <ul className="max-h-64 divide-y divide-line overflow-y-auto">
@@ -154,10 +155,10 @@ export default function JsonValidator() {
                         >
                           <span className="min-w-0">
                             <span className="block truncate font-mono text-[12.5px] text-fg">"{d.key}"</span>
-                            <span className="block truncate font-mono text-[11.5px] text-fg-muted">in {d.path}</span>
+                            <span className="block truncate font-mono text-[11.5px] text-fg-muted">{t('in {path}', { path: d.path })}</span>
                           </span>
                           <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">
-                            line {d.line} <span className="text-fg-muted">(first {d.firstLine})</span>
+                            {t('line {line}', { line: d.line })}{' '}<span className="text-fg-muted">{t('(first {firstLine})', { firstLine: d.firstLine })}</span>
                           </span>
                         </button>
                       </li>
@@ -167,21 +168,21 @@ export default function JsonValidator() {
               )}
               {result.scan.truncated && (
                 <p className="text-[12.5px] text-fg-muted">
-                  Nesting is very deep; duplicate keys were checked only in the first 1,500 levels.
+                  {t('Nesting is very deep; duplicate keys were checked only in the first 1,500 levels.')}
                 </p>
               )}
 
               {result.stats && (
-                <Panel title="Statistics">
+                <Panel title={t('Statistics')}>
                   <div className="grid grid-cols-2 gap-2">
-                    <Stat label="Objects" value={formatNumber(result.stats.objects)} />
-                    <Stat label="Arrays" value={formatNumber(result.stats.arrays)} />
-                    <Stat label="Keys" value={formatNumber(result.stats.keys)} />
-                    <Stat label="Max depth" value={formatNumber(result.stats.maxDepth)} />
-                    <Stat label="Strings" value={formatNumber(result.stats.strings)} />
-                    <Stat label="Numbers" value={formatNumber(result.stats.numbers)} />
-                    <Stat label="Booleans" value={formatNumber(result.stats.booleans)} />
-                    <Stat label="Nulls" value={formatNumber(result.stats.nulls)} />
+                    <Stat label={t('Objects')} value={formatNumber(result.stats.objects)} />
+                    <Stat label={t('Arrays')} value={formatNumber(result.stats.arrays)} />
+                    <Stat label={t('Keys')} value={formatNumber(result.stats.keys)} />
+                    <Stat label={t('Max depth')} value={formatNumber(result.stats.maxDepth)} />
+                    <Stat label={t('Strings')} value={formatNumber(result.stats.strings)} />
+                    <Stat label={t('Numbers')} value={formatNumber(result.stats.numbers)} />
+                    <Stat label={t('Booleans')} value={formatNumber(result.stats.booleans)} />
+                    <Stat label={t('Nulls')} value={formatNumber(result.stats.nulls)} />
                   </div>
                 </Panel>
               )}

@@ -13,6 +13,7 @@ import { TARGETS, targetInfo, type GenerateOptions, type GenerateResult, type Ta
 import type { NullMode } from './lib/infer';
 import type { TypegenRequest } from './lib/typegen.worker';
 import { useExtraLanguage, useLatestJobRunner } from './hooks';
+import { t } from '@/lib/i18n';
 
 const ID = 'json-to-types';
 
@@ -38,9 +39,9 @@ const SAMPLE = JSON.stringify(
 );
 
 const NULL_MODES: Array<{ value: NullMode; label: string }> = [
-  { value: 'exact', label: 'Optional if missing, nullable if null' },
-  { value: 'loose', label: 'Optional and nullable if either' },
-  { value: 'all-optional', label: 'Every field optional' },
+  { value: 'exact', label: t('Optional if missing, nullable if null') },
+  { value: 'loose', label: t('Optional and nullable if either') },
+  { value: 'all-optional', label: t('Every field optional') },
 ];
 
 function createWorker() {
@@ -100,8 +101,8 @@ export default function JsonToTypes() {
       clearTimeout(timer);
       setSlow(false);
       if (outcome.status === 'done') setOutput({ result: outcome.result });
-      else if (outcome.status === 'timeout') setOutput({ failure: 'Generating the types took longer than 30 seconds. Try a smaller sample.' });
-      else setOutput({ failure: 'The type generator stopped unexpectedly. The input may be too large for this browser.' });
+      else if (outcome.status === 'timeout') setOutput({ failure: t('Generating the types took longer than 30 seconds. Try a smaller sample.') });
+      else setOutput({ failure: t('The type generator stopped unexpectedly. The input may be too large for this browser.') });
     });
     return () => {
       active = false;
@@ -127,7 +128,7 @@ export default function JsonToTypes() {
     <ToolStack>
       <ToolBar>
         <div className="w-full min-w-0 sm:w-60">
-          <Label htmlFor="typegen-target">Language</Label>
+          <Label htmlFor="typegen-target">{t('Language')}</Label>
           <Select id="typegen-target" value={info.id} onChange={(e) => setTarget(e.target.value as TargetId)}>
             {TARGETS.map((t) => (
               <option key={t.id} value={t.id}>
@@ -137,18 +138,18 @@ export default function JsonToTypes() {
           </Select>
         </div>
         <div className="w-full min-w-0 sm:w-40">
-          <Label htmlFor="typegen-root">Root type name</Label>
+          <Label htmlFor="typegen-root">{t('Root type name')}</Label>
           <Input
             id="typegen-root"
             value={rootName}
             onChange={(e) => setRootName(e.target.value)}
-            placeholder="Root"
+            placeholder={t('Root')}
             spellCheck={false}
             autoComplete="off"
           />
         </div>
         <div className="w-full min-w-0 sm:w-72">
-          <Label htmlFor="typegen-nulls">Missing keys and nulls</Label>
+          <Label htmlFor="typegen-nulls">{t('Missing keys and nulls')}</Label>
           <Select id="typegen-nulls" value={nullModeValue} onChange={(e) => setNullMode(e.target.value as NullMode)}>
             {NULL_MODES.map((m) => (
               <option key={m.value} value={m.value}>
@@ -159,7 +160,7 @@ export default function JsonToTypes() {
         </div>
         {info.options.includes('goPackage') && (
           <div className="w-full min-w-0 sm:w-32">
-            <Label htmlFor="typegen-package">Package</Label>
+            <Label htmlFor="typegen-package">{t('Package')}</Label>
             <Input
               id="typegen-package"
               value={goPackage}
@@ -173,30 +174,30 @@ export default function JsonToTypes() {
         )}
         {info.options.includes('csharpStyle') && (
           <div>
-            <Label>Declare as</Label>
+            <Label>{t('Declare as')}</Label>
             <Segmented
-              label="Declare as"
+              label={t('Declare as')}
               value={csharpStyle}
               onChange={setCsharpStyle}
               options={[
-                { value: 'record', label: 'Records' },
-                { value: 'class', label: 'Classes' },
+                { value: 'record', label: t('Records') },
+                { value: 'class', label: t('Classes') },
               ]}
             />
           </div>
         )}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:h-9">
-          <Switch label="Detect formats" checked={formats} onChange={setFormats} />
-          {info.options.includes('export') && <Switch label="Export" checked={exportTypes} onChange={setExportTypes} />}
-          {info.options.includes('readonly') && <Switch label="Readonly" checked={readonly} onChange={setReadonly} />}
+          <Switch label={t('Detect formats')} checked={formats} onChange={setFormats} />
+          {info.options.includes('export') && <Switch label={t('Export')} checked={exportTypes} onChange={setExportTypes} />}
+          {info.options.includes('readonly') && <Switch label={t('Readonly')} checked={readonly} onChange={setReadonly} />}
           {info.options.includes('names') && (
-            <Switch label="Idiomatic names" checked={idiomaticNames} onChange={setIdiomaticNames} />
+            <Switch label={t('Idiomatic names')} checked={idiomaticNames} onChange={setIdiomaticNames} />
           )}
         </div>
       </ToolBar>
 
       <ErrorMessage
-        title={parseError ? 'Invalid JSON' : 'Could not generate types'}
+        title={parseError ? t('Invalid JSON') : t('Could not generate types')}
         error={parseError ? formatJsonError(parseError) : failure}
       />
 
@@ -206,7 +207,7 @@ export default function JsonToTypes() {
           value={input}
           onChange={setInput}
           language="json"
-          placeholder="Paste a JSON sample, e.g. an API response…"
+          placeholder={t('Paste a JSON sample, e.g. an API response…')}
           sample={SAMPLE}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(parseError)}
@@ -219,18 +220,18 @@ export default function JsonToTypes() {
           value={code}
           language={editorLanguage}
           extensions={outputExtensions}
-          placeholder="Types appear here as you type or paste JSON."
+          placeholder={t('Types appear here as you type or paste JSON.')}
           downloadName={info.filename}
           downloadType="text/plain;charset=utf-8"
           lineWrapping={false}
           height="520px"
           footer={
             slow ? (
-              <Spinner label="Generating…" size={14} />
+              <Spinner label={t('Generating…')} size={14} />
             ) : result?.ok ? (
               <>
                 <span>
-                  {pluralize(result.types, 'type')}, {pluralize(result.fields, 'field')}
+                  {pluralize(result.types, t('type'), t('types'))}, {pluralize(result.fields, t('field'), t('fields'))}
                 </span>
                 {formats && <span className="min-w-0">{info.formatsHint}</span>}
               </>
@@ -240,7 +241,7 @@ export default function JsonToTypes() {
       </SplitPanes>
 
       {result?.ok && result.warnings.length > 0 && (
-        <Alert tone="warning" title="Partially analysed">
+        <Alert tone="warning" title={t('Partially analysed')}>
           {result.warnings.join(' ')}
         </Alert>
       )}

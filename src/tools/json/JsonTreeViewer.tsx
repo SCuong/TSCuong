@@ -11,6 +11,7 @@ import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { cn, copyText, formatNumber, pluralize } from '@/lib/utils';
 import { formatJsonError, parseJson } from './lib/json';
 import { countNodes, flattenTree, previewValue, searchTree, type ExpansionState, type JsonType, type TreeRow } from './lib/tree';
+import { t } from '@/lib/i18n';
 
 const SAMPLE = JSON.stringify(
   {
@@ -20,9 +21,9 @@ const SAMPLE = JSON.stringify(
       rating: 4.7,
       address: { street: '12 Main St', city: 'Springfield', zip: null },
       books: [
-        { title: 'Sayings of the Century', author: 'Nigel Rees', price: 8.95, tags: ['quotes'] },
-        { title: 'Moby Dick', author: 'Herman Melville', price: 8.99, isbn: '0-553-21311-3' },
-        { title: 'The Lord of the Rings', author: 'J. R. R. Tolkien', price: 22.99, tags: ['fantasy', 'classic'] },
+        { title: t('Sayings of the Century'), author: 'Nigel Rees', price: 8.95, tags: ['quotes'] },
+        { title: t('Moby Dick'), author: 'Herman Melville', price: 8.99, isbn: '0-553-21311-3' },
+        { title: t('The Lord of the Rings'), author: 'J. R. R. Tolkien', price: 22.99, tags: ['fantasy', 'classic'] },
       ],
     },
   },
@@ -47,8 +48,8 @@ function valueForCopy(row: TreeRow): string {
 }
 
 async function copyWithToast(text: string, what: string) {
-  if (await copyText(text)) toast(`Copied ${what}`);
-  else toast('Copy failed. Your browser blocked clipboard access.', 'error');
+  if (await copyText(text)) toast(t('Copied {what}', { what }));
+  else toast(t('Copy failed. Your browser blocked clipboard access.'), 'error');
 }
 
 export default function JsonTreeViewer() {
@@ -89,14 +90,14 @@ export default function JsonTreeViewer() {
     <ToolStack>
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <EditorPanel code
-          title="JSON input"
+          title={t('JSON input')}
           value={input}
           onChange={(v) => {
             setInput(v);
             setSelected(null);
           }}
           language="json"
-          placeholder="Paste JSON or open a .json file…"
+          placeholder={t('Paste JSON or open a .json file…')}
           sample={SAMPLE}
           fileAccept=".json,application/json,text/plain"
           invalid={Boolean(parsed && !parsed.ok)}
@@ -109,37 +110,37 @@ export default function JsonTreeViewer() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter keys and values…"
-                aria-label="Filter keys and values"
+                placeholder={t('Filter keys and values…')}
+                aria-label={t('Filter keys and values')}
                 className="h-8 pl-8 text-[13px]"
                 disabled={!parsed?.ok}
               />
             </div>
             <div className="flex items-center gap-1">
               <Button size="sm" variant="ghost" icon={ChevronsUpDown} onClick={() => setExpansion({ depth: Infinity, toggled: new Set() })} disabled={!parsed?.ok}>
-                Expand all
+                {t('Expand all')}
               </Button>
               <Button size="sm" variant="ghost" icon={ChevronsDownUp} onClick={() => setExpansion({ depth: 1, toggled: new Set() })} disabled={!parsed?.ok}>
-                Collapse all
+                {t('Collapse all')}
               </Button>
             </div>
           </header>
           {parsed && !parsed.ok && (
             <div className="p-3">
-              <ErrorMessage error={formatJsonError(parsed.error)} title="Invalid JSON" />
+              <ErrorMessage error={formatJsonError(parsed.error)} title={t('Invalid JSON')} />
             </div>
           )}
           {!parsed && (
-            <EmptyState icon={ListTree} title="No JSON yet" className="flex-1">
-              Paste JSON on the left to explore it as a collapsible tree. Large files stay responsive: only visible rows render.
+            <EmptyState icon={ListTree} title={t('No JSON yet')} className="flex-1">
+              {t('Paste JSON on the left to explore it as a collapsible tree. Large files stay responsive: only visible rows render.')}
             </EmptyState>
           )}
           {parsed?.ok && (
             <>
-              <div ref={scrollRef} className="h-[550px] overflow-auto font-mono text-[12.5px]" role="tree" aria-label="JSON tree">
+              <div ref={scrollRef} className="h-[550px] overflow-auto font-mono text-[12.5px]" role="tree" aria-label={t('JSON tree')}>
                 {noMatches ? (
-                  <EmptyState icon={Search} title="No matches">
-                    Nothing matches “{debouncedQuery}”.
+                  <EmptyState icon={Search} title={t('No matches')}>
+                    {t('Nothing matches “{debouncedQuery}”.', { debouncedQuery })}
                   </EmptyState>
                 ) : (
                   <div style={{ height: virtualizer.getTotalSize(), position: 'relative', minWidth: '100%' }} className="w-max">
@@ -164,7 +165,7 @@ export default function JsonTreeViewer() {
                             <button
                               type="button"
                               onClick={() => toggle(row.path)}
-                              aria-label={row.expanded ? 'Collapse' : 'Expand'}
+                              aria-label={row.expanded ? t('Collapse') : t('Expand')}
                               className="flex size-5 shrink-0 items-center justify-center rounded text-fg-muted hover:bg-surface-hover hover:text-fg"
                             >
                               <ChevronRight size={14} className={cn('transition-transform', row.expanded && 'rotate-90')} aria-hidden />
@@ -184,7 +185,7 @@ export default function JsonTreeViewer() {
                                 {typeof row.key === 'number' ? row.key : row.key === '' ? '""' : row.key}
                               </span>
                             ) : (
-                              <span className="text-fg-muted">root</span>
+                              <span className="text-fg-muted">{t('root')}</span>
                             )}
                             {container ? (
                               <span className="text-[11.5px] text-fg-muted">
@@ -203,14 +204,14 @@ export default function JsonTreeViewer() {
                             <span className="rounded border border-line px-1 font-sans text-[10.5px] leading-4 text-fg-muted">{row.type}</span>
                             <IconButton
                               icon={Link}
-                              label="Copy JSONPath"
+                              label={t('Copy JSONPath')}
                               size="sm"
                               className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                               onClick={() => void copyWithToast(row.path, 'JSONPath')}
                             />
                             <IconButton
                               icon={Copy}
-                              label="Copy value"
+                              label={t('Copy value')}
                               size="sm"
                               className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                               onClick={() => void copyWithToast(valueForCopy(row), 'value')}
@@ -230,18 +231,18 @@ export default function JsonTreeViewer() {
                     </code>
                     <div className="flex gap-1">
                       <Button size="sm" icon={Link} onClick={() => void copyWithToast(selectedRow.path, 'JSONPath')}>
-                        Copy path
+                        {t('Copy path')}
                       </Button>
                       <Button size="sm" icon={Copy} onClick={() => void copyWithToast(valueForCopy(selectedRow), 'value')}>
-                        Copy value
+                        {t('Copy value')}
                       </Button>
                     </div>
                   </>
                 ) : (
                   <span className="flex-1">
-                    {formatNumber(total)} nodes · {formatNumber(rows.length)} shown
-                    {search && search.count > 0 && ` · ${pluralize(search.count, 'match', 'matches')}`}
-                    <span className="hidden sm:inline"> · Select a row to copy its JSONPath</span>
+                    {t('{total} nodes · {count} shown', { total: formatNumber(total), count: formatNumber(rows.length) })}
+                    {search && search.count > 0 && ` · ${pluralize(search.count, t('match'), t('matches'))}`}
+                    <span className="hidden sm:inline">{' '}{t('· Select a row to copy its JSONPath')}</span>
                   </span>
                 )}
               </footer>

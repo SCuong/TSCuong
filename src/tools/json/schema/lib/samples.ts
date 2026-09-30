@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n';
 export interface SchemaSample {
   id: string;
   label: string;
@@ -10,7 +11,7 @@ const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 export const SCHEMA_SAMPLES: SchemaSample[] = [
   {
     id: 'user',
-    label: 'User profile',
+    label: t('User profile'),
     schema: pretty({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       $id: 'https://example.com/user.schema.json',
@@ -55,7 +56,7 @@ export const SCHEMA_SAMPLES: SchemaSample[] = [
   },
   {
     id: 'order',
-    label: 'Order (valid)',
+    label: t('Order (valid)'),
     schema: pretty({
       $schema: 'http://json-schema.org/draft-07/schema#',
       title: 'Order',
@@ -104,7 +105,7 @@ export const SCHEMA_SAMPLES: SchemaSample[] = [
   },
   {
     id: 'config',
-    label: 'Draft-04 config',
+    label: t('Draft-04 config'),
     schema: pretty({
       $schema: 'http://json-schema.org/draft-04/schema#',
       id: 'https://example.com/config.json',
@@ -130,7 +131,7 @@ export const SCHEMA_SAMPLES: SchemaSample[] = [
   },
   {
     id: 'event',
-    label: 'anyOf and if/then',
+    label: t('anyOf and if/then'),
     schema: pretty({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',

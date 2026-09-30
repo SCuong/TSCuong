@@ -1,6 +1,7 @@
 import { ucs2length, type OutputUnit, type Schema, type SchemaDraft } from '@cfworker/json-schema';
 import { escapeToken, fromLocation, lastToken, parsePointer, valueAt } from './pointer';
 import { isPlainObject, walkSchema } from './walk';
+import { t } from '@/lib/i18n';
 
 /** A validation error explained for people. */
 export interface Issue {
@@ -324,7 +325,7 @@ function branchDetails(node: Node, ctx: Context): Issue['details'] {
   const details = [...branchGroups(node).entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([index, children]) => ({
-      label: index >= 0 ? `Option ${index + 1}` : 'Another option',
+      label: index >= 0 ? t('Option {index}', { index: index + 1 }) : t('Another option'),
       issues: flatten(children, ctx, node.unit),
     }))
     .filter((d) => d.issues.length);
