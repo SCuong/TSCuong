@@ -12,9 +12,10 @@ import { toast } from '@/components/ui/Toast';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
 import { downloadBlob, errorMessage } from '@/lib/utils';
 import { ColorField, RangeField } from './components/controls';
-import { canvasToBlob, createCanvas, decodeImage, getContext, rasterizeSvg, svgIntrinsicSize, type AnyCanvas, type Drawable } from './lib/canvas';
+import { canvasToBlob, createCanvas, decodeImage, fitWithin, getContext, rasterizeSvg, svgIntrinsicSize, type AnyCanvas, type Drawable } from './lib/canvas';
+import { scaledBitmap } from './lib/pipeline';
 import { buildIco, renderSquare } from './lib/favicon';
-import { buildHtml, buildManifest, FAVICON_FILES, letterMarkText } from './lib/faviconSet';
+import { buildHtml, buildManifest, FAVICON_FILES, letterMarkText, shortNameFor } from './lib/faviconSet';
 import { zipBlobs } from './lib/zip';
 import { IMAGE_ACCEPT } from './lib/accept';
 
@@ -71,7 +72,8 @@ export default function FaviconGenerator() {
   const [themeColor, setThemeColor] = useToolState('image-favicon', 'theme', '#2563eb');
   const [path, setPath] = useToolState('image-favicon', 'path', '/');
   const [file, setFile] = useState<File | null>(null);
-  const [src, setSrc] = useState<{ drawable: Drawable; svg: string | null } | null>(null);
+  /** The decoded source (at most 1024 px: icons are 512 px or smaller) and its original size. */
+  const [src, setSrc] = useState<{ drawable: Drawable; svg: string | null; width: number; height: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rendered, setRendered] = useState<Rendered[]>([]);
   const [busy, setBusy] = useState(false);
@@ -80,10 +82,8 @@ export default function FaviconGenerator() {
 
   // Decode the uploaded source (SVGs are rasterized large for crisp downscaling).
   useEffect(() => {
-    if (source !== 'image' || !file) {
-      setSrc(null);
-      return;
-    }
+    setSrc(null);
+    if (source !== 'image' || !file) return;
     let cancelled = false;
     let bitmap: ImageBitmap | null = null;
     (async () => {
@@ -95,11 +95,17 @@ export default function FaviconGenerator() {
           const dims = svgIntrinsicSize(svg);
           const scale = 1024 / Math.max(dims.width, dims.height);
           bitmap = await rasterizeSvg(svg, Math.max(1, Math.round(dims.width * scale)), Math.max(1, Math.round(dims.height * scale)));
-          if (!cancelled) setSrc({ drawable: bitmap, svg });
+          if (!cancelled) setSrc({ drawable: bitmap, svg, width: bitmap.width, height: bitmap.height });
         } else {
           const d = await decodeImage(file);
-          bitmap = d.bitmap;
-          if (!cancelled) setSrc({ drawable: d.bitmap, svg: null });
+          // Work from a copy scaled off the main thread: huge photos would freeze every re-render.
+          const size = fitWithin(d.width, d.height, 1024);
+          try {
+            bitmap = await scaledBitmap(d.bitmap, size.width, size.height);
+          } finally {
+            d.bitmap.close();
+          }
+          if (!cancelled) setSrc({ drawable: bitmap, svg: null, width: d.width, height: d.height });
         }
       } catch (e) {
         if (!cancelled) {
@@ -110,7 +116,9 @@ export default function FaviconGenerator() {
     })();
     return () => {
       cancelled = true;
-      bitmap?.close();
+      // Icons may still be rendering from it: release it a little later.
+      const old = bitmap;
+      if (old) setTimeout(() => old.close(), 2000);
     };
   }, [file, source]);
 
@@ -146,6 +154,8 @@ export default function FaviconGenerator() {
         // Text marks already contain their shape: draw the background only for maskable/apple squares.
         const opts = source === 'text' && s.name !== FAVICON_FILES.maskable && s.name !== FAVICON_FILES.apple ? { padding: s.opts?.padding ?? 0 } : s.opts;
         const blob = await canvasToBlob(renderSquare(drawable, s.size, opts), 'image/png');
+        // Settings changed meanwhile: stop without creating URLs the cleanup has already missed.
+        if (cancelled) return;
         const url = URL.createObjectURL(blob);
         created.push(url);
         out.push({ name: s.name, size: s.size, blob, url, label: s.label });
@@ -160,15 +170,17 @@ export default function FaviconGenerator() {
     };
   }, [drawable, padding, fillBg, imageBg, touchBg, source]);
 
-  const manifest = buildManifest({ name, shortName: name.slice(0, 12), themeColor, backgroundColor: touchBg, path });
+  const manifest = buildManifest({ name, shortName: shortNameFor(name), themeColor, backgroundColor: touchBg, path });
+
+  /** favicon.ico uses the same padding (and solid background for images) as the 16/32 px PNGs. */
+  const icoSource = (d: Drawable) => renderSquare(d, 256, { padding: padding / 100, background: source === 'image' && fillBg ? imageBg : null });
   const html = buildHtml({ path, themeColor, hasSvg: Boolean(src?.svg) && source === 'image' });
 
   async function downloadZip() {
     if (!drawable) return;
     setZipping(true);
     try {
-      const icoSrc = source === 'text' ? drawable : renderSquare(drawable, 256, { padding: padding / 100, background: fillBg ? imageBg : null });
-      const ico = await buildIco(icoSrc, [16, 32, 48]);
+      const ico = await buildIco(icoSource(drawable), [16, 32, 48]);
       const entries: Array<{ name: string; data: Blob | string }> = [
         { name: FAVICON_FILES.ico, data: ico },
         ...rendered.map((r) => ({ name: r.name, data: r.blob })),
@@ -187,19 +199,18 @@ export default function FaviconGenerator() {
   async function downloadIco() {
     if (!drawable) return;
     try {
-      const icoSrc = source === 'text' ? drawable : renderSquare(drawable, 256, { padding: padding / 100, background: fillBg ? imageBg : null });
-      downloadBlob(await buildIco(icoSrc, [16, 32, 48]), FAVICON_FILES.ico);
+      downloadBlob(await buildIco(icoSource(drawable), [16, 32, 48]), FAVICON_FILES.ico);
     } catch (e) {
       toast(errorMessage(e, 'Could not create the ICO.'), 'error');
     }
   }
 
-  const dims = src && 'width' in src.drawable ? { w: src.drawable.width, h: src.drawable.height } : null;
+  const dims = src ? { w: src.width, h: src.height } : null;
 
   return (
     <ToolStack>
       <ToolBar>
-        <div>
+        <div className="min-w-0">
           <Label>Source</Label>
           <Segmented
             label="Source"
@@ -219,7 +230,7 @@ export default function FaviconGenerator() {
             </div>
             <ColorField label="Text" value={fg} onChange={setFg} />
             <ColorField label="Background" value={bg} onChange={setBg} />
-            <div>
+            <div className="min-w-0">
               <Label>Shape</Label>
               <Segmented
                 label="Shape"
@@ -232,7 +243,7 @@ export default function FaviconGenerator() {
                 ]}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <Label>Weight</Label>
               <Segmented
                 label="Weight"

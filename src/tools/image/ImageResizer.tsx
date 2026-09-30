@@ -12,7 +12,7 @@ import { BatchFileList } from './components/BatchFileList';
 import { RangeField } from './components/controls';
 import { useImageBatch } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
-import { OUTPUT_INFO, readHeader } from './lib/canvas';
+import { firstFrameNote, joinNotes, OUTPUT_INFO, readHeader } from './lib/canvas';
 import { computeResize, type ResizeSpec } from './lib/geometry';
 import { IMAGE_ACCEPT } from './lib/accept';
 
@@ -62,7 +62,10 @@ export default function ImageResizer() {
     async (file: File, signal: AbortSignal) => {
       const r = await pool.run(file, { resize: spec, output: { format, quality: quality / 100, background: '#ffffff' } }, signal);
       const upscaleSkipped =
-        noUpscale && r.width === r.sourceWidth && r.height === r.sourceHeight && mode !== 'exact' ? 'Already smaller than the target: size unchanged.' : undefined;
+        noUpscale && r.width === r.sourceWidth && r.height === r.sourceHeight && mode !== 'exact'
+          ? 'Already within the target size, so it keeps its original dimensions.'
+          : undefined;
+      const firstFrame = firstFrameNote(r.sourceAnimated, r.sourceFormat);
       return {
         blob: r.blob,
         name: withExtension(file.name, OUTPUT_INFO[r.format].ext),
@@ -70,7 +73,8 @@ export default function ImageResizer() {
         height: r.height,
         sourceWidth: r.sourceWidth,
         sourceHeight: r.sourceHeight,
-        note: upscaleSkipped,
+        note: joinNotes(upscaleSkipped, firstFrame),
+        warning: Boolean(firstFrame),
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +97,17 @@ export default function ImageResizer() {
   }, [first]);
 
   const ratio = firstRatio ?? (typeof width === 'number' && typeof height === 'number' && height > 0 ? width / height : 1);
+
+  // With the aspect lock on, the height follows the first image's shape as soon as it is
+  // known (otherwise the lock would show "locked" while the output is stretched).
+  const lockActive = lock && mode === 'exact';
+  const [syncedRatio, setSyncedRatio] = useState<number | null>(null);
+  if (!lockActive || !firstRatio) {
+    if (syncedRatio !== null) setSyncedRatio(null);
+  } else if (firstRatio !== syncedRatio && typeof width === 'number') {
+    setSyncedRatio(firstRatio);
+    setHeight(Math.max(1, Math.round(width / firstRatio)));
+  }
 
   function changeWidth(v: number | '') {
     setWidth(v);

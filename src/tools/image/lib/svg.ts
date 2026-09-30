@@ -23,17 +23,34 @@ function toPx(v: string | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * A readable message from a DOMParser <parsererror>. Chrome reports "…error on line 1 at
+ * column 98: Unexpected closing tag… Below is a rendering of the page…", Firefox
+ * "XML Parsing Error: mismatched tag… Location: … Line Number 1, Column 98: …".
+ */
+export function describeXmlError(raw: string): string {
+  const msg = raw.replace(/\s+/g, ' ').trim();
+  const chrome = /error on line (\d+) at column (\d+):\s*(.*?)\s*(?:Below is a rendering of the page.*)?$/i.exec(msg);
+  const firefox = /XML Parsing Error:\s*(.*?)\s*Location:.*?Line Number (\d+), Column (\d+)/i.exec(msg);
+  let line: string | undefined;
+  let column: string | undefined;
+  let detail: string;
+  if (chrome) [, line, column, detail] = chrome;
+  else if (firefox) [, detail, line, column] = firefox;
+  else detail = msg.replace(/^.*?error[^:]*:\s*/i, '');
+  // Namespaced names like "{http://www.w3.org/2000/svg}rect" → "rect".
+  detail = detail.replace(/\{[^}]*\}/g, '').trim().replace(/[.:]+$/, '');
+  const where = line ? ` at line ${line}${column ? `, column ${column}` : ''}` : '';
+  return `Invalid XML${where}: ${detail.slice(0, 160) || 'the markup could not be parsed'}.`;
+}
+
 /** Parse and inspect SVG markup (uses DOMParser; nothing is rendered or executed). */
 export function analyzeSvg(text: string): SvgInfo {
   const empty: SvgInfo = { ok: false, error: null, width: null, height: null, viewBox: null, size: null, elements: 0, warnings: [] };
   if (!text.trim()) return { ...empty, error: 'The SVG is empty.' };
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const err = doc.querySelector('parsererror');
-  if (err) {
-    const msg = (err.textContent || '').replace(/\s+/g, ' ').trim();
-    const line = /line\s*(?:number\s*)?(\d+)/i.exec(msg)?.[1];
-    return { ...empty, error: `Invalid XML${line ? ` near line ${line}` : ''}: ${msg.replace(/^.*?error[^:]*:\s*/i, '').slice(0, 160) || 'the markup could not be parsed.'}` };
-  }
+  if (err) return { ...empty, error: describeXmlError(err.textContent || '') };
   const root = doc.documentElement;
   if (!root || root.localName !== 'svg') return { ...empty, error: `The root element is <${root?.localName ?? '?'}>, not <svg>.` };
   const width = root.getAttribute('width');
@@ -61,13 +78,20 @@ export function analyzeSvg(text: string): SvgInfo {
   if (!w || !h) warnings.push('No usable width/height or viewBox: a default size of 300×150 may be used.');
   const scripts = all.filter((el) => el.localName === 'script').length;
   if (scripts) warnings.push(`Contains ${scripts} <script> element${scripts > 1 ? 's' : ''} (not executed in previews here).`);
-  const handlers = all.filter((el) => Array.from(el.attributes).some((a) => /^on/i.test(a.name))).length;
+  const handlers = [root, ...all].filter((el) => Array.from(el.attributes).some((a) => /^on/i.test(a.name))).length;
   if (handlers) warnings.push(`${handlers} element${handlers > 1 ? 's have' : ' has'} event handler attributes (onload, onclick…).`);
   if (all.some((el) => el.localName === 'foreignObject')) warnings.push('Contains <foreignObject> (HTML inside SVG), which some renderers ignore.');
-  const external = all.filter((el) => {
-    const href = el.getAttribute('href') ?? el.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
-    return href && /^(https?:)?\/\//i.test(href);
-  }).length;
+  const remote = /^\s*(https?:)?\/\//i;
+  // @import "…", @import url(…) and url(…) pointing at the web, in <style> or style="".
+  const cssRemote = /(?:@import\s+(?:url\(\s*)?|url\(\s*)["']?\s*(?:https?:)?\/\//gi;
+  const cssCount = (css: string | null | undefined) => (css ? (css.match(cssRemote)?.length ?? 0) : 0);
+  const external =
+    all.filter((el) => {
+      const href = el.getAttribute('href') ?? el.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+      return href && remote.test(href);
+    }).length +
+    [root, ...all].reduce((n, el) => n + Array.from(el.attributes).reduce((m, a) => m + cssCount(a.value), 0), 0) +
+    all.filter((el) => el.localName === 'style').reduce((n, el) => n + cssCount(el.textContent), 0);
   if (external) warnings.push(`${external} external reference${external > 1 ? 's' : ''} (images/fonts from the web are blocked when used as an image).`);
   return {
     ok: true,

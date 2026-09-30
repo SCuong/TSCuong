@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { optimize } from 'svgo/browser';
-import { analyzeSvg, buildSvgoConfig, presetToggles } from './svg';
+import { analyzeSvg, buildSvgoConfig, describeXmlError, presetToggles } from './svg';
 
 const NS = 'xmlns="http://www.w3.org/2000/svg"';
 
@@ -35,6 +35,29 @@ describe('analyzeSvg', () => {
     expect(w).toMatch(/foreignObject/);
     expect(w).toMatch(/No viewBox/);
     expect(analyzeSvg('<svg width="1" height="1" viewBox="0 0 1 1"/>').warnings.join()).toMatch(/xmlns/);
+  });
+
+  it('counts handlers on the root and remote CSS references (regression)', () => {
+    const a = analyzeSvg(
+      `<svg ${NS} viewBox="0 0 1 1" onload="fetch('//x')"><style>@import url("http://evil.test/a.css"); rect { fill: url(https://evil.test/p.svg#p) }</style><rect style="fill: url('//evil.test/q.svg#q')" filter="url(http://evil.test/f.svg#f)"/></svg>`,
+    );
+    const w = a.warnings.join('\n');
+    expect(w).toMatch(/1 element has event handler/);
+    expect(w).toMatch(/4 external references/);
+    // Local references are fine.
+    expect(analyzeSvg(`<svg ${NS} viewBox="0 0 1 1"><rect fill="url(#g)"/></svg>`).warnings).toEqual([]);
+  });
+
+  it('turns browser parser errors into a readable sentence', () => {
+    const chrome =
+      'This page contains the following errors:error on line 1 at column 98: Unexpected closing tag: {http://www.w3.org/2000/svg}svg != {http://www.w3.org/2000/svg}rect\nBelow is a rendering of the page up to the first error.';
+    expect(describeXmlError(chrome)).toBe('Invalid XML at line 1, column 98: Unexpected closing tag: svg != rect.');
+    const firefox = 'XML Parsing Error: mismatched tag. Expected: </rect>.\nLocation: blob:x\nLine Number 1, Column 93:';
+    expect(describeXmlError(firefox)).toBe('Invalid XML at line 1, column 93: mismatched tag. Expected: </rect>.');
+    expect(describeXmlError('')).toBe('Invalid XML: the markup could not be parsed.');
+    const real = analyzeSvg(`<svg ${NS}><g></svg>`).error!;
+    expect(real).toMatch(/^Invalid XML/);
+    expect(real).not.toMatch(/Below is a rendering|\{http/);
   });
 
   it('handles Unicode text content', () => {

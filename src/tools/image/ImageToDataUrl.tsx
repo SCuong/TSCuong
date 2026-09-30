@@ -7,15 +7,32 @@ import { Input, Label } from '@/components/ui/Field';
 import { Segmented } from '@/components/ui/Segmented';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
-import { useObjectUrl, useToolState } from '@/lib/hooks';
+import { CopyButton, DownloadButton } from '@/components/ui/Actions';
+import { useDebouncedValue, useObjectUrl, useToolState } from '@/lib/hooks';
 import { baseName, errorMessage, formatBytes } from '@/lib/utils';
 import { FORMAT_INFO, sniffImageFormat, type ImageFormat } from './lib/formats';
-import { snippets, svgToDataUrl, toDataUrl } from './lib/dataurl';
+import { snippets, svgToDataUrl } from './lib/dataurl';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 type Output = 'dataUrl' | 'css' | 'html' | 'markdown' | 'base64';
 
 const MAX_FILE = 20 * 1024 * 1024;
+/** Outputs longer than this are previewed instead of loaded into the editor. */
+const LARGE_OUTPUT = 1_000_000;
+const PREVIEW_CHARS = 2_000;
+
+/** The Base64 payload of a file, encoded by the browser. */
+function fileBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface Loaded {
   file: File;
@@ -36,11 +53,12 @@ export default function ImageToDataUrl() {
     setError(null);
     try {
       if (file.size > MAX_FILE) throw new Error(`This file is ${formatBytes(file.size)}. Data URLs that large are impractical (limit 20 MB).`);
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const format = sniffImageFormat(bytes);
+      if (file.size === 0) throw new Error('The file is empty.');
+      const format = sniffImageFormat(new Uint8Array(await file.slice(0, 4096).arrayBuffer()));
       if (!format) throw new Error('This file is not a recognized image (checked by its contents).');
-      const svgText = format === 'svg' ? new TextDecoder().decode(bytes) : null;
-      setData({ file, format, base64Url: toDataUrl(bytes, FORMAT_INFO[format].mime), svgText });
+      const svgText = format === 'svg' ? await file.text() : null;
+      // FileReader encodes Base64 natively (a pure-JS loop over megabytes would freeze the page).
+      setData({ file, format, base64Url: `data:${FORMAT_INFO[format].mime};base64,${await fileBase64(file)}`, svgText });
       setAlt(baseName(file.name));
     } catch (e) {
       setData(null);
@@ -48,15 +66,20 @@ export default function ImageToDataUrl() {
     }
   }
 
-  const url = data ? (data.svgText !== null && svgEncoding === 'url' ? svgToDataUrl(data.svgText) : data.base64Url) : '';
+  const url = useMemo(() => (data ? (data.svgText !== null && svgEncoding === 'url' ? svgToDataUrl(data.svgText) : data.base64Url) : ''), [data, svgEncoding]);
+  // Snippets of large images are megabytes long: don't rebuild them on every keystroke.
+  const debouncedAlt = useDebouncedValue(alt, 250);
+  const snippetAlt = url.length > LARGE_OUTPUT ? debouncedAlt : alt;
   const text = useMemo(() => {
     if (!url) return '';
     if (output === 'base64') return url.includes(';base64,') ? url.slice(url.indexOf(',') + 1) : '';
-    const s = snippets(url, alt);
+    const s = snippets(url, snippetAlt);
     return output === 'dataUrl' ? s.dataUrl : s[output];
-  }, [url, output, alt]);
+  }, [url, output, snippetAlt]);
+  const outputTitle = output === 'dataUrl' ? 'Data URL' : output === 'css' ? 'CSS' : output === 'html' ? 'HTML' : output === 'markdown' ? 'Markdown' : 'Base64';
+  const outputFile = data ? `${baseName(data.file.name)}.${output === 'css' ? 'css' : output === 'html' ? 'html' : output === 'markdown' ? 'md' : 'txt'}` : 'output.txt';
 
-  const size = new Blob([url]).size;
+  const size = useMemo(() => new Blob([url]).size, [url]);
   const overhead = data ? ((size - data.file.size) / data.file.size) * 100 : 0;
 
   return (
@@ -82,7 +105,7 @@ export default function ImageToDataUrl() {
               />
             </div>
             {data.svgText !== null && (
-              <div>
+              <div className="min-w-0">
                 <Label>SVG encoding</Label>
                 <Segmented
                   label="SVG encoding"
@@ -131,13 +154,31 @@ export default function ImageToDataUrl() {
                 </Badge>
               </div>
             </Panel>
-            <EditorPanel
-              title={output === 'dataUrl' ? 'Data URL' : output === 'css' ? 'CSS' : output === 'html' ? 'HTML' : output === 'markdown' ? 'Markdown' : 'Base64'}
-              value={text}
-              height="320px"
-              downloadName={`${baseName(data.file.name)}.${output === 'css' ? 'css' : output === 'html' ? 'html' : output === 'markdown' ? 'md' : 'txt'}`}
-              footer={<span>{text.length.toLocaleString()} characters</span>}
-            />
+            {text.length > LARGE_OUTPUT ? (
+              // Showing megabytes of text in an editor freezes the page: preview the start, copy/download the whole.
+              <Panel
+                title={outputTitle}
+                description={`${text.length.toLocaleString()} characters: too long to show in full`}
+                actions={
+                  <>
+                    <CopyButton value={text} label="Copy all" />
+                    <DownloadButton data={text} filename={outputFile} label="Download" />
+                  </>
+                }
+              >
+                <pre className="max-h-72 overflow-auto rounded-lg border border-line bg-surface-sunken p-3 font-mono text-[12px] break-all whitespace-pre-wrap text-fg">
+                  {text.slice(0, PREVIEW_CHARS)}…
+                </pre>
+              </Panel>
+            ) : (
+              <EditorPanel
+                title={outputTitle}
+                value={text}
+                height="320px"
+                downloadName={outputFile}
+                footer={<span>{text.length.toLocaleString()} characters</span>}
+              />
+            )}
           </div>
         </>
       )}

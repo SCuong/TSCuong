@@ -125,6 +125,7 @@ export class ImagePool {
         sourceFormat: response.sourceFormat as ImageFormat,
         sourceWidth: response.sourceWidth,
         sourceHeight: response.sourceHeight,
+        sourceAnimated: response.sourceAnimated,
       };
     }
     if (response.fallback) return processImage(file, job);

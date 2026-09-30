@@ -160,7 +160,7 @@ export default function BarcodeGenerator() {
             <Checkbox label="Show text" checked={showText} onChange={setShowText} />
             {showText && (
               <>
-                <div>
+                <div className="min-w-0">
                   <Label>Text position</Label>
                   <Segmented
                     label="Text position"

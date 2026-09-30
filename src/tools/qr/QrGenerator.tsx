@@ -88,6 +88,8 @@ export default function QrGenerator() {
       case 'url': {
         const u = url.trim();
         if (!u || u === 'https://' || u === 'http://') return { value: '', error: null };
+        // Browsers "fix" spaces, but phones reading the code would get a broken link.
+        if (/\s/.test(u)) return { value: '', error: 'A URL cannot contain spaces. Remove them or replace them with %20.' };
         const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : `https://${u}`;
         try {
           new URL(withScheme);
@@ -139,7 +141,8 @@ export default function QrGenerator() {
       try {
         const QR = (await import('qrcode')).default;
         const qr = QR.create(debounced.value, { errorCorrectionLevel: ec });
-        const out = await QR.toString(debounced.value, { type: 'svg', errorCorrectionLevel: ec, margin, color: { dark: fg, light: bg } });
+        // width gives the downloaded SVG the same intrinsic size as the PNG.
+        const out = await QR.toString(debounced.value, { type: 'svg', errorCorrectionLevel: ec, margin, width: size, color: { dark: fg, light: bg } });
         if (cancelled) return;
         setVersion(qr.version);
         setSvg(out);
@@ -154,7 +157,7 @@ export default function QrGenerator() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, ec, margin, fg, bg]);
+  }, [debounced, ec, margin, size, fg, bg]);
 
   const svgBlob = useMemo(() => (svg ? new Blob([svg], { type: 'image/svg+xml' }) : null), [svg]);
   const svgUrl = useObjectUrl(svgBlob);
@@ -279,7 +282,7 @@ export default function QrGenerator() {
           </Panel>
           <Panel title="Style">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
+              <div className="min-w-0">
                 <Label>Error correction</Label>
                 <Segmented
                   label="Error correction"
@@ -319,7 +322,17 @@ export default function QrGenerator() {
                 {bytes.toLocaleString()} bytes encoded · error correction {ec}
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="primary" icon={Download} onClick={async () => downloadBlob(await pngBlob(), 'qr-code.png')}>
+                <Button
+                  variant="primary"
+                  icon={Download}
+                  onClick={async () => {
+                    try {
+                      downloadBlob(await pngBlob(), 'qr-code.png');
+                    } catch (e) {
+                      toast(friendlyQrError(e), 'error');
+                    }
+                  }}
+                >
                   PNG
                 </Button>
                 <Button icon={Download} onClick={() => downloadBlob(svg, 'qr-code.svg', 'image/svg+xml')}>

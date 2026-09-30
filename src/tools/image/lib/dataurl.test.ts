@@ -45,6 +45,29 @@ describe('parseDataUrl', () => {
     expect(new TextDecoder().decode(r.bytes)).toContain("fill='#f00'");
   });
 
+  it('keeps SVGs with apostrophes and quotes intact (regression: blind " → \' swap broke them)', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50"><text font-family="'Open Sans', Arial">Tom &amp; Jerry say "hi" #1 100%</text></svg>`;
+    const url = svgToDataUrl(svg);
+    expect(url).not.toMatch(/["<>\\\n]/);
+    // Decodes back to exactly the original markup (quotes included).
+    expect(new TextDecoder().decode(parseDataUrl(url).bytes)).toBe(svg);
+    // Without apostrophes or quoted text, the shorter single-quote form is used.
+    const plain = svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="red"/></svg>`);
+    expect(plain).toBe(`data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect fill='red'/%3E%3C/svg%3E`);
+    // " inside text content is not changed into '.
+    const quoted = `<svg xmlns="http://www.w3.org/2000/svg"><text>"hi"</text></svg>`;
+    expect(new TextDecoder().decode(parseDataUrl(svgToDataUrl(quoted)).bytes)).toBe(quoted);
+  });
+
+  it('collapses insignificant whitespace but keeps preserved text and non-breaking spaces', () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg">\n  <text>a  b</text>\n</svg>';
+    expect(new TextDecoder().decode(parseDataUrl(svgToDataUrl(svg)).bytes)).toBe('<svg xmlns=\'http://www.w3.org/2000/svg\'> <text>a  b</text> </svg>');
+    const pre = '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve"><text>a  \n\tb</text></svg>';
+    const url = svgToDataUrl(pre);
+    expect(url).not.toMatch(/\n|\t/);
+    expect(new TextDecoder().decode(parseDataUrl(url).bytes)).toBe(pre.replace(/"/g, "'"));
+  });
+
   it('gives clear errors', () => {
     expect(() => parseDataUrl('')).toThrow(DataUrlError);
     expect(() => parseDataUrl('data:image/png;base64')).toThrow(/comma/);
@@ -70,10 +93,30 @@ describe('encoding helpers', () => {
   it('toDataUrl and snippets', () => {
     const url = toDataUrl(new Uint8Array([1, 2, 3]), 'image/png');
     expect(url).toBe('data:image/png;base64,AQID');
-    const s = snippets(url, 'A "quoted" [alt]');
+    const s = snippets(url, 'A "quoted" [alt] & <b>');
     expect(s.css).toBe(`background-image: url("${url}");`);
-    expect(s.html).toBe(`<img src="${url}" alt="A &quot;quoted&quot; [alt]" />`);
-    expect(s.markdown).toBe(`![A "quoted" alt](${url})`);
+    expect(s.html).toBe(`<img src="${url}" alt="A &quot;quoted&quot; [alt] &amp; &lt;b&gt;" />`);
+    expect(s.markdown).toBe(`![A "quoted" alt & <b>](${url})`);
+  });
+  it('snippets stay valid for URL-encoded SVG (spaces, &, parentheses)', () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><g transform="translate(1 2)"><text>A &amp; B</text></g></svg>`;
+    const url = svgToDataUrl(svg);
+    const s = snippets(url, 'x');
+    // HTML: & is escaped so the browser hands the original &amp; back to the SVG parser.
+    expect(s.html).toContain('A &amp;amp; B');
+    expect(unwrap(s.html)).toBe(url);
+    // Markdown: no raw spaces or parentheses in the link destination.
+    const dest = /^!\[x\]\((.*)\)$/.exec(s.markdown)![1];
+    expect(dest).not.toMatch(/[ ()]/);
+    expect(new TextDecoder().decode(parseDataUrl(s.markdown).bytes)).toBe(new TextDecoder().decode(parseDataUrl(url).bytes));
+    // CSS: the url("…") string needs no escaping.
+    expect(s.css).toBe(`background-image: url("${url}");`);
+  });
+  it('unwrap handles Markdown <…> destinations, titles and HTML entities', () => {
+    const d = 'data:image/png;base64,AQID';
+    expect(unwrap(`![a](<${d}>)`)).toBe(d);
+    expect(unwrap(`![a](${d} "title")`)).toBe(d);
+    expect(unwrap(`<img src="data:image/svg+xml,%3Csvg%3E&amp;x&#39;" alt="">`)).toBe("data:image/svg+xml,%3Csvg%3E&x'");
   });
   it('extensionFor', () => {
     expect(extensionFor('jpeg', null)).toBe('jpg');

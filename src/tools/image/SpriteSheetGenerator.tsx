@@ -12,7 +12,7 @@ import { toast } from '@/components/ui/Toast';
 import { useToolState } from '@/lib/hooks';
 import { downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { canvasToBlob, checkDimensions, createCanvas, decodeImage, getContext } from './lib/canvas';
-import { gridLayout, packLayout, spriteCss, spriteJson } from './lib/sprite';
+import { gridLayout, packLayout, sheetFileName, spriteCss, spriteJson } from './lib/sprite';
 import { zipBlobs } from './lib/zip';
 import { IMAGE_ACCEPT } from './lib/accept';
 
@@ -124,22 +124,23 @@ export default function SpriteSheetGenerator() {
     };
   }, [layout, sprites]);
 
-  const css = sprites.length ? spriteCss(layout, prefix, sheetName || 'sprite.png') : '';
-  const json = sprites.length ? spriteJson(layout, sheetName || 'sprite.png') : '';
+  const sheetFile = sheetFileName(sheetName);
+  const sheetBase = sheetFile.replace(/\.png$/i, '');
+  const css = sprites.length ? spriteCss(layout, prefix, sheetFile) : '';
+  const json = sprites.length ? spriteJson(layout, sheetFile) : '';
 
   async function downloadZip() {
     if (!png) return;
     try {
-      const name = sheetName || 'sprite.png';
       const blob = await zipBlobs(
         [
-          { name, data: png },
-          { name: name.replace(/\.png$/i, '') + '.css', data: css },
-          { name: name.replace(/\.png$/i, '') + '.json', data: json },
+          { name: sheetFile, data: png },
+          { name: `${sheetBase}.css`, data: css },
+          { name: `${sheetBase}.json`, data: json },
         ],
         6,
       );
-      downloadBlob(blob, name.replace(/\.png$/i, '') + '.zip');
+      downloadBlob(blob, `${sheetBase}.zip`);
     } catch (e) {
       toast(errorMessage(e, 'Could not create the ZIP.'), 'error');
     }
@@ -148,7 +149,7 @@ export default function SpriteSheetGenerator() {
   return (
     <ToolStack>
       <ToolBar>
-        <div>
+        <div className="min-w-0">
           <Label>Layout</Label>
           <Segmented
             label="Layout"
@@ -217,7 +218,7 @@ export default function SpriteSheetGenerator() {
               description={`${layout.width} × ${layout.height} px${png ? ` · ${formatBytes(png.size)}` : ''}`}
               actions={
                 <>
-                  <Button size="sm" icon={Download} disabled={!png} onClick={() => png && downloadBlob(png, sheetName || 'sprite.png')}>
+                  <Button size="sm" icon={Download} disabled={!png} onClick={() => png && downloadBlob(png, sheetFile)}>
                     PNG
                   </Button>
                   <Button size="sm" variant="primary" icon={FileArchive} disabled={!png} onClick={downloadZip}>
@@ -227,12 +228,12 @@ export default function SpriteSheetGenerator() {
               }
             >
               <div className="lk-checker flex max-h-[420px] items-start justify-center overflow-auto rounded-lg border border-line p-2">
-                <canvas ref={canvasRef} className="block h-auto max-w-full" style={{ imageRendering: layout.width < 400 ? 'pixelated' : 'auto', width: layout.width < 160 ? layout.width * 2 : undefined }} aria-label="Sprite sheet preview" />
+                <canvas ref={canvasRef} className="block h-auto max-w-full" style={{ imageRendering: layout.width < 400 ? 'pixelated' : 'auto', width: layout.width < 160 ? layout.width * 2 : undefined }} role="img" aria-label="Sprite sheet preview" />
               </div>
             </Panel>
             <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-              <EditorPanel title="CSS" value={css} language="css" height="260px" downloadName={(sheetName || 'sprite.png').replace(/\.png$/i, '') + '.css'} downloadType="text/css" />
-              <EditorPanel title="JSON map" value={json} language="json" height="260px" downloadName={(sheetName || 'sprite.png').replace(/\.png$/i, '') + '.json'} downloadType="application/json" />
+              <EditorPanel title="CSS" value={css} language="css" height="260px" downloadName={`${sheetBase}.css`} downloadType="text/css" />
+              <EditorPanel title="JSON map" value={json} language="json" height="260px" downloadName={`${sheetBase}.json`} downloadType="application/json" />
             </div>
           </div>
         </div>

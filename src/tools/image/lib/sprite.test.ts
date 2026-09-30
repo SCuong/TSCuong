@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classNames, gridLayout, hasOverlap, packLayout, spriteCss, spriteJson } from './sprite';
+import { classNames, gridLayout, hasOverlap, packLayout, sheetFileName, spriteCss, spriteJson } from './sprite';
 
 const sizes = [
   { name: 'home.png', width: 32, height: 32 },
@@ -74,5 +74,20 @@ describe('sprite outputs', () => {
     expect(Object.keys(j.frames)).toHaveLength(5);
     expect(j.frames.dot.frame).toEqual({ x: l.items[3].x, y: l.items[3].y, w: 8, h: 8 });
     expect(j.meta).toMatchObject({ image: 'sheet.png', size: { w: l.width, h: l.height } });
+  });
+});
+
+describe('sheet file name', () => {
+  it('always ends in .png and is safe in a ZIP and in CSS (regression: "icons" had no extension)', () => {
+    expect(sheetFileName('icons')).toBe('icons.png');
+    expect(sheetFileName('icons.PNG')).toBe('icons.PNG');
+    expect(sheetFileName('  ')).toBe('sprite.png');
+    expect(sheetFileName('a/b:c?.png')).toBe('a-b-c-.png');
+    expect(sheetFileName('..hidden')).toBe('hidden.png');
+    expect(sheetFileName('name.')).toBe('name.png');
+  });
+  it('escapes quotes in the CSS url()', () => {
+    const css = spriteCss(packLayout([{ name: 'a.png', width: 1, height: 1 }], 0), 'icon', 'my"sheet.png');
+    expect(css).toContain('background-image: url("my\\"sheet.png");');
   });
 });

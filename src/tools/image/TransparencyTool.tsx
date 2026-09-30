@@ -13,11 +13,11 @@ import { useToolState } from '@/lib/hooks';
 import { baseName, downloadBlob, errorMessage, formatBytes } from '@/lib/utils';
 import { useSingleImage } from './components/useSingleImage';
 import { ColorField, RangeField } from './components/controls';
-import { canvasToBlob, createCanvas, getContext } from './lib/canvas';
+import { canvasToBlob, createCanvas, fitWithin, getContext } from './lib/canvas';
+import { scaledBitmap } from './lib/pipeline';
 import { flatten, guessBackground, keyColor } from './lib/chroma';
 import { hexToRgb } from './lib/encoders';
 import { rgbToHex } from './lib/palette';
-import { resample } from './lib/pipeline';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 type Mode = 'transparent' | 'replace' | 'flatten';
@@ -39,24 +39,33 @@ export default function TransparencyTool() {
   const [affected, setAffected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const base = useRef<{ data: ImageData; scale: number } | null>(null);
+  const [base, setBase] = useState<{ data: ImageData; scale: number } | null>(null);
 
-  // Build the downscaled preview source when a new image loads.
+  // Build the downscaled preview source when a new image loads (scaled off the main thread).
   useEffect(() => {
-    base.current = null;
+    setBase(null);
     setSeed(null);
     if (!image) return;
-    const scale = Math.min(1, PREVIEW_MAX / Math.max(image.width, image.height));
-    const w = Math.max(1, Math.round(image.width * scale));
-    const h = Math.max(1, Math.round(image.height * scale));
-    const small = scale < 1 ? resample(image.bitmap, { width: w, height: h }) : (() => {
-      const c = createCanvas(w, h);
-      getContext(c).drawImage(image.bitmap, 0, 0);
-      return c;
-    })();
-    base.current = { data: getContext(small, { willReadFrequently: true }).getImageData(0, 0, w, h), scale };
-    const guess = guessBackground(base.current.data.data, w, h);
-    setTarget(rgbToHex(guess));
+    let cancelled = false;
+    const size = fitWithin(image.width, image.height, PREVIEW_MAX);
+    scaledBitmap(image.bitmap, size.width, size.height).then(
+      (small) => {
+        if (cancelled) return small.close();
+        const c = createCanvas(small.width, small.height);
+        const ctx = getContext(c, { willReadFrequently: true });
+        ctx.drawImage(small, 0, 0);
+        small.close();
+        const data = ctx.getImageData(0, 0, c.width, c.height);
+        setBase({ data, scale: c.width / image.width });
+        setTarget(rgbToHex(guessBackground(data.data, c.width, c.height)));
+      },
+      () => {
+        // The image was replaced or closed meanwhile.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [image, setTarget]);
 
   function apply(data: ImageData, scale: number): number {
@@ -77,7 +86,7 @@ export default function TransparencyTool() {
 
   // Re-render the preview when settings change.
   useEffect(() => {
-    const b = base.current;
+    const b = base;
     const c = canvasRef.current;
     if (!b || !c) return;
     const t = setTimeout(() => {
@@ -90,10 +99,10 @@ export default function TransparencyTool() {
     }, 40);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image, mode, target, replacement, background, tolerance, feather, contiguous, seed]);
+  }, [base, mode, target, replacement, background, tolerance, feather, contiguous, seed]);
 
   function onPick(e: ReactPointerEvent<HTMLCanvasElement>) {
-    const b = base.current;
+    const b = base;
     if (!b || !image || mode === 'flatten') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const px = Math.floor(((e.clientX - rect.left) / rect.width) * b.data.width);
@@ -131,7 +140,7 @@ export default function TransparencyTool() {
   return (
     <ToolStack>
       <ToolBar>
-        <div>
+        <div className="min-w-0">
           <Label>Action</Label>
           <Segmented
             label="Action"
@@ -163,13 +172,13 @@ export default function TransparencyTool() {
             checked={contiguous}
             onChange={setContiguous}
           />
-          {image && base.current && (
+          {image && base && (
             <Button
               size="sm"
               variant="ghost"
               icon={Wand}
               onClick={() => {
-                const b = base.current!;
+                const b = base;
                 setTarget(rgbToHex(guessBackground(b.data.data, b.data.width, b.data.height)));
                 setSeed(null);
               }}
@@ -208,6 +217,7 @@ export default function TransparencyTool() {
           <div className={`flex justify-center overflow-hidden rounded-lg border border-line ${bgClass}`} style={bgStyle}>
             <canvas
               ref={canvasRef}
+              role="img"
               onPointerDown={onPick}
               className={`block h-auto max-h-[65vh] max-w-full object-contain ${mode === 'flatten' ? '' : 'cursor-crosshair'}`}
               aria-label={mode === 'flatten' ? 'Preview' : 'Preview. Click to choose the color to change.'}

@@ -1,7 +1,8 @@
 /**
- * Lossless metadata removal for JPEG, PNG and WebP by rewriting container
- * segments/chunks. Pixel data is copied byte-for-byte (no re-encoding).
+ * Lossless metadata removal for JPEG, PNG, WebP and GIF by rewriting container
+ * segments/chunks/blocks. Pixel data is copied byte-for-byte (no re-encoding).
  */
+import { gifAppId, gifBlocks, isGif } from './metaContainers';
 
 export interface StripOptions {
   /** Keep the embedded ICC color profile (recommended: colors stay accurate). */
@@ -132,7 +133,9 @@ export function stripJpeg(b: Uint8Array, opts: StripOptions): StripResult {
     let keep = true;
     let label = '';
     if (m === 0xe0) {
-      keep = true;
+      // JFIF is structural; a JFXX extension only carries a thumbnail of the original photo.
+      keep = ascii(b, payload, 5) !== 'JFXX\0';
+      if (!keep) label = 'JFIF thumbnail (JFXX)';
     } else if (m === 0xe1) {
       keep = false;
       label = app1Kind(b, payload);
@@ -262,6 +265,45 @@ export function stripPng(b: Uint8Array, opts: StripOptions): StripResult {
   }
   if (!sawEnd) throw new CorruptImageError('The PNG file is truncated (no IEND chunk).');
   if (o < b.length) removed.push(`Trailing data after the image (${b.length - o} bytes)`);
+  return { bytes: concat(parts), removed: summarize(removed), kept };
+}
+
+// ---------------------------------------------------------------------------
+// GIF
+// ---------------------------------------------------------------------------
+
+/** Application extensions that control playback (looping), not metadata. */
+const GIF_PLAYBACK_APPS = new Set(['NETSCAPE2.0', 'ANIMEXTS1.0']);
+
+/**
+ * Remove comments, XMP and other application data from a GIF without touching
+ * its frames, so animations keep playing.
+ */
+export function stripGif(b: Uint8Array, opts: StripOptions): StripResult {
+  if (!isGif(b)) throw new CorruptImageError('This is not a valid GIF file.');
+  const blocks = gifBlocks(b);
+  if (!blocks) throw new CorruptImageError('The GIF file is truncated or corrupt.');
+  const headerEnd = blocks.length ? blocks[0].start : b.length - 1;
+  const parts: Uint8Array[] = [b.subarray(0, headerEnd)];
+  const removed: string[] = [];
+  const kept: string[] = [];
+  for (const blk of blocks) {
+    let label = '';
+    if (blk.kind === 'extension' && blk.label === 0xfe) label = 'Comment';
+    else if (blk.kind === 'extension' && blk.label === 0xff) {
+      const id = gifAppId(b, blk.start);
+      if (id === 'ICCRGBG1012') {
+        if (opts.keepIcc) kept.push('ICC color profile');
+        else label = 'ICC color profile';
+      } else if (id === 'XMP DataXMP') label = 'XMP metadata';
+      else if (!GIF_PLAYBACK_APPS.has(id)) label = `Application data (${id.trim() || 'unnamed'})`;
+    }
+    if (label) removed.push(label);
+    else parts.push(b.subarray(blk.start, blk.end));
+  }
+  const last = blocks.length ? blocks[blocks.length - 1].end : headerEnd;
+  parts.push(new Uint8Array([0x3b]));
+  if (last + 1 < b.length) removed.push(`Trailing data after the image (${b.length - last - 1} bytes)`);
   return { bytes: concat(parts), removed: summarize(removed), kept };
 }
 

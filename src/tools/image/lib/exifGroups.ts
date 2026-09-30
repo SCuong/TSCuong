@@ -1,7 +1,7 @@
 /** Pure grouping/formatting of EXIF tags for the EXIF viewer. */
 import { formatMetaValue, type MetaGroups } from './exif';
 
-export type DisplayGroup = 'camera' | 'exposure' | 'dates' | 'gps' | 'image' | 'icc' | 'xmp' | 'iptc' | 'other';
+export type DisplayGroup = 'camera' | 'exposure' | 'dates' | 'gps' | 'image' | 'text' | 'icc' | 'xmp' | 'iptc' | 'other';
 
 export const GROUP_LABELS: Record<DisplayGroup, string> = {
   camera: 'Camera & lens',
@@ -9,6 +9,7 @@ export const GROUP_LABELS: Record<DisplayGroup, string> = {
   dates: 'Dates',
   gps: 'GPS location',
   image: 'Image',
+  text: 'Text comments (PNG)',
   icc: 'Color profile (ICC)',
   xmp: 'XMP',
   iptc: 'IPTC',
@@ -31,6 +32,9 @@ export interface DisplayRow {
   label: string;
   value: string;
 }
+
+/** Fields of the PNG IHDR chunk; other keys exifr files under "ihdr" are PNG text chunks. */
+const IHDR_FIELDS = new Set(['ImageWidth', 'ImageHeight', 'BitDepth', 'ColorType', 'Compression', 'Filter', 'Interlace']);
 
 /** "ExposureTime" → "Exposure time", "GPSLatitudeRef" → "GPS latitude ref" */
 export function humanizeKey(key: string): string {
@@ -74,6 +78,13 @@ export function formatTagValue(key: string, v: unknown): string {
   return formatMetaValue(v);
 }
 
+/** "dc:creator" → "Creator (dc)", "exif:GPSLatitude" → "GPS latitude (exif)" */
+export function xmpLabel(key: string): string {
+  const i = key.indexOf(':');
+  if (i <= 0) return humanizeKey(key);
+  return `${humanizeKey(key.slice(i + 1))} (${key.slice(0, i)})`;
+}
+
 function classifyTiffKey(key: string): DisplayGroup {
   if (CAMERA.has(key)) return 'camera';
   if (EXPOSURE.has(key)) return 'exposure';
@@ -84,7 +95,7 @@ function classifyTiffKey(key: string): DisplayGroup {
 /** Group parsed segments into display sections (empty sections omitted). */
 export function groupForDisplay(groups: MetaGroups): Array<{ id: DisplayGroup; rows: DisplayRow[] }> {
   const out: Record<DisplayGroup, DisplayRow[]> = {
-    camera: [], exposure: [], dates: [], gps: [], image: [], icc: [], xmp: [], iptc: [], other: [],
+    camera: [], exposure: [], dates: [], gps: [], image: [], text: [], icc: [], xmp: [], iptc: [], other: [],
   };
   const seen = new Set<string>();
   for (const [segment, tags] of Object.entries(groups)) {
@@ -99,24 +110,39 @@ export function groupForDisplay(groups: MetaGroups): Array<{ id: DisplayGroup; r
       else if (segment === 'icc') target = 'icc';
       else if (segment === 'xmp') target = 'xmp';
       else if (segment === 'iptc') target = 'iptc';
-      else if (segment === 'ifd0' || segment === 'exif' || segment === 'interop' || segment === 'jfif' || segment === 'ihdr') target = classifyTiffKey(key);
+      else if (segment === 'ihdr') target = IHDR_FIELDS.has(key) ? 'image' : 'text';
+      else if (segment === 'ifd0' || segment === 'exif' || segment === 'interop' || segment === 'jfif') target = classifyTiffKey(key);
       else if (segment === 'ifd1') target = 'image';
       else target = 'other';
-      const label = segment === 'ifd1' ? `Thumbnail ${humanizeKey(key).toLowerCase()}` : humanizeKey(key);
+      const label = segment === 'ifd1' ? `Thumbnail ${humanizeKey(key).toLowerCase()}` : segment === 'xmp' ? xmpLabel(key) : humanizeKey(key);
       const id = `${target}:${label}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      out[target].push({ key: `${segment}.${key}`, label, value: formatTagValue(key, value) });
+      out[target].push({ key: `${segment}.${key}`, label, value: formatTagValue(segment === 'xmp' ? '' : key, value) });
     }
   }
   return (Object.keys(out) as DisplayGroup[]).filter((k) => out[k].length).map((id) => ({ id, rows: out[id] }));
 }
 
-/** JSON-safe copy of parsed metadata (Dates → ISO strings, bytes → length notes). */
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * EXIF dates have no time zone: exifr reads them as local time. Export the same
+ * wall-clock value ("2024-05-06 07:08:09") instead of a UTC ISO string, which
+ * would shift the time by the viewer's offset.
+ */
+export function wallClock(d: Date): string {
+  if (Number.isNaN(d.getTime())) return 'Invalid date';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+/** JSON-safe copy of parsed metadata (dates as written in the file, bytes → length notes). */
 export function metadataToJson(groups: MetaGroups): string {
   return JSON.stringify(
     groups,
-    (_k, v) => {
+    function (this: Record<string, unknown>, k, v) {
+      const raw = this[k];
+      if (raw instanceof Date) return wallClock(raw);
       if (v instanceof Uint8Array) return `<${v.length} bytes>`;
       if (typeof v === 'bigint') return v.toString();
       return v;

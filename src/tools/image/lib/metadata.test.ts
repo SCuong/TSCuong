@@ -93,6 +93,18 @@ describe('stripJpeg', () => {
     expect(removed.some((r) => r.startsWith('Trailing data'))).toBe(true);
   });
 
+  it('drops a JFXX thumbnail segment but keeps the JFIF header', () => {
+    const base = makeJpeg({ orientation: 1 });
+    const jfxx = seg(0xe0, [...enc('JFXX\0'), 0x13, 1, 1, 0xff, 0x00, 0x00]);
+    // Insert the JFXX segment right after the JFIF APP0.
+    const jfifEnd = 2 + 4 + 14;
+    const withThumb = new Uint8Array([...base.slice(0, jfifEnd), ...jfxx, ...base.slice(jfifEnd)]);
+    const { bytes, removed } = stripJpeg(withThumb, { keepIcc: true, keepOrientation: true });
+    expect(removed).toContain('JFIF thumbnail (JFXX)');
+    expect(new TextDecoder().decode(bytes)).toContain('JFIF');
+    expect(new TextDecoder().decode(bytes)).not.toContain('JFXX');
+  });
+
   it('is idempotent', () => {
     const once = stripJpeg(makeJpeg(), { keepIcc: true, keepOrientation: true }).bytes;
     const twice = stripJpeg(once, { keepIcc: true, keepOrientation: true });

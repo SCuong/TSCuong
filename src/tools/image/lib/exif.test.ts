@@ -74,7 +74,8 @@ describe('exif helpers', () => {
   });
 
   it('serializes to JSON safely', () => {
-    const json = metadataToJson({ a: { d: new Date('2020-01-01T00:00:00Z'), b: new Uint8Array(5) } });
-    expect(JSON.parse(json)).toEqual({ a: { d: '2020-01-01T00:00:00.000Z', b: '<5 bytes>' } });
+    // Dates keep the wall-clock time written in the file (EXIF dates have no time zone).
+    const json = metadataToJson({ a: { d: new Date(2020, 0, 1, 0, 0, 0), b: new Uint8Array(5) } });
+    expect(JSON.parse(json)).toEqual({ a: { d: '2020-01-01 00:00:00', b: '<5 bytes>' } });
   });
 });

@@ -9,7 +9,7 @@ export interface WorkerRequest {
 }
 
 export type WorkerResponse =
-  | { id: number; ok: true; blob: Blob; width: number; height: number; format: string; sourceFormat: string; sourceWidth: number; sourceHeight: number }
+  | { id: number; ok: true; blob: Blob; width: number; height: number; format: string; sourceFormat: string; sourceWidth: number; sourceHeight: number; sourceAnimated: boolean }
   | { id: number; ok: false; error: string; fallback?: boolean };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;

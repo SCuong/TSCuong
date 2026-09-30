@@ -9,6 +9,7 @@ import {
   buildWifi,
   contrastRatio,
   detectContent,
+  formatIcsDate,
   EMPTY_VCARD,
   escapeText,
   escapeWifi,
@@ -173,6 +174,21 @@ describe('detectContent', () => {
     expect(detectContent(buildVCard({ ...EMPTY_VCARD, firstName: 'A', email: 'a@b.co' })).kind).toBe('vcard');
     expect(detectContent(buildEvent({ title: 'T', location: '', description: '', allDay: true, start: '2024-01-01', end: '' })).kind).toBe('event');
     expect(detectContent('just some text').kind).toBe('text');
+  });
+
+  it('shows event times as readable local dates, not raw iCalendar stamps (regression)', () => {
+    const fmt = (d: Date) => d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    const timed = detectContent(buildEvent({ title: 'Launch', location: '', description: '', allDay: false, start: '2026-10-01T18:30', end: '2026-10-01T21:00' }));
+    expect(timed.fields).toContainEqual({ label: 'Starts', value: fmt(new Date(2026, 9, 1, 18, 30)) });
+    expect(timed.fields).toContainEqual({ label: 'Ends', value: fmt(new Date(2026, 9, 1, 21, 0)) });
+    // All-day DTEND is exclusive: a one-day event ends on the same day.
+    const day = (d: Date) => `${d.toLocaleDateString(undefined, { dateStyle: 'medium' })} (all day)`;
+    const allDay = detectContent(buildEvent({ title: 'Trip', location: '', description: '', allDay: true, start: '2024-12-31', end: '' }));
+    expect(allDay.fields).toContainEqual({ label: 'Starts', value: day(new Date(2024, 11, 31)) });
+    expect(allDay.fields).toContainEqual({ label: 'Ends', value: day(new Date(2024, 11, 31)) });
+    // TZID times keep their wall clock and name the zone; unknown formats pass through.
+    expect(formatIcsDate(';TZID=Europe/Paris', '20261001T113000')).toBe(`${fmt(new Date(2026, 9, 1, 11, 30))} (Europe/Paris)`);
+    expect(formatIcsDate('', 'next tuesday')).toBe('next tuesday');
   });
 });
 

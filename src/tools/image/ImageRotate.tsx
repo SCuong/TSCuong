@@ -12,7 +12,8 @@ import { BatchFileList } from './components/BatchFileList';
 import { ColorField, RangeField } from './components/controls';
 import { useImageBatch } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
-import { OUTPUT_INFO } from './lib/canvas';
+import { firstFrameNote, joinNotes, OUTPUT_INFO } from './lib/canvas';
+import { rotateFlipCss } from './lib/geometry';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 type Format = 'keep' | 'png' | 'jpeg' | 'webp';
@@ -53,10 +54,13 @@ export default function ImageRotate() {
         height: r.height,
         sourceWidth: r.sourceWidth,
         sourceHeight: r.sourceHeight,
-        note:
+        note: joinNotes(
           !rightAngle && fillMode === 'transparent' && !OUTPUT_INFO[r.format].alpha
             ? `${OUTPUT_INFO[r.format].label} has no transparency: corners were filled with white. Choose PNG or WebP to keep them transparent.`
             : undefined,
+          firstFrameNote(r.sourceAnimated, r.sourceFormat),
+        ),
+        warning: r.sourceAnimated,
       };
     },
     [pool, angle, flipH, flipV, fillMode, fill, format, rightAngle],
@@ -99,7 +103,7 @@ export default function ImageRotate() {
         </div>
       </ToolBar>
       <ToolBar>
-        <div>
+        <div className="min-w-0">
           <Label>Corner fill (angled rotation)</Label>
           <Segmented
             label="Corner fill"
@@ -133,7 +137,7 @@ export default function ImageRotate() {
               src={preview.thumbUrl}
               alt="Preview of the rotation"
               className="max-h-[60%] max-w-[60%] transition-transform duration-200"
-              style={{ transform: `rotate(${angle}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` }}
+              style={{ transform: rotateFlipCss(angle, flipH, flipV) }}
             />
           </div>
         </Panel>

@@ -341,6 +341,30 @@ export interface DetectedContent {
   href?: string;
 }
 
+const DATE_FMT: Intl.DateTimeFormatOptions = { dateStyle: 'medium' };
+const DATE_TIME_FMT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
+
+/**
+ * An iCalendar DTSTART/DTEND value as readable local text: UTC times ("…Z") are
+ * converted to this device's time zone, floating and TZID times keep their wall
+ * clock, and all-day ends (exclusive in iCalendar) show the last day of the event.
+ */
+export function formatIcsDate(params: string, value: string, isEnd = false): string {
+  const v = value.trim();
+  const day = /^(\d{4})(\d{2})(\d{2})$/.exec(v);
+  if (day) {
+    const d = new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]) - (isEnd ? 1 : 0));
+    return Number.isNaN(d.getTime()) ? v : `${d.toLocaleDateString(undefined, DATE_FMT)} (all day)`;
+  }
+  const t = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/i.exec(v);
+  if (!t) return v;
+  const [y, mo, d, h, mi, s] = t.slice(1, 7).map(Number);
+  if (t[7]) return new Date(Date.UTC(y, mo - 1, d, h, mi, s)).toLocaleString(undefined, DATE_TIME_FMT);
+  const local = new Date(y, mo - 1, d, h, mi, s).toLocaleString(undefined, DATE_TIME_FMT);
+  const tzid = /TZID=("?)([^";:]+)\1/i.exec(params)?.[2];
+  return tzid ? `${local} (${tzid})` : local;
+}
+
 function safeDecode(s: string): string {
   try {
     return decodeURIComponent(s.replace(/\+/g, ' '));
@@ -378,17 +402,23 @@ export function detectContent(raw: string): DetectedContent {
     return { kind: 'vcard', label: 'Contact card (vCard)', fields: f };
   }
   if (/BEGIN:VEVENT/i.test(text)) {
+    const unfolded = text.replace(/\r?\n[ \t]/g, '');
+    const prop = (k: string) => new RegExp(`^${k}((?:;[^:\\r\\n]*)?):(.*)$`, 'im').exec(unfolded);
     const get = (k: string) => {
-      const m = new RegExp(`^${k}[^:\\r\\n]*:(.*)$`, 'im').exec(text.replace(/\r?\n[ \t]/g, ''));
-      return m ? unescapeText(m[1].trim()) : '';
+      const m = prop(k);
+      return m ? unescapeText(m[2].trim()) : '';
+    };
+    const when = (k: string, isEnd: boolean) => {
+      const m = prop(k);
+      return m ? formatIcsDate(m[1], m[2], isEnd) : '';
     };
     return {
       kind: 'event',
       label: 'Calendar event',
       fields: [
         { label: 'Title', value: get('SUMMARY') },
-        { label: 'Starts', value: get('DTSTART') },
-        { label: 'Ends', value: get('DTEND') },
+        { label: 'Starts', value: when('DTSTART', false) },
+        { label: 'Ends', value: when('DTEND', true) },
         { label: 'Location', value: get('LOCATION') },
         { label: 'Description', value: get('DESCRIPTION') },
       ].filter((x) => x.value),

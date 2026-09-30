@@ -11,7 +11,7 @@ import { BatchFileList } from './components/BatchFileList';
 import { ColorField, RangeField } from './components/controls';
 import { useImageBatch } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
-import { canEncode, decodeImage, OUTPUT_INFO } from './lib/canvas';
+import { canEncode, decodeImage, firstFrameNote, joinNotes, OUTPUT_INFO } from './lib/canvas';
 import { buildIco, icoSizesFor } from './lib/favicon';
 import { IMAGE_ACCEPT } from './lib/accept';
 
@@ -42,12 +42,14 @@ export default function ImageConverter() {
           if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
           const sizes = icoSizesFor(decoded.width, decoded.height);
           const blob = await buildIco(decoded.bitmap, sizes, { background: flatten ? background : null });
+          const firstFrame = firstFrameNote(decoded.header.animated, decoded.header.format);
           return {
             blob,
             name: withExtension(file.name, 'ico'),
             width: Math.max(...sizes),
             height: Math.max(...sizes),
-            note: `Icon sizes: ${sizes.map((s) => `${s}×${s}`).join(', ')}`,
+            note: joinNotes(`Icon sizes: ${sizes.map((s) => `${s}×${s}`).join(', ')}.`, firstFrame),
+            warning: Boolean(firstFrame),
           };
         } finally {
           decoded.bitmap.close();
@@ -58,7 +60,15 @@ export default function ImageConverter() {
         { output: { format: target, quality: quality / 100, background, flatten: needsBackground } },
         signal,
       );
-      return { blob: r.blob, name: withExtension(file.name, OUTPUT_INFO[r.format].ext), width: r.width, height: r.height };
+      const firstFrame = firstFrameNote(r.sourceAnimated, r.sourceFormat);
+      return {
+        blob: r.blob,
+        name: withExtension(file.name, OUTPUT_INFO[r.format].ext),
+        width: r.width,
+        height: r.height,
+        note: firstFrame,
+        warning: Boolean(firstFrame),
+      };
     },
     [pool, target, quality, background, flatten, needsBackground],
   );
@@ -118,7 +128,7 @@ export default function ImageConverter() {
         icon={Repeat}
         compact={batch.items.length > 0}
         title="Drop images to convert"
-        hint="Reads PNG, JPEG, WebP, AVIF, GIF, BMP, ICO and SVG. HEIC is not supported. Nothing is uploaded."
+        hint="Reads PNG, JPEG, WebP, AVIF, GIF, BMP, ICO and SVG (animated images keep only their first frame). HEIC is not supported. Nothing is uploaded."
       />
       <BatchFileList
         items={batch.items}

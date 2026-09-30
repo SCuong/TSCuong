@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { EditorPanel, SplitPanes, ToolStack } from '@/components/tool/EditorPanel';
 import { Alert, ErrorMessage } from '@/components/ui/Alert';
@@ -7,7 +7,7 @@ import { KeyValueList, Panel } from '@/components/ui/Panel';
 import { EmptyState } from '@/components/ui/Feedback';
 import { useDebouncedValue, useObjectUrl } from '@/lib/hooks';
 import { downloadBlob, formatBytes } from '@/lib/utils';
-import { FORMAT_INFO, readImageHeader } from './lib/formats';
+import { DECODABLE, FORMAT_INFO, readImageHeader } from './lib/formats';
 import { DataUrlError, extensionFor, parseDataUrl } from './lib/dataurl';
 
 const SAMPLE =
@@ -35,6 +35,27 @@ export default function DataUrlToImage() {
   );
   const url = useObjectUrl(blob);
   const imgError = url !== null && errorUrl === url;
+
+  // <img> quietly shows a partial picture for truncated data, so decode it explicitly.
+  const detected = value?.detected ?? null;
+  useEffect(() => {
+    if (!url || !blob || !detected) return;
+    let cancelled = false;
+    const check =
+      detected === 'svg'
+        ? (() => {
+            const img = new Image();
+            img.src = url;
+            return img.decode();
+          })()
+        : createImageBitmap(blob).then((b) => b.close());
+    check.catch(() => {
+      if (!cancelled) setErrorUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url, blob, detected]);
   const notImage = value && !value.detected;
   const mismatch = value?.detected && value.declaredMime && value.declaredMime !== FORMAT_INFO[value.detected].mime && !(value.detected === 'jpeg' && value.declaredMime === 'image/jpg');
 
@@ -69,7 +90,11 @@ export default function DataUrlToImage() {
                 </Alert>
               )}
               {imgError ? (
-                <Alert tone="danger">The data looks like {FORMAT_INFO[value.detected].label} but the browser can't display it. It may be truncated or corrupt.</Alert>
+                <Alert tone="danger">
+                  {DECODABLE.has(value.detected) && value.detected !== 'avif'
+                    ? `The data looks like ${FORMAT_INFO[value.detected].label} but it can't be displayed: it is probably truncated or corrupt.`
+                    : `The data is ${FORMAT_INFO[value.detected].label}, which this browser can't display. You can still download it.`}
+                </Alert>
               ) : (
                 <div className="lk-checker flex min-h-40 items-center justify-center overflow-hidden rounded-lg border border-line p-3">
                   <img

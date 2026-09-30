@@ -14,7 +14,7 @@ export const qrTools: ToolDefinition[] = [
       'qr', 'qr code', 'generate', 'generator', 'create', 'wifi', 'wi-fi', 'vcard', 'contact', 'url', 'link', 'email', 'sms', 'phone',
       'geo', 'location', 'calendar', 'event', 'png', 'svg',
     ],
-    aliases: ['wifi qr', 'vcard qr', 'qr code generator', 'url to qr', 'make qr code', 'generate qr', 'wifi qr code', 'contact qr code'],
+    aliases: ['wifi qr', 'vcard qr', 'qr code generator', 'url to qr', 'make qr code', 'generate qr', 'wifi qr code', 'contact qr code', 'qr code maker', 'event qr code'],
     load: () => import('../qr/QrGenerator'),
   },
   {
@@ -39,8 +39,8 @@ export const qrTools: ToolDefinition[] = [
     category: 'qr',
     icon: Barcode,
     route: 'qr/barcode',
-    keywords: ['barcode', 'generator', 'code128', 'ean', 'ean13', 'ean8', 'upc', 'upca', 'upce', 'code39', 'itf', 'itf14', 'msi', 'pharmacode', 'codabar', 'gtin', 'svg', 'png'],
-    aliases: ['barcode generator', 'ean 13 generator', 'upc barcode', 'make barcode', 'code 128 generator'],
+    keywords: ['barcode', 'generator', 'code128', 'ean', 'ean13', 'ean8', 'upc', 'upca', 'upce', 'code39', 'itf', 'itf14', 'msi', 'pharmacode', 'codabar', 'gtin', 'isbn', 'check digit', 'svg', 'png'],
+    aliases: ['barcode generator', 'ean 13 generator', 'upc barcode', 'make barcode', 'code 128 generator', 'isbn barcode'],
     load: () => import('../qr/BarcodeGenerator'),
   },
 ];

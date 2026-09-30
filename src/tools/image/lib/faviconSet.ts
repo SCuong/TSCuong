@@ -66,11 +66,22 @@ export function buildHtml(o: { path: string; themeColor: string; hasSvg: boolean
   return lines.join('\n');
 }
 
+function graphemes(text: string): string[] {
+  const Seg = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment(s: string): Iterable<{ segment: string }> } }).Segmenter;
+  return Seg ? Array.from(new Seg(undefined, { granularity: 'grapheme' }).segment(text), (s) => s.segment) : Array.from(text);
+}
+
 /** Up to 3 visible characters for a letter mark (grapheme-aware). */
 export function letterMarkText(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return '';
-  const Seg = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment(s: string): Iterable<{ segment: string }> } }).Segmenter;
-  const graphemes = Seg ? Array.from(new Seg(undefined, { granularity: 'grapheme' }).segment(trimmed), (s) => s.segment) : Array.from(trimmed);
-  return graphemes.slice(0, 3).join('');
+  return graphemes(trimmed).slice(0, 3).join('');
+}
+
+/**
+ * The manifest `short_name` (shown under home-screen icons): at most 12 visible
+ * characters, never splitting an emoji or accented letter, without trailing spaces.
+ */
+export function shortNameFor(name: string, max = 12): string {
+  return graphemes(name.trim()).slice(0, max).join('').trim();
 }

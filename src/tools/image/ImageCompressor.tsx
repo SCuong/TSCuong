@@ -14,7 +14,7 @@ import { CompareSlider } from './components/CompareSlider';
 import { RangeField } from './components/controls';
 import { useImageBatch, type BatchItem } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
-import { OUTPUT_INFO, readHeader, type OutputFormat } from './lib/canvas';
+import { firstFrameNote, joinNotes, OUTPUT_INFO, readHeader, type OutputFormat } from './lib/canvas';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 type Target = 'keep' | 'jpeg' | 'webp' | 'avif' | 'png-lossy';
@@ -39,6 +39,20 @@ export default function ImageCompressor() {
   const processor = useCallback(
     async (file: File, signal: AbortSignal) => {
       const header = await readHeader(file);
+      if (header?.format === 'svg') {
+        throw new Error('SVG is a vector format, so it is not compressed as pixels here. Use the SVG Optimizer to make it smaller.');
+      }
+      if (target === 'keep' && header?.animated) {
+        // Re-encoding would keep only the first frame, which is not "the same format".
+        return {
+          blob: file,
+          name: file.name,
+          width: header.width,
+          height: header.height,
+          note: 'Animated image kept unchanged: only still images are recompressed here. Choose an output format to convert its first frame.',
+          warning: true,
+        };
+      }
       const format = compressFormat(target, header?.format);
       const r = await pool.run(
         file,
@@ -47,6 +61,7 @@ export default function ImageCompressor() {
       );
       const name = withExtension(file.name, OUTPUT_INFO[r.format].ext);
       const base = { width: r.width, height: r.height, sourceWidth: r.sourceWidth, sourceHeight: r.sourceHeight };
+      const firstFrame = firstFrameNote(r.sourceAnimated, r.sourceFormat);
       if (r.blob.size >= file.size) {
         const larger = `${Math.abs(savingsPercent(file.size, r.blob.size)).toFixed(1)}% larger`;
         if (keepOriginal) {
@@ -60,19 +75,19 @@ export default function ImageCompressor() {
             warning: true,
           };
         }
-        return { ...base, blob: r.blob, name, note: `The output is ${larger} than the original.`, warning: true };
+        return { ...base, blob: r.blob, name, note: joinNotes(`The output is ${larger} than the original.`, firstFrame), warning: true };
       }
-      return { ...base, blob: r.blob, name };
+      return { ...base, blob: r.blob, name, note: firstFrame, warning: Boolean(firstFrame) };
     },
     [pool, target, quality, maxDim, keepOriginal],
   );
 
   const settingsKey = `${target}|${quality}|${maxDim}|${keepOriginal}`;
   const batch = useImageBatch(processor, settingsKey);
-  const compareItem = useMemo(
-    () => batch.items.find((it) => it.id === compareId && it.output) ?? batch.items.find((it) => it.output),
-    [batch.items, compareId],
-  );
+  const compareItem = useMemo(() => {
+    const comparable = (it: BatchItem) => Boolean(it.output && it.output.blob !== it.file);
+    return batch.items.find((it) => it.id === compareId && comparable(it)) ?? batch.items.find(comparable);
+  }, [batch.items, compareId]);
   const compareUrl = useObjectUrl(compareItem?.output?.blob);
 
   const pngNote = target === 'png-lossy' || target === 'keep';
@@ -133,7 +148,7 @@ export default function ImageCompressor() {
         icon={ImagePlus}
         compact={batch.items.length > 0}
         title="Drop images to compress"
-        hint="JPEG, PNG, WebP, AVIF, GIF (first frame) or BMP. Processed on this device, never uploaded."
+        hint="JPEG, PNG, WebP, AVIF, BMP or GIF (animated images keep only their first frame). Processed on this device, never uploaded."
       />
       <BatchFileList
         items={batch.items}

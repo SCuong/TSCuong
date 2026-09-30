@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { EditorPanel, SplitPanes, ToolBar, ToolStack } from '@/components/tool/EditorPanel';
 import { ErrorMessage } from '@/components/ui/Alert';
 import { Checkbox, Label, Switch } from '@/components/ui/Field';
@@ -6,9 +6,10 @@ import { Segmented } from '@/components/ui/Segmented';
 import { Badge, Panel } from '@/components/ui/Panel';
 import { Spinner } from '@/components/ui/Feedback';
 import { useDebouncedValue, useToolState } from '@/lib/hooks';
-import { errorMessage, formatBytes } from '@/lib/utils';
+import { formatBytes } from '@/lib/utils';
 import { RangeField } from './components/controls';
 import { SvgPreview, type PreviewBg } from './components/SvgPreview';
+import { useSvgo } from './components/useSvgo';
 import { buildSvgoConfig, defaultPrecision, presetToggles, SVGO_TOGGLES, type SvgoPreset } from './lib/svg';
 
 const SAMPLE = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -33,8 +34,6 @@ const SAMPLE = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
   </g>
 </svg>`;
 
-type OptimizeFn = (input: string, config: ReturnType<typeof buildSvgoConfig>) => { data: string };
-
 export default function SvgOptimizer() {
   const [input, setInput] = useToolState('svg-optimizer', 'input', '');
   const [preset, setPresetState] = useToolState<SvgoPreset>('svg-optimizer', 'preset', 'default');
@@ -43,20 +42,10 @@ export default function SvgOptimizer() {
   const [precision, setPrecision] = useToolState('svg-optimizer', 'precision', 3);
   const [pretty, setPretty] = useToolState('svg-optimizer', 'pretty', false);
   const [bg, setBg] = useState<PreviewBg>('checker');
-  const [optimizeFn, setOptimizeFn] = useState<OptimizeFn | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const debounced = useDebouncedValue(input, 200);
-
-  useEffect(() => {
-    let cancelled = false;
-    import('svgo/browser').then(
-      (m) => !cancelled && setOptimizeFn(() => m.optimize as unknown as OptimizeFn),
-      () => !cancelled && setLoadError('The SVG optimizer failed to load. Check your connection and reload the page.'),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const config = useMemo(() => buildSvgoConfig({ preset, multipass, precision, pretty, plugins }), [preset, multipass, precision, pretty, plugins]);
+  // SVGO runs in a worker: multi-megabyte SVGs take seconds and must not freeze the page.
+  const { result, working, loadError } = useSvgo(debounced, config);
 
   function setPreset(p: SvgoPreset) {
     setPresetState(p);
@@ -65,26 +54,17 @@ export default function SvgOptimizer() {
     setMultipass(true);
   }
 
-  const result = useMemo(() => {
-    if (!debounced.trim() || !optimizeFn) return null;
-    try {
-      const data = optimizeFn(debounced, buildSvgoConfig({ preset, multipass, precision, pretty, plugins })).data;
-      return { ok: true as const, data };
-    } catch (e) {
-      const msg = errorMessage(e, 'The SVG could not be parsed.').split('\n')[0];
-      return { ok: false as const, error: msg };
-    }
-  }, [debounced, optimizeFn, preset, multipass, precision, pretty, plugins]);
-
   const output = result?.ok ? result.data : '';
-  const before = new Blob([debounced]).size;
-  const after = new Blob([output]).size;
+  // Sizes of the input the current result was made from (the editor may be ahead of it).
+  const inputSize = useMemo(() => new Blob([input]).size, [input]);
+  const before = useMemo(() => new Blob([result?.input ?? '']).size, [result]);
+  const after = useMemo(() => new Blob([output]).size, [output]);
   const saved = before ? ((before - after) / before) * 100 : 0;
 
   return (
     <ToolStack>
       <ToolBar>
-        <div>
+        <div className="min-w-0">
           <Label>Preset</Label>
           <Segmented
             label="Preset"
@@ -128,7 +108,7 @@ export default function SvgOptimizer() {
           fileAccept=".svg,image/svg+xml"
           invalid={Boolean(result && !result.ok)}
           height="360px"
-          footer={input ? <span>{formatBytes(before)}</span> : undefined}
+          footer={input ? <span>{formatBytes(inputSize)}</span> : undefined}
         />
         <EditorPanel
           title="Optimized SVG"
@@ -137,7 +117,7 @@ export default function SvgOptimizer() {
           height="360px"
           downloadName="optimized.svg"
           downloadType="image/svg+xml"
-          placeholder={optimizeFn ? 'Optimized output appears here' : 'Loading optimizer…'}
+          placeholder={working ? 'Optimizing…' : 'Optimized output appears here'}
           footer={
             output ? (
               <>
@@ -150,7 +130,7 @@ export default function SvgOptimizer() {
           }
         />
       </SplitPanes>
-      {!optimizeFn && !loadError && input && <Spinner label="Loading SVGO…" />}
+      {working && <Spinner label={output ? 'Updating the optimized SVG…' : 'Optimizing…'} />}
       {output && (
         <Panel
           title="Preview"

@@ -14,10 +14,10 @@ import { useToolState } from '@/lib/hooks';
 import { baseName, copyText, downloadBlob } from '@/lib/utils';
 import { useSingleImage } from './components/useSingleImage';
 import { RangeField } from './components/controls';
-import { canvasToBlob, createCanvas, getContext } from './lib/canvas';
+import { canvasToBlob, createCanvas, fitWithin, getContext } from './lib/canvas';
+import { scaledBitmap } from './lib/pipeline';
 import { formatColor, readableTextOn } from './lib/color';
 import { extractPalette, paletteToCss, paletteToJson, srgbToOklab, type PaletteColor } from './lib/palette';
-import { resample } from './lib/pipeline';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 type Sort = 'share' | 'lightness' | 'hue';
@@ -59,9 +59,25 @@ export default function PaletteExtractor() {
 
   useEffect(() => {
     if (!image) return setPixels(null);
-    const scale = Math.min(1, 256 / Math.max(image.width, image.height));
-    const small = resample(image.bitmap, { width: Math.max(1, Math.round(image.width * scale)), height: Math.max(1, Math.round(image.height * scale)) });
-    setPixels(getContext(small).getImageData(0, 0, small.width, small.height).data);
+    let cancelled = false;
+    // Downscale off the main thread: huge photos would otherwise freeze the page.
+    const size = fitWithin(image.width, image.height, 256);
+    scaledBitmap(image.bitmap, size.width, size.height).then(
+      (small) => {
+        if (cancelled) return small.close();
+        const c = createCanvas(small.width, small.height);
+        const ctx = getContext(c, { willReadFrequently: true });
+        ctx.drawImage(small, 0, 0);
+        small.close();
+        setPixels(ctx.getImageData(0, 0, c.width, c.height).data);
+      },
+      () => {
+        // The image was replaced or closed meanwhile.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [image]);
 
   const palette = useMemo(() => (pixels ? extractPalette(pixels, count) : []), [pixels, count]);
@@ -74,7 +90,7 @@ export default function PaletteExtractor() {
     <ToolStack>
       <ToolBar>
         <RangeField label="Colors" className="w-full sm:w-64" value={count} min={3} max={16} onChange={setCount} />
-        <div>
+        <div className="min-w-0">
           <Label>Order</Label>
           <Segmented
             label="Order"

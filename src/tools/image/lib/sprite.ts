@@ -87,13 +87,24 @@ export function classNames(names: string[]): string[] {
   });
 }
 
+/** A safe sheet file name that always ends in .png (used for the download, the ZIP, the CSS and the JSON). */
+export function sheetFileName(name: string): string {
+  const base =
+    Array.from(name.trim(), (c) => (c.charCodeAt(0) < 32 || '\\/:*?"<>|'.includes(c) ? '-' : c))
+      .join('')
+      .replace(/-{2,}/g, '-')
+      .replace(/^\.+/, '') || 'sprite';
+  return /\.png$/i.test(base) ? base : `${base.replace(/\.+$/, '') || 'sprite'}.png`;
+}
+
 export function spriteCss(layout: SpriteLayout, prefix: string, sheetUrl: string): string {
   const p = prefix.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'sprite';
   const names = classNames(layout.items.map((i) => i.name));
+  const url = sheetUrl.replace(/["\\]/g, '\\$&').replace(/[\n\r]/g, '');
   const lines = [
     `.${p} {`,
     `  display: inline-block;`,
-    `  background-image: url("${sheetUrl}");`,
+    `  background-image: url("${url}");`,
     `  background-repeat: no-repeat;`,
     `}`,
     '',

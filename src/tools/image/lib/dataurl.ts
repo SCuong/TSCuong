@@ -33,13 +33,33 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+/** Decode the character references that can appear in an HTML attribute value. */
+function decodeHtmlAttr(v: string): string {
+  return v.replace(/&(#x[0-9a-f]+|#\d+|amp|quot|apos|lt|gt);/gi, (_, e: string) => {
+    const k = e.toLowerCase();
+    if (k === 'amp') return '&';
+    if (k === 'quot') return '"';
+    if (k === 'apos') return "'";
+    if (k === 'lt') return '<';
+    if (k === 'gt') return '>';
+    const n = k.startsWith('#x') ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10);
+    return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : _;
+  });
+}
+
 /** Accept pasted CSS (`background: url(...)`), HTML (`<img src="...">`), Markdown or quoted strings. */
 export function unwrap(input: string): string {
   let text = input.trim();
   const src = /<img\b[^>]*\bsrc\s*=\s*(["'])(.*?)\1/is.exec(text);
-  if (src) return src[2].trim();
+  if (src) return decodeHtmlAttr(src[2].trim());
   const md = /^!\[[^\]]*\]\((.*)\)$/s.exec(text);
-  if (md) return md[1].trim();
+  if (md) {
+    const dest = md[1].trim();
+    const angled = /^<(.*)>(?:\s+["'(].*)?$/s.exec(dest);
+    if (angled) return angled[1].trim();
+    // Drop an optional title: ![alt](url "title")
+    return dest.replace(/\s+(["'(]).*$/s, '').trim();
+  }
   text = text.replace(/^background(-image)?\s*:\s*/i, '').replace(/;\s*$/, '').trim();
   const url = /^url\(\s*(["']?)(.*)\1\s*\)$/is.exec(text);
   if (url) text = url[2];
@@ -94,28 +114,34 @@ export function toDataUrl(bytes: Uint8Array, mime: string): string {
   return `data:${mime};base64,${bytesToBase64(bytes)}`;
 }
 
-/** URL-encoded (non-Base64) SVG data URL: usually smaller than Base64 for SVG. */
+/**
+ * URL-encoded (non-Base64) SVG data URL: usually smaller than Base64 for SVG.
+ * The result never contains `"`, `\`, `<`, `>` or line breaks, so it can be
+ * dropped into CSS `url("…")` and HTML attributes as is.
+ */
 export function svgToDataUrl(svg: string): string {
-  const encoded = svg
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/"/g, "'")
-    .replace(/%/g, '%25')
-    .replace(/#/g, '%23')
-    .replace(/</g, '%3C')
-    .replace(/>/g, '%3E')
-    .replace(/{/g, '%7B')
-    .replace(/}/g, '%7D');
+  let text = svg.replace(/^\uFEFF/, '').trim();
+  // Whitespace is insignificant in SVG markup unless the document preserves it.
+  const preserves = /xml:space\s*=\s*["']preserve|white-space\s*:\s*(pre|break-spaces)/i.test(text);
+  text = preserves ? text.replace(/\r\n?/g, '\n') : text.replace(/[ \t\r\n]+/g, ' ');
+  // Swapping " for ' keeps the URL short. It is only safe when the SVG has no ' of its own
+  // (e.g. font-family="'Open Sans'") and no " in its text, where the swap would change what is shown.
+  const textContent = text.replace(/<[^>]*>/g, '');
+  const swap = !text.includes("'") && !textContent.includes('"');
+  const encoded = (swap ? text.replace(/"/g, "'") : text).replace(/[%#<>"\\{}\n\t]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
   return `data:image/svg+xml,${encoded}`;
 }
 
+const escapeAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export function snippets(dataUrl: string, alt = '') {
-  const safeAlt = alt.replace(/"/g, '&quot;');
+  // Markdown link destinations cannot contain spaces or unbalanced parentheses.
+  const mdUrl = dataUrl.replace(/[ ()]/g, (c) => (c === ' ' ? '%20' : c === '(' ? '%28' : '%29'));
   return {
     dataUrl,
-    css: `background-image: url("${dataUrl}");`,
-    html: `<img src="${dataUrl}" alt="${safeAlt}" />`,
-    markdown: `![${alt.replace(/[[\]]/g, '')}](${dataUrl})`,
+    css: `background-image: url("${dataUrl.replace(/["\\]/g, '\\$&')}");`,
+    html: `<img src="${escapeAttr(dataUrl)}" alt="${escapeAttr(alt)}" />`,
+    markdown: `![${alt.replace(/[[\]\\]/g, '')}](${mdUrl})`,
   };
 }
 

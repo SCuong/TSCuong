@@ -36,6 +36,7 @@ export default function ExifViewer() {
     setError(null);
     setFilter('');
     try {
+      if (file.size === 0) throw new Error('The file is empty.');
       const header = await readHeader(file);
       if (!header) throw new Error(UNSUPPORTED_MESSAGE);
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -66,7 +67,7 @@ export default function ExifViewer() {
       .filter((s) => s.rows.length);
   }, [data, filter]);
   const json = useMemo(() => (data ? metadataToJson(data.groups) : ''), [data]);
-  const empty = data && Object.keys(data.groups).filter((k) => k !== 'jfif' && k !== 'ihdr').length === 0;
+  const empty = summary !== null && summary.total === 0;
 
   return (
     <ToolStack>
@@ -76,7 +77,7 @@ export default function ExifViewer() {
         icon={FileSearch}
         compact={Boolean(data)}
         title="Drop a photo to read its EXIF data"
-        hint="JPEG, PNG, WebP, HEIC, TIFF and AVIF. Read on this device, never uploaded."
+        hint="JPEG, PNG, WebP, GIF, HEIC, TIFF and AVIF. Read on this device, never uploaded."
       />
       {loading && <Spinner label="Reading metadata…" />}
       <ErrorMessage error={error} />

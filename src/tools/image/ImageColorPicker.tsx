@@ -207,10 +207,12 @@ export default function ImageColorPicker() {
                   </div>
                   <dl className="mt-3 space-y-1.5 font-mono text-[13px]">
                     {(['hex', 'rgb', 'hsl'] as const).map((k) => (
-                      <div key={k} className="flex items-center justify-between gap-2">
-                        <dt className="w-10 text-fg-muted uppercase">{k}</dt>
-                        <dd className="min-w-0 flex-1 truncate text-fg">{current[k]}</dd>
-                        <CopyButton value={current[k]} iconOnly label={`Copy ${k.toUpperCase()}`} />
+                      <div key={k} className="flex items-center gap-2">
+                        <dt className="w-10 shrink-0 text-fg-muted uppercase">{k}</dt>
+                        <dd className="flex min-w-0 flex-1 items-center justify-between gap-2 text-fg">
+                          <span className="min-w-0 truncate">{current[k]}</span>
+                          <CopyButton value={current[k]} iconOnly label={`Copy ${k.toUpperCase()}`} />
+                        </dd>
                       </div>
                     ))}
                   </dl>

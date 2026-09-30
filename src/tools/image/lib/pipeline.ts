@@ -17,7 +17,7 @@ import {
   type Drawable,
   type OutputFormat,
 } from './canvas';
-import { computeResize, fitMaxDimension, rotatedBounds, type Rect, type ResizeSpec, type Size } from './geometry';
+import { computeResize, fitMaxDimension, rotateFlipTransform, type Rect, type ResizeSpec, type Size } from './geometry';
 import { applyFiltersToPixels, filterString, isIdentity, supportsCanvasFilter, type FilterSettings } from './filters';
 import type { ImageFormat } from './formats';
 
@@ -50,6 +50,8 @@ export interface JobResult {
   sourceFormat: ImageFormat;
   sourceWidth: number;
   sourceHeight: number;
+  /** The source is an animation (GIF, APNG, animated WebP/AVIF): only its first frame was used. */
+  sourceAnimated: boolean;
 }
 
 /** High-quality resampling: halve repeatedly (box-like), then a final smooth draw. */
@@ -76,6 +78,24 @@ export function resample(src: Drawable, target: Size): AnyCanvas {
   return out;
 }
 
+/**
+ * A downscaled copy of `src`. Uses createImageBitmap's resize options, which
+ * browsers run off the main thread (a 144-megapixel photo scales in ~0.1 s
+ * without freezing the page); falls back to {@link resample} elsewhere.
+ */
+export async function scaledBitmap(src: ImageBitmap, width: number, height: number): Promise<ImageBitmap> {
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  try {
+    const out = await createImageBitmap(src, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' });
+    if (out.width === w && out.height === h) return out;
+    out.close();
+  } catch {
+    // Resize options unsupported: resample on this thread instead.
+  }
+  return createImageBitmap(resample(src, { width: w, height: h }));
+}
+
 function toCanvas(src: Drawable): AnyCanvas {
   const { width, height } = sourceSize(src);
   const c = createCanvas(width, height);
@@ -83,22 +103,47 @@ function toCanvas(src: Drawable): AnyCanvas {
   return c;
 }
 
-/** Rotate by any angle (expanding the canvas) and/or flip. */
+/**
+ * Rotate clockwise by any angle (expanding the canvas), then mirror in screen space:
+ * "horizontal" always flips the result left↔right, whatever the rotation.
+ * The returned canvas has an identity transform, so later drawing is not skewed.
+ */
 export function rotateFlip(src: Drawable, degrees: number, flipH = false, flipV = false, fill: string | null = null): AnyCanvas {
   const size = sourceSize(src);
   const norm = ((degrees % 360) + 360) % 360;
-  const bounds = rotatedBounds(size, norm);
-  const out = createCanvas(bounds.width, bounds.height);
+  const { matrix, width, height } = rotateFlipTransform(size, norm, flipH, flipV);
+  const out = createCanvas(width, height);
   const ctx = getContext(out);
   if (fill && norm % 90 !== 0) {
     ctx.fillStyle = fill;
-    ctx.fillRect(0, 0, bounds.width, bounds.height);
+    ctx.fillRect(0, 0, width, height);
   }
   ctx.imageSmoothingQuality = 'high';
-  ctx.translate(bounds.width / 2, bounds.height / 2);
-  ctx.rotate((norm * Math.PI) / 180);
-  ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-  ctx.drawImage(src as CanvasImageSource, -size.width / 2, -size.height / 2);
+  ctx.setTransform(...matrix);
+  ctx.drawImage(src as CanvasImageSource, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return out;
+}
+
+/**
+ * A copy of `src` surrounded by `pad` pixels that repeat its edge pixels, so a
+ * blur does not fade the borders towards transparent (or white/black after flattening).
+ */
+function edgeExtended(src: AnyCanvas, pad: number): AnyCanvas {
+  const { width: w, height: h } = src;
+  const out = createCanvas(w + pad * 2, h + pad * 2);
+  const ctx = getContext(out);
+  ctx.imageSmoothingEnabled = false;
+  const img = src as CanvasImageSource;
+  ctx.drawImage(img, pad, pad);
+  ctx.drawImage(img, 0, 0, w, 1, pad, 0, w, pad); // top
+  ctx.drawImage(img, 0, h - 1, w, 1, pad, pad + h, w, pad); // bottom
+  ctx.drawImage(img, 0, 0, 1, h, 0, pad, pad, h); // left
+  ctx.drawImage(img, w - 1, 0, 1, h, pad + w, pad, pad, h); // right
+  ctx.drawImage(img, 0, 0, 1, 1, 0, 0, pad, pad);
+  ctx.drawImage(img, w - 1, 0, 1, 1, pad + w, 0, pad, pad);
+  ctx.drawImage(img, 0, h - 1, 1, 1, 0, pad + h, pad, pad);
+  ctx.drawImage(img, w - 1, h - 1, 1, 1, pad + w, pad + h, pad, pad);
   return out;
 }
 
@@ -107,8 +152,11 @@ export function applyFilters(src: AnyCanvas, filters: FilterSettings): AnyCanvas
   const out = createCanvas(src.width, src.height);
   const ctx = getContext(out, { willReadFrequently: true });
   if (supportsCanvasFilter()) {
+    // Canvas blur samples transparent pixels outside the image: extend the edges first.
+    const pad = filters.blur > 0 ? Math.ceil(filters.blur * 3) : 0;
     ctx.filter = filterString(filters);
-    ctx.drawImage(src, 0, 0);
+    if (pad > 0) ctx.drawImage(edgeExtended(src, pad), -pad, -pad);
+    else ctx.drawImage(src, 0, 0);
     ctx.filter = 'none';
   } else {
     ctx.drawImage(src, 0, 0);
@@ -124,7 +172,7 @@ export async function runJobOnSource(
   source: Drawable,
   sourceFormat: ImageFormat,
   job: ImageJob,
-): Promise<Omit<JobResult, 'sourceFormat' | 'sourceWidth' | 'sourceHeight'>> {
+): Promise<Omit<JobResult, 'sourceFormat' | 'sourceWidth' | 'sourceHeight' | 'sourceAnimated'>> {
   let current: Drawable = source;
   let size = sourceSize(source);
 
@@ -133,6 +181,7 @@ export async function runJobOnSource(
     checkDimensions(width, height);
     const c = createCanvas(width, height);
     const ctx = getContext(c);
+    ctx.save();
     if (circle) {
       ctx.beginPath();
       ctx.ellipse(width / 2, height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
@@ -140,6 +189,7 @@ export async function runJobOnSource(
       ctx.clip();
     }
     ctx.drawImage(current as CanvasImageSource, x, y, width, height, 0, 0, width, height);
+    ctx.restore();
     current = c;
     size = { width, height };
   }
@@ -172,7 +222,13 @@ export async function processImage(file: Blob, job: ImageJob): Promise<JobResult
   const decoded = await decodeImage(file);
   try {
     const result = await runJobOnSource(decoded.bitmap, decoded.header.format, job);
-    return { ...result, sourceFormat: decoded.header.format, sourceWidth: decoded.width, sourceHeight: decoded.height };
+    return {
+      ...result,
+      sourceFormat: decoded.header.format,
+      sourceWidth: decoded.width,
+      sourceHeight: decoded.height,
+      sourceAnimated: Boolean(decoded.header.animated),
+    };
   } finally {
     decoded.bitmap.close();
   }

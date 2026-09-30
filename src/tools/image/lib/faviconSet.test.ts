@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHtml, buildManifest, letterMarkText, normalizePath } from './faviconSet';
+import { buildHtml, buildManifest, letterMarkText, normalizePath, shortNameFor } from './faviconSet';
 import { icoSizesFor } from './favicon';
 
 describe('favicon outputs', () => {
@@ -33,6 +33,15 @@ describe('favicon outputs', () => {
     expect(letterMarkText('é')).toBe('é');
     expect(letterMarkText('ÀB')).toBe('ÀB');
     expect(letterMarkText('')).toBe('');
+  });
+
+  it('shortNameFor never splits emoji and drops trailing spaces (regression)', () => {
+    expect(shortNameFor('Hello World 👋 app')).toBe('Hello World');
+    const emoji = shortNameFor('Hello World👋 app');
+    expect(emoji).toBe('Hello World👋');
+    expect(JSON.stringify(emoji)).not.toMatch(/\\ud83d/i);
+    expect(shortNameFor('  Café  ')).toBe('Café');
+    expect(shortNameFor('👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻👩‍💻')).toBe('👩‍💻'.repeat(12));
   });
 
   it('icoSizesFor includes larger sizes only when the source allows', () => {

@@ -9,9 +9,9 @@ import { withExtension } from '@/lib/utils';
 import { BatchFileList } from './components/BatchFileList';
 import { useImageBatch, type BatchItem } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
-import { readHeader, UNSUPPORTED_MESSAGE } from './lib/canvas';
+import { firstFrameNote, readHeader, UNSUPPORTED_MESSAGE } from './lib/canvas';
 import { readMetadata, summarizeMetadata, formatCoord, type MetaSummary } from './lib/exif';
-import { stripJpeg, stripPng, stripWebp, type StripResult } from './lib/metadata';
+import { stripGif, stripJpeg, stripPng, stripWebp, type StripResult } from './lib/metadata';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 interface Report {
@@ -28,6 +28,7 @@ function describe(s: MetaSummary): string[] {
   if (s.gps) out.push('GPS location');
   if (s.hasXmp) out.push('XMP');
   if (s.hasIptc) out.push('IPTC');
+  if (s.textTags) out.push(`PNG text (${s.textTags})`);
   if (s.hasIcc) out.push('ICC profile');
   return out;
 }
@@ -44,7 +45,7 @@ function ReportView({ item }: { item: BatchItem }) {
     <div className="mt-1.5 space-y-1 text-[12px]">
       <div className="flex flex-wrap items-center gap-1">
         <span className="text-fg-muted">Found:</span>
-        {found.length ? found.map((f) => <Badge key={f}>{f}</Badge>) : <span className="text-fg-secondary">no EXIF, GPS, XMP or IPTC</span>}
+        {found.length ? found.map((f) => <Badge key={f}>{f}</Badge>) : <span className="text-fg-secondary">no EXIF, GPS, XMP, IPTC or text comments</span>}
       </div>
       {r.before.gps && (
         <p className="flex items-center gap-1 text-warning">
@@ -64,7 +65,7 @@ function ReportView({ item }: { item: BatchItem }) {
       )}
       {remaining.length === 0 && !r.after.gps ? (
         <p className="flex items-center gap-1 text-success">
-          <CircleCheck size={12} aria-hidden /> Verified: no EXIF, GPS, XMP or IPTC left
+          <CircleCheck size={12} aria-hidden /> Verified: no EXIF, GPS, XMP, IPTC or text comments left
           {r.method === 'lossless' ? ' · pixels untouched (lossless)' : ' · re-encoded as PNG'}
         </p>
       ) : (
@@ -83,8 +84,12 @@ export default function RemoveMetadata() {
 
   const processor = useCallback(
     async (file: File, signal: AbortSignal) => {
+      if (file.size === 0) throw new Error('The file is empty.');
       const header = await readHeader(file);
       if (!header) throw new Error(UNSUPPORTED_MESSAGE);
+      if (header.format === 'svg') {
+        throw new Error('SVG files are text, not photos: use the SVG Optimizer (it removes metadata, comments and editor data) to keep them as vectors.');
+      }
       const bytes = new Uint8Array(await file.arrayBuffer());
       const before = summarizeMetadata(await readMetadata(bytes));
       const opts = { keepIcc, keepOrientation };
@@ -92,12 +97,14 @@ export default function RemoveMetadata() {
       if (header.format === 'jpeg') result = stripJpeg(bytes, opts);
       else if (header.format === 'png') result = stripPng(bytes, opts);
       else if (header.format === 'webp') result = stripWebp(bytes, opts);
+      else if (header.format === 'gif') result = stripGif(bytes, opts);
 
       let blob: Blob;
       let name = file.name;
       let method: Report['method'] = 'lossless';
       let removed: string[];
       let kept: string[] = [];
+      let firstFrame: string | undefined;
       if (result) {
         blob = new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: header.mime });
         removed = result.removed;
@@ -108,6 +115,7 @@ export default function RemoveMetadata() {
         name = withExtension(file.name, 'png');
         method = 'reencoded';
         removed = ['All metadata (image re-encoded)'];
+        firstFrame = firstFrameNote(r.sourceAnimated, r.sourceFormat);
       }
       const after = summarizeMetadata(await readMetadata(new Uint8Array(await blob.arrayBuffer())));
       const report: Report = { before, after, removed, kept, method };
@@ -117,7 +125,8 @@ export default function RemoveMetadata() {
         width: header.width,
         height: header.height,
         data: report,
-        note: removed.length === 0 && method === 'lossless' ? 'No metadata to remove: the file is already clean.' : undefined,
+        note: firstFrame ?? (removed.length === 0 && method === 'lossless' ? 'No metadata to remove: the file is already clean.' : undefined),
+        warning: Boolean(firstFrame),
       };
     },
     [pool, keepIcc, keepOrientation],
@@ -148,7 +157,7 @@ export default function RemoveMetadata() {
         icon={ShieldCheck}
         compact={batch.items.length > 0}
         title="Drop photos to remove EXIF, GPS and other metadata"
-        hint="JPEG, PNG and WebP are cleaned losslessly (pixels untouched). Other formats are re-encoded as PNG. Nothing is uploaded."
+        hint="JPEG, PNG, WebP and GIF are cleaned losslessly (pixels and animation untouched). BMP, ICO and AVIF are re-encoded as PNG. Nothing is uploaded."
       />
       <BatchFileList
         items={batch.items}

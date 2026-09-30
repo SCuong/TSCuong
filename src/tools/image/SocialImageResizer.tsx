@@ -13,9 +13,9 @@ import { useToolState } from '@/lib/hooks';
 import { baseName, cn, downloadBlob, errorMessage, formatBytes } from '@/lib/utils';
 import { useSingleImage } from './components/useSingleImage';
 import { ColorField, RangeField } from './components/controls';
-import { createCanvas, encodeCanvas, getContext, OUTPUT_INFO, type AnyCanvas } from './lib/canvas';
+import { createCanvas, encodeCanvas, fillBackground, fitWithin, getContext, OUTPUT_INFO, type AnyCanvas } from './lib/canvas';
 import { containDestRect, coverSourceRect } from './lib/geometry';
-import { resample } from './lib/pipeline';
+import { resample, scaledBitmap } from './lib/pipeline';
 import { supportsCanvasFilter } from './lib/filters';
 import { SOCIAL_PRESETS } from './lib/socialPresets';
 import { zipBlobs } from './lib/zip';
@@ -25,7 +25,20 @@ type Fit = 'cover' | 'contain';
 type Fill = 'color' | 'blur';
 type Format = 'jpeg' | 'png' | 'webp';
 
-function render(src: ImageBitmap, w: number, h: number, fit: Fit, focal: { x: number; y: number }, fill: Fill, color: string): AnyCanvas {
+/**
+ * Render `src` into a w×h frame. `flattenOn` fills transparent areas (needed for
+ * JPEG, which has no alpha: the encoder would otherwise turn them black).
+ */
+function render(
+  src: ImageBitmap,
+  w: number,
+  h: number,
+  fit: Fit,
+  focal: { x: number; y: number },
+  fill: Fill,
+  color: string,
+  flattenOn: string | null,
+): AnyCanvas {
   const out = createCanvas(w, h);
   const ctx = getContext(out);
   ctx.imageSmoothingQuality = 'high';
@@ -36,13 +49,22 @@ function render(src: ImageBitmap, w: number, h: number, fit: Fit, focal: { x: nu
     const crop = createCanvas(Math.max(1, Math.round(r.width)), Math.max(1, Math.round(r.height)));
     getContext(crop).drawImage(src, r.x, r.y, r.width, r.height, 0, 0, crop.width, crop.height);
     ctx.drawImage(resample(crop, { width: w, height: h }), 0, 0);
+    if (flattenOn) fillBackground(ctx, w, h, flattenOn);
     return out;
+  }
+  if (flattenOn) {
+    // Paint the flattening color first so transparent parts of the blurred backdrop don't turn black.
+    ctx.fillStyle = flattenOn;
+    ctx.fillRect(0, 0, w, h);
   }
   if (fill === 'blur') {
     const r = coverSourceRect(size, { width: w, height: h });
+    // Scale the blur with the frame so the preview (smaller) matches the export.
+    const k = Math.max(w, h) / 1200;
+    const bleed = Math.round(40 * k);
     if (supportsCanvasFilter()) {
-      ctx.filter = 'blur(24px) brightness(0.85)';
-      ctx.drawImage(src, r.x, r.y, r.width, r.height, -40, -40, w + 80, h + 80);
+      ctx.filter = `blur(${Math.max(1, 24 * k)}px) brightness(0.85)`;
+      ctx.drawImage(src, r.x, r.y, r.width, r.height, -bleed, -bleed, w + bleed * 2, h + bleed * 2);
       ctx.filter = 'none';
     } else {
       // No canvas filters (older Safari): upscale a tiny copy, which blurs naturally.
@@ -76,24 +98,56 @@ export default function SocialImageResizer() {
   const previewRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
   const preset = SOCIAL_PRESETS.find((p) => p.id === presetId) ?? SOCIAL_PRESETS[0];
+  // JPEG has no transparency: flatten on white (or the chosen background color).
+  const flattenOn = format === 'jpeg' ? (fit === 'contain' && fill === 'color' ? color : '#ffffff') : null;
 
   useEffect(() => setFocal({ x: 0.5, y: 0.5 }), [image]);
+
+  // A small copy (scaled off the main thread) drives the live preview, so dragging the
+  // focal point stays smooth on large photos. Exports use the full-resolution image.
+  const [previewSrc, setPreviewSrc] = useState<{ for: ImageBitmap; bitmap: ImageBitmap } | null>(null);
+  useEffect(() => {
+    if (!image) return;
+    let cancelled = false;
+    let made: ImageBitmap | null = null;
+    const size = fitWithin(image.width, image.height, 1600);
+    scaledBitmap(image.bitmap, size.width, size.height).then(
+      (bitmap) => {
+        if (cancelled) return bitmap.close();
+        made = bitmap;
+        setPreviewSrc({ for: image.bitmap, bitmap });
+      },
+      () => {
+        // The image was replaced or closed meanwhile.
+      },
+    );
+    return () => {
+      cancelled = true;
+      // Close after the next preview has been drawn from the new source.
+      if (made) setTimeout(() => made?.close(), 1000);
+    };
+  }, [image]);
 
   // Live preview at reduced resolution.
   useEffect(() => {
     const c = previewRef.current;
-    if (!image || !c) return;
+    const src = image && previewSrc?.for === image.bitmap ? previewSrc.bitmap : null;
+    if (!src || !c) return;
     const t = setTimeout(() => {
       const scale = Math.min(1, 640 / Math.max(preset.width, preset.height));
       const w = Math.round(preset.width * scale);
       const h = Math.round(preset.height * scale);
-      const r = render(image.bitmap, w, h, fit, focal, fill, color);
-      c.width = w;
-      c.height = h;
-      c.getContext('2d')?.drawImage(r, 0, 0);
+      try {
+        const r = render(src, w, h, fit, focal, fill, color, flattenOn);
+        c.width = w;
+        c.height = h;
+        c.getContext('2d')?.drawImage(r, 0, 0);
+      } catch {
+        // The source was released while switching images; the next render replaces it.
+      }
     }, 16);
     return () => clearTimeout(t);
-  }, [image, preset, fit, focal, fill, color]);
+  }, [image, previewSrc, preset, fit, focal, fill, color, flattenOn]);
 
   function moveFocal(e: ReactPointerEvent<HTMLElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -104,7 +158,7 @@ export default function SocialImageResizer() {
   }
 
   async function exportOne(p = preset): Promise<{ name: string; blob: Blob }> {
-    const c = render(image!.bitmap, p.width, p.height, fit, focal, fill, color);
+    const c = render(image!.bitmap, p.width, p.height, fit, focal, fill, color, flattenOn);
     const blob = await encodeCanvas(c, { format, quality: quality / 100 });
     return { name: `${baseName(image!.file.name)}-${p.id}-${p.width}x${p.height}.${OUTPUT_INFO[format].ext}`, blob };
   }
@@ -150,7 +204,7 @@ export default function SocialImageResizer() {
             ))}
           </Select>
         </div>
-        <div>
+        <div className="min-w-0">
           <Label>Fit</Label>
           <Segmented
             label="Fit"
@@ -164,7 +218,7 @@ export default function SocialImageResizer() {
         </div>
         {fit === 'contain' && (
           <>
-            <div>
+            <div className="min-w-0">
               <Label>Background</Label>
               <Segmented
                 label="Background"
@@ -191,7 +245,7 @@ export default function SocialImageResizer() {
             actions={<Button size="sm" variant="ghost" onClick={clear}>Choose another</Button>}
           >
             <div className="lk-checker flex justify-center rounded-lg border border-line p-2">
-              <canvas ref={previewRef} className="block h-auto max-h-[60vh] max-w-full shadow-card" aria-label="Preview" />
+              <canvas ref={previewRef} className="block h-auto max-h-[60vh] max-w-full shadow-card" role="img" aria-label={`Preview of the ${preset.width}×${preset.height} image`} />
             </div>
             {tooSmall && (
               <p className="mt-2 text-[12.5px] text-warning">
@@ -234,7 +288,7 @@ export default function SocialImageResizer() {
             )}
             <Panel title="Export">
               <div className="space-y-3">
-                <div>
+                <div className="min-w-0">
                   <Label>Format</Label>
                   <Segmented
                     label="Format"

@@ -1,34 +1,12 @@
 /**
- * Lazy zxing-wasm reader. The WebAssembly binary is served from this app
- * (Vite `?url` import), never from a CDN.
+ * Barcode decoding with zxing-wasm in a Web Worker (the WebAssembly binary is
+ * served from this app, never from a CDN). Decoding a large photo takes a second
+ * or more, so it must not run on the main thread.
  */
-import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
-import type { ReaderOptions, ReadResult } from 'zxing-wasm/reader';
+import type { ReaderOptions } from 'zxing-wasm/reader';
+import type { ScanHit, ScanRequest, ScanResponse } from './zxing.worker';
 
-export type { ReadResult };
-
-type ReaderModule = typeof import('zxing-wasm/reader');
-
-let ready: Promise<ReaderModule> | null = null;
-
-export function loadReader(): Promise<ReaderModule> {
-  if (!ready) {
-    ready = (async () => {
-      const mod = await import('zxing-wasm/reader');
-      await mod.prepareZXingModule({
-        overrides: {
-          locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path),
-        },
-        fireImmediately: true,
-      });
-      return mod;
-    })();
-    ready.catch(() => {
-      ready = null;
-    });
-  }
-  return ready;
-}
+export type { ScanHit };
 
 export const SCAN_FORMATS: NonNullable<ReaderOptions['formats']> = [
   'QRCode',
@@ -50,17 +28,67 @@ export const SCAN_FORMATS: NonNullable<ReaderOptions['formats']> = [
   'DataBarExp',
 ];
 
-export async function scan(input: Blob | ImageData, fast = false): Promise<ReadResult[]> {
-  const mod = await loadReader();
-  const results = await mod.readBarcodes(input, {
+export const READER_LOAD_ERROR = 'The code reader failed to load. Check your connection and reload the page.';
+
+let worker: Worker | null = null;
+let seq = 0;
+const pending = new Map<number, { resolve: (hits: ScanHit[]) => void; reject: (error: Error) => void }>();
+
+function failAll(message: string) {
+  for (const p of pending.values()) p.reject(new Error(message));
+  pending.clear();
+}
+
+function getWorker(): Worker {
+  if (worker) return worker;
+  const w = new Worker(new URL('./zxing.worker.ts', import.meta.url), { type: 'module' });
+  w.onmessage = (event: MessageEvent<ScanResponse>) => {
+    const msg = event.data;
+    const p = pending.get(msg.id);
+    if (!p) return;
+    pending.delete(msg.id);
+    if (msg.ok) p.resolve(msg.hits);
+    else p.reject(new Error(READER_LOAD_ERROR));
+  };
+  w.onerror = (event) => {
+    event.preventDefault();
+    w.terminate();
+    if (worker === w) worker = null;
+    failAll(READER_LOAD_ERROR);
+  };
+  worker = w;
+  return w;
+}
+
+/** Start loading the decoder in the background (e.g. while the camera starts). */
+export function warmUpScanner() {
+  void scan(new ImageData(1, 1), true).catch(() => {});
+}
+
+/** Stop the decoder worker (pending scans fail); it restarts on the next scan. */
+export function disposeScanner() {
+  worker?.terminate();
+  worker = null;
+  failAll('The scan was stopped.');
+}
+
+/** Decode every valid code in the image. The pixel buffer is transferred to the worker. */
+export function scan(image: ImageData, fast = false): Promise<ScanHit[]> {
+  const w = getWorker();
+  const id = ++seq;
+  const options: ReaderOptions = {
     formats: SCAN_FORMATS,
     tryHarder: !fast,
     tryRotate: !fast,
     tryInvert: true,
     tryDownscale: true,
     maxNumberOfSymbols: fast ? 4 : 16,
+  };
+  return new Promise<ScanHit[]>((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    const request: ScanRequest = { id, image, options };
+    w.postMessage(request, [image.data.buffer]);
   });
-  return results.filter((r) => r.isValid);
 }
 
 export function formatLabel(format: string): string {

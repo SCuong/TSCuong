@@ -11,8 +11,11 @@ import { EmptyState, Spinner } from '@/components/ui/Feedback';
 import { CopyButton } from '@/components/ui/Actions';
 import { useObjectUrl } from '@/lib/hooks';
 import { errorMessage } from '@/lib/utils';
+import { createCanvas, decodeImage, fitWithin, getContext } from '../image/lib/canvas';
+import { scaledBitmap } from '../image/lib/pipeline';
+import { IMAGE_ACCEPT } from '../image/lib/accept';
 import { detectContent } from './lib/content';
-import { formatLabel, loadReader, scan, type ReadResult } from './lib/zxing';
+import { disposeScanner, formatLabel, scan, warmUpScanner, type ScanHit } from './lib/zxing';
 
 type Source = 'image' | 'camera';
 
@@ -21,10 +24,37 @@ interface Found {
   format: string;
   text: string;
   at: number;
-  position?: ReadResult['position'];
+  position?: ScanHit['position'];
 }
 
 let seq = 0;
+
+/** Longest side handed to the decoder (zxing also tries smaller scales itself). */
+const MAX_SCAN_SIDE = 4096;
+
+/** Decode an image file with the browser and return its pixels (downscaled if huge). */
+async function imagePixels(file: File): Promise<{ data: ImageData; scale: number }> {
+  const decoded = await decodeImage(file);
+  let bitmap = decoded.bitmap;
+  try {
+    const size = fitWithin(decoded.width, decoded.height, MAX_SCAN_SIDE);
+    // Huge photos are scaled off the main thread first.
+    if (size.width < decoded.width) bitmap = await scaledBitmap(decoded.bitmap, size.width, size.height);
+    const canvas = createCanvas(bitmap.width, bitmap.height);
+    const ctx = getContext(canvas, { willReadFrequently: true });
+    ctx.drawImage(bitmap, 0, 0);
+    return { data: ctx.getImageData(0, 0, canvas.width, canvas.height), scale: bitmap.width / decoded.width };
+  } finally {
+    bitmap.close();
+    decoded.bitmap.close();
+  }
+}
+
+function scalePosition(p: ScanHit['position'], k: number): ScanHit['position'] {
+  if (k === 1) return p;
+  const s = (q: { x: number; y: number }) => ({ x: q.x * k, y: q.y * k });
+  return { topLeft: s(p.topLeft), topRight: s(p.topRight), bottomRight: s(p.bottomRight), bottomLeft: s(p.bottomLeft) };
+}
 
 function cameraError(e: unknown): string {
   const name = e instanceof DOMException ? e.name : '';
@@ -86,6 +116,7 @@ export default function QrScanner() {
   const [file, setFile] = useState<File | null>(null);
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
   const fileUrl = useObjectUrl(file);
+  const scanSeq = useRef(0);
 
   // Camera state
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -99,7 +130,7 @@ export default function QrScanner() {
   const flashTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => clearTimeout(flashTimer.current), []);
 
-  const addResults = useCallback((list: ReadResult[], replace: boolean) => {
+  const addResults = useCallback((list: ScanHit[], replace: boolean) => {
     setResults((prev) => {
       const base = replace ? [] : prev;
       const next = [...base];
@@ -112,19 +143,25 @@ export default function QrScanner() {
   }, []);
 
   async function scanFile(f: File) {
+    const id = ++scanSeq.current;
     setFile(f);
     setBusy(true);
     setError(null);
     setNoneFound(false);
     try {
-      const found = await scan(f);
-      addResults(found, true);
+      // Decode with the browser (WebP, AVIF, SVG, ICO, EXIF rotation, clear errors for
+      // HEIC or non-images), then hand zxing the pixels.
+      const { data, scale } = await imagePixels(f);
+      const found = await scan(data);
+      if (id !== scanSeq.current) return;
+      addResults(found.map((r) => ({ ...r, position: scalePosition(r.position, 1 / scale) })), true);
       setNoneFound(found.length === 0);
     } catch (e) {
+      if (id !== scanSeq.current) return;
       setError(errorMessage(e, 'This image could not be read.'));
       setResults([]);
     } finally {
-      setBusy(false);
+      if (id === scanSeq.current) setBusy(false);
     }
   }
 
@@ -155,6 +192,8 @@ export default function QrScanner() {
   }, []);
 
   useEffect(() => stopCamera, [stopCamera]);
+  // The decoder worker lives while the tool is open.
+  useEffect(() => () => disposeScanner(), []);
   useEffect(() => {
     if (source !== 'camera') stopCamera();
   }, [source, stopCamera]);
@@ -167,7 +206,7 @@ export default function QrScanner() {
       return;
     }
     try {
-      void loadReader();
+      warmUpScanner();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: id ? { deviceId: { exact: id } } : { facingMode: { ideal: 'environment' } },
         audio: false,
@@ -235,7 +274,7 @@ export default function QrScanner() {
           {source === 'image' ? (
             <>
               <FileDrop
-                accept="image/*"
+                accept={IMAGE_ACCEPT}
                 onFiles={(f) => void scanFile(f[0])}
                 icon={ScanLine}
                 compact={Boolean(file)}

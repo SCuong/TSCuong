@@ -8,11 +8,11 @@ import { Spinner } from '@/components/ui/Feedback';
 import { CopyButton } from '@/components/ui/Actions';
 import { useObjectUrl } from '@/lib/hooks';
 import { errorMessage, formatBytes, formatNumber } from '@/lib/utils';
-import { decodeImage, getContext, UNSUPPORTED_MESSAGE } from './lib/canvas';
+import { createCanvas, decodeImage, fitWithin, getContext, UNSUPPORTED_MESSAGE } from './lib/canvas';
+import { scaledBitmap } from './lib/pipeline';
 import { FORMAT_INFO, readImageHeader, type ImageHeader } from './lib/formats';
 import { aspectRatioLabel } from './lib/geometry';
 import { extractPalette, type PaletteColor } from './lib/palette';
-import { resample } from './lib/pipeline';
 import { IMAGE_ACCEPT } from './lib/accept';
 
 interface Info {
@@ -37,6 +37,7 @@ export default function ImageInfo() {
     setLoading(true);
     setError(null);
     try {
+      if (file.size === 0) throw new Error('The file is empty.');
       // Animated GIF/WebP frame counts need the whole file (capped for memory).
       const whole = file.size <= 64 * 1024 * 1024;
       const bytes = new Uint8Array(await (whole ? file : file.slice(0, 1024 * 1024)).arrayBuffer());
@@ -51,10 +52,19 @@ export default function ImageInfo() {
         const d = await decodeImage(file);
         width = d.width;
         height = d.height;
-        const scale = Math.min(1, 200 / Math.max(d.width, d.height));
-        const small = resample(d.bitmap, { width: Math.max(1, Math.round(d.width * scale)), height: Math.max(1, Math.round(d.height * scale)) });
-        d.bitmap.close();
-        const px = getContext(small).getImageData(0, 0, small.width, small.height).data;
+        // Sample colors from a small copy scaled off the main thread (huge images don't freeze the page).
+        const size = fitWithin(d.width, d.height, 200);
+        let small: ImageBitmap;
+        try {
+          small = await scaledBitmap(d.bitmap, size.width, size.height);
+        } finally {
+          d.bitmap.close();
+        }
+        const canvas = createCanvas(small.width, small.height);
+        const ctx = getContext(canvas, { willReadFrequently: true });
+        ctx.drawImage(small, 0, 0);
+        small.close();
+        const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         palette = extractPalette(px, 5);
         transparentPixels = false;
         for (let i = 3; i < px.length; i += 4) {

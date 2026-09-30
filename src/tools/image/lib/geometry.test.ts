@@ -8,6 +8,9 @@ import {
   coverSourceRect,
   fitMaxDimension,
   rotatedBounds,
+  rotateFlipCss,
+  rotateFlipTransform,
+  transformPoint,
 } from './geometry';
 import { moveCrop, resizeCrop, roundCrop } from './crop';
 import { uniqueNames } from './zip';
@@ -50,6 +53,40 @@ describe('geometry helpers', () => {
     expect(rotatedBounds({ width: 400, height: 200 }, 180)).toEqual({ width: 400, height: 200 });
     const b = rotatedBounds({ width: 100, height: 100 }, 45);
     expect(b.width).toBe(141);
+  });
+  it('rotateFlipTransform: rotates clockwise, then mirrors on screen', () => {
+    // 200×100 image; where does each source corner land (as a pixel box corner)?
+    const size = { width: 200, height: 100 };
+    const at = (deg: number, h: boolean, v: boolean, x: number, y: number) => {
+      const t = rotateFlipTransform(size, deg, h, v);
+      const p = transformPoint(t.matrix, x, y);
+      return [Math.round(p.x), Math.round(p.y), t.width, t.height];
+    };
+    // Right 90°: top-left goes to the top-right corner, bottom-left to the top-left.
+    expect(at(90, false, false, 0, 0)).toEqual([100, 0, 100, 200]);
+    expect(at(90, false, false, 0, 100)).toEqual([0, 0, 100, 200]);
+    // Right 90° + horizontal flip mirrors the rotated result left↔right (regression:
+    // the flip used to be applied before rotating, which flipped it vertically on screen).
+    expect(at(90, true, false, 0, 0)).toEqual([0, 0, 100, 200]);
+    expect(at(90, true, false, 0, 100)).toEqual([100, 0, 100, 200]);
+    // Vertical flip after 90° swaps top and bottom of the rotated image.
+    expect(at(90, false, true, 0, 0)).toEqual([100, 200, 100, 200]);
+    // Flip without rotation.
+    expect(at(0, true, false, 0, 0)).toEqual([200, 0, 200, 100]);
+    expect(at(0, false, true, 0, 0)).toEqual([0, 100, 200, 100]);
+    expect(at(180, false, false, 0, 0)).toEqual([200, 100, 200, 100]);
+    expect(at(-90, false, false, 0, 0)).toEqual([0, 200, 100, 200]);
+    // Right angles are exact (no 1e-16 drift that would blur pixels).
+    for (const v of rotateFlipTransform(size, 270, true, true).matrix) expect(Number.isInteger(v)).toBe(true);
+    // Arbitrary angles keep the image centered in the expanded canvas.
+    const t = rotateFlipTransform({ width: 100, height: 100 }, 45);
+    const center = transformPoint(t.matrix, 50, 50);
+    expect(center.x).toBeCloseTo(t.width / 2, 6);
+    expect(center.y).toBeCloseTo(t.height / 2, 6);
+  });
+  it('rotateFlipCss applies the rotation before the on-screen mirror', () => {
+    expect(rotateFlipCss(90, true, false)).toBe('scale(-1, 1) rotate(90deg)');
+    expect(rotateFlipCss(0, false, false)).toBe('scale(1, 1) rotate(0deg)');
   });
   it('clampRect and centeredAspectRect', () => {
     expect(clampRect({ x: -10, y: 50, width: 500, height: 500 }, { width: 200, height: 300 })).toEqual({ x: 0, y: 0, width: 200, height: 300 });

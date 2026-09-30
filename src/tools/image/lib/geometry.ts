@@ -74,15 +74,59 @@ export function fitMaxDimension(src: Size, max: number | null | undefined): Size
   return { width: r(src.width * f), height: r(src.height * f) };
 }
 
+/** cos/sin of a clockwise angle in degrees, exact for multiples of 90°. */
+function cosSin(degrees: number): [number, number] {
+  const norm = ((degrees % 360) + 360) % 360;
+  if (norm === 0) return [1, 0];
+  if (norm === 90) return [0, 1];
+  if (norm === 180) return [-1, 0];
+  if (norm === 270) return [0, -1];
+  const rad = (norm * Math.PI) / 180;
+  return [Math.cos(rad), Math.sin(rad)];
+}
+
 /** Bounding box of a w×h rectangle rotated by `degrees`. */
 export function rotatedBounds(src: Size, degrees: number): Size {
-  const rad = (((degrees % 360) + 360) % 360) * (Math.PI / 180);
-  const cos = Math.abs(Math.cos(rad));
-  const sin = Math.abs(Math.sin(rad));
+  const [c, s] = cosSin(degrees);
+  const cos = Math.abs(c);
+  const sin = Math.abs(s);
   // Snap near-integers so 90° rotations give exact swapped sizes.
   const w = src.width * cos + src.height * sin;
   const h = src.width * sin + src.height * cos;
   return { width: Math.max(1, Math.round(w - 1e-9)), height: Math.max(1, Math.round(h - 1e-9)) };
+}
+
+/** A 2D affine transform in canvas `setTransform(a, b, c, d, e, f)` order. */
+export type Matrix2D = [a: number, b: number, c: number, d: number, e: number, f: number];
+
+/**
+ * Transform that draws a `src`-sized image rotated clockwise by `degrees` and then
+ * mirrored in screen space (so "horizontal" always means left↔right of the result,
+ * whatever the rotation), centered in the rotated bounding box.
+ */
+export function rotateFlipTransform(src: Size, degrees: number, flipH = false, flipV = false): { matrix: Matrix2D; width: number; height: number } {
+  const { width, height } = rotatedBounds(src, degrees);
+  const [cos, sin] = cosSin(degrees);
+  const sx = flipH ? -1 : 1;
+  const sy = flipV ? -1 : 1;
+  // Screen-space flip × rotation (canvas rotate() is clockwise because y points down).
+  const a = sx * cos;
+  const c = -sx * sin;
+  const b = sy * sin;
+  const d = sy * cos;
+  const e = width / 2 - (a * src.width + c * src.height) / 2;
+  const f = height / 2 - (b * src.width + d * src.height) / 2;
+  return { matrix: [a, b, c, d, e, f], width, height };
+}
+
+/** Apply a matrix to a point (used by tests and previews). */
+export function transformPoint([a, b, c, d, e, f]: Matrix2D, x: number, y: number): { x: number; y: number } {
+  return { x: a * x + c * y + e, y: b * x + d * y + f };
+}
+
+/** CSS transform equivalent to {@link rotateFlipTransform} for a preview element (rotate first, then mirror on screen). */
+export function rotateFlipCss(degrees: number, flipH = false, flipV = false): string {
+  return `scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1}) rotate(${degrees}deg)`;
 }
 
 export interface Rect {

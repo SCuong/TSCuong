@@ -117,7 +117,11 @@ export default function ImageCropper() {
     if (aspect && (key === 'width' || key === 'height')) {
       if (key === 'width') next.height = value / aspect;
       else next.width = value * aspect;
-      if (next.width > bounds.width || next.height > bounds.height) return;
+      if (next.width > bounds.width || next.height > bounds.height) {
+        // Too large for the image at this ratio: use the largest box that fits.
+        const fit = centeredAspectRect(bounds, aspect);
+        next = { ...next, width: fit.width, height: fit.height };
+      }
     }
     next = roundCrop(next, bounds);
     setCrop(next);

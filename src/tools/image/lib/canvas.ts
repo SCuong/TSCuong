@@ -5,6 +5,7 @@
  */
 import { DECODABLE, FORMAT_INFO, readImageHeader, svgDimensions, type ImageFormat, type ImageHeader } from './formats';
 import { encodeBmp, hexToRgb } from './encoders';
+import { quantizeRgba } from './quantize';
 
 export type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
 export type Ctx2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
@@ -125,11 +126,29 @@ function friendlyUnsupported(format: ImageFormat | undefined): string {
   return UNSUPPORTED_MESSAGE;
 }
 
+export const TAINTED_SVG_MESSAGE =
+  'The browser refuses to turn this SVG into pixels because it embeds HTML (<foreignObject>). Remove those elements and try again.';
+
+/**
+ * An SVG with no width, height or viewBox has no intrinsic size, so browsers draw
+ * its content unscaled whatever the target size. Give it the assumed size.
+ */
+export function withAssumedSize(svg: string, width: number, height: number): string {
+  const m = /<svg\b[^>]*>/i.exec(svg);
+  if (!m) return svg;
+  const has = (name: string) => new RegExp(`\\s${name}\\s*=`, 'i').test(m[0]);
+  if (has('viewBox') || has('width') || has('height')) return svg;
+  const tag = m[0].replace(/^<svg\b/i, `<svg width="${width}" height="${height}"`);
+  return svg.slice(0, m.index) + tag + svg.slice(m.index + m[0].length);
+}
+
 /** Load an SVG (main thread only) and rasterize it at the given size. */
 export async function rasterizeSvg(svg: Blob | string, width: number, height: number): Promise<ImageBitmap> {
   if (!hasDocument()) throw new ImageError('SVG images can only be rendered on the main thread.');
   checkDimensions(Math.round(width), Math.round(height));
-  const blob = typeof svg === 'string' ? new Blob([svg], { type: 'image/svg+xml' }) : new Blob([svg], { type: 'image/svg+xml' });
+  const text = typeof svg === 'string' ? svg : await svg.text();
+  const size = svgIntrinsicSize(text);
+  const blob = new Blob([withAssumedSize(text, Math.round(size.width), Math.round(size.height))], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(blob);
   try {
     const img = new Image();
@@ -141,7 +160,14 @@ export async function rasterizeSvg(svg: Blob | string, width: number, height: nu
       throw new ImageError('The SVG could not be rendered. It may be invalid XML or reference external resources.');
     }
     const c = createCanvas(width, height);
-    getContext(c).drawImage(img, 0, 0, c.width, c.height);
+    const ctx = getContext(c);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    try {
+      // SVGs with <foreignObject> taint the canvas: nothing could be exported from it.
+      ctx.getImageData(0, 0, 1, 1);
+    } catch {
+      throw new ImageError(TAINTED_SVG_MESSAGE);
+    }
     return await createImageBitmap(c);
   } finally {
     URL.revokeObjectURL(url);
@@ -188,6 +214,12 @@ export async function decodeImage(blob: Blob): Promise<DecodedImage> {
     throw e;
   }
   return { bitmap, width: bitmap.width, height: bitmap.height, header };
+}
+
+/** Size that fits `maxSide` (never upscales). */
+export function fitWithin(width: number, height: number, maxSide: number): { width: number; height: number } {
+  const k = Math.min(1, maxSide / Math.max(width, height));
+  return { width: Math.max(1, Math.round(width * k)), height: Math.max(1, Math.round(height * k)) };
 }
 
 // ---------------------------------------------------------------------------
@@ -289,8 +321,10 @@ export async function encodeCanvas(canvas: AnyCanvas, { format, quality = 0.82 }
       const ctx = getContext(canvas);
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const { default: UPNG } = await import('upng-js');
-      const copy = data.data.slice().buffer;
-      const png = UPNG.encode([copy], canvas.width, canvas.height, paletteSizeForQuality(q));
+      // Quantize ourselves (upng's quantizer merges distinct hues), then let upng write an
+      // indexed PNG: with ≤ 255 colors it picks a palette (it reserves one entry itself).
+      const reduced = quantizeRgba(data.data, Math.min(255, paletteSizeForQuality(q)));
+      const png = UPNG.encode([reduced.buffer as ArrayBuffer], canvas.width, canvas.height, 0);
       return new Blob([png], { type: 'image/png' });
     }
     case 'bmp': {
@@ -304,6 +338,10 @@ export async function encodeCanvas(canvas: AnyCanvas, { format, quality = 0.82 }
 /** Fill a canvas background (used to flatten transparency). */
 export function fillBackground(ctx: Ctx2D, width: number, height: number, color: string) {
   ctx.save();
+  // Always fill the whole canvas, even if a caller left a transform or clip behind.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'destination-over';
   ctx.fillStyle = hexToRgb(color) ? color : '#ffffff';
   ctx.fillRect(0, 0, width, height);
@@ -312,4 +350,17 @@ export function fillBackground(ctx: Ctx2D, width: number, height: number, color:
 
 export function formatLabel(format: ImageFormat | undefined): string {
   return format ? FORMAT_INFO[format].label : 'Unknown';
+}
+
+/** Result note for animated sources: browsers decode only their first frame. */
+export function firstFrameNote(animated: boolean | undefined, format?: ImageFormat): string | undefined {
+  if (!animated) return undefined;
+  const kind = format === 'gif' ? 'an animated GIF' : format === 'png' ? 'an animated PNG' : format === 'webp' ? 'an animated WebP' : 'an animation';
+  return `The source is ${kind}: only its first frame was used, so the result is a still image.`;
+}
+
+/** Join optional result notes into one sentence list. */
+export function joinNotes(...notes: Array<string | undefined | null | false>): string | undefined {
+  const list = notes.filter((n): n is string => Boolean(n));
+  return list.length ? list.join(' ') : undefined;
 }

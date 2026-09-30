@@ -65,7 +65,7 @@ export default function SvgToPng() {
           name: withExtension(file.name, OUTPUT_INFO[format].ext),
           width: w,
           height: h,
-          note: info.size ? undefined : 'No width, height or viewBox: rendered at a default 512 px size.',
+          note: info.size ? undefined : 'No width, height or viewBox: the SVG was assumed to be 512 × 512 px before scaling.',
           warning: !info.size,
         };
       } finally {
@@ -80,7 +80,7 @@ export default function SvgToPng() {
   return (
     <ToolStack>
       <ToolBar>
-        <div>
+        <div className="min-w-0">
           <Label>Size</Label>
           <Segmented
             label="Size"
@@ -94,7 +94,7 @@ export default function SvgToPng() {
           />
         </div>
         {sizeMode === 'scale' ? (
-          <div>
+          <div className="min-w-0">
             <Label>Scale factor</Label>
             <Segmented
               label="Scale factor"
@@ -109,7 +109,7 @@ export default function SvgToPng() {
             <NumberInput id="svg-target" value={target} onChange={setTarget} min={1} max={16384} />
           </div>
         )}
-        <div>
+        <div className="min-w-0">
           <Label>Format</Label>
           <Segmented
             label="Format"
@@ -124,7 +124,7 @@ export default function SvgToPng() {
         </div>
         {format !== 'png' && <RangeField label="Quality" className="w-full sm:w-44" value={quality} min={10} max={100} onChange={setQuality} format={(v) => `${v}%`} />}
         {format !== 'jpeg' && (
-          <div>
+          <div className="min-w-0">
             <Label>Background</Label>
             <Segmented
               label="Background"

@@ -11,7 +11,7 @@ import { BatchFileList } from './components/BatchFileList';
 import { RangeField } from './components/controls';
 import { useImageBatch } from './components/useImageBatch';
 import { useImagePool } from './components/useImagePool';
-import { OUTPUT_INFO } from './lib/canvas';
+import { firstFrameNote, OUTPUT_INFO } from './lib/canvas';
 import { DEFAULT_FILTERS, filterString, isIdentity, type FilterSettings } from './lib/filters';
 import { IMAGE_ACCEPT } from './lib/accept';
 
@@ -50,7 +50,15 @@ export default function ImageFilters() {
   const processor = useCallback(
     async (file: File, signal: AbortSignal) => {
       const r = await pool.run(file, { filters, output: { format, quality: 0.92, background: '#ffffff' } }, signal);
-      return { blob: r.blob, name: withExtension(file.name, OUTPUT_INFO[r.format].ext), width: r.width, height: r.height };
+      const firstFrame = firstFrameNote(r.sourceAnimated, r.sourceFormat);
+      return {
+        blob: r.blob,
+        name: withExtension(file.name, OUTPUT_INFO[r.format].ext),
+        width: r.width,
+        height: r.height,
+        note: firstFrame,
+        warning: Boolean(firstFrame),
+      };
     },
     [pool, filters, format],
   );
