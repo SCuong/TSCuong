@@ -159,6 +159,15 @@ export default function UserAgentParser() {
       {info?.fromProductToken && (
         <Alert tone="info">Identified from the leading product token; this looks like an HTTP client or script rather than a browser.</Alert>
       )}
+      {info && info.notes.length > 0 && (
+        <Alert tone="info" title="What this User-Agent can’t tell you">
+          <ul className="list-disc space-y-0.5 pl-4">
+            {info.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </Alert>
+      )}
 
       {info && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

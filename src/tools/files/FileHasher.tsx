@@ -244,12 +244,13 @@ export default function FileHasher() {
                     const value = fmt(r.digests[a.id]!);
                     const hit = verdict.status === 'match' && verdict.algo === a.id;
                     return (
+                      // A <dl> group may only contain <dt>/<dd>, so the copy button lives inside the <dd>.
                       <div key={a.id} className="flex items-center gap-3 px-3 py-1.5">
                         <dt className="w-16 shrink-0 text-[12px] font-medium text-fg-muted">{a.label}</dt>
-                        <dd className={cn('min-w-0 flex-1 font-mono text-[12.5px] break-all', hit ? 'text-success' : 'text-fg')}>
-                          {value}
+                        <dd className="flex min-w-0 flex-1 items-center gap-3">
+                          <span className={cn('min-w-0 flex-1 font-mono text-[12.5px] break-all', hit ? 'text-success' : 'text-fg')}>{value}</span>
+                          <CopyButton value={value} iconOnly label={`Copy ${a.label}`} />
                         </dd>
-                        <CopyButton value={value} iconOnly label={`Copy ${a.label}`} />
                       </div>
                     );
                   })}

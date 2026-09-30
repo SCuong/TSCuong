@@ -1,6 +1,34 @@
-import { MAX, NIL, v1, v4, v6, v7 } from 'uuid';
+import { MAX, NIL, v1, v3, v4, v5, v6, v7 } from 'uuid';
 
-export type UuidKind = 'v1' | 'v4' | 'v6' | 'v7' | 'nil' | 'max';
+export type UuidKind = 'v1' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'nil' | 'max';
+export type NameBasedKind = 'v3' | 'v5';
+
+export function isNameBased(kind: UuidKind): kind is NameBasedKind {
+  return kind === 'v3' || kind === 'v5';
+}
+
+/** The predefined namespaces of RFC 9562 §6.6. */
+export const NAMESPACES: Array<{ id: string; label: string; uuid: string }> = [
+  { id: 'dns', label: 'DNS (domain names)', uuid: '6ba7b810-9dad-11d1-80b4-00c04fd430c8' },
+  { id: 'url', label: 'URL', uuid: '6ba7b811-9dad-11d1-80b4-00c04fd430c8' },
+  { id: 'oid', label: 'ISO OID', uuid: '6ba7b812-9dad-11d1-80b4-00c04fd430c8' },
+  { id: 'x500', label: 'X.500 DN', uuid: '6ba7b814-9dad-11d1-80b4-00c04fd430c8' },
+];
+
+export type NameBasedResult = { ok: true; ids: string[] } | { ok: false; error: string };
+
+/**
+ * Name-based UUIDs (v3 = MD5, v5 = SHA-1, RFC 9562 §5.3/§5.5): one per name, UTF-8 encoded. The same
+ * namespace and name always produce the same UUID. Empty lines are skipped; other whitespace counts.
+ */
+export function nameBasedUuids(kind: NameBasedKind, namespace: string, names: string[]): NameBasedResult {
+  const hex = normalizeUuid(namespace);
+  if (!hex) return { ok: false, error: 'The namespace must be a UUID, such as 6ba7b810-9dad-11d1-80b4-00c04fd430c8.' };
+  const ns = hyphenate(hex);
+  const make = kind === 'v3' ? v3 : v5;
+  const ids = names.filter((n) => n !== '').slice(0, MAX_UUIDS).map((name) => make(name, ns));
+  return { ok: true, ids };
+}
 
 export interface UuidFormat {
   uppercase: boolean;
@@ -16,7 +44,8 @@ export function formatUuid(id: string, { uppercase, braces, hyphens }: UuidForma
   return braces ? `{${s}}` : s;
 }
 
-export function generateUuids(kind: UuidKind, count: number, format: UuidFormat): string[] {
+/** Random or time-based UUIDs (name-based kinds need a name: use `nameBasedUuids`). */
+export function generateUuids(kind: Exclude<UuidKind, NameBasedKind>, count: number, format: UuidFormat): string[] {
   const n = Math.max(1, Math.min(MAX_UUIDS, Math.floor(count)));
   const make =
     kind === 'v1' ? () => v1() : kind === 'v6' ? () => v6() : kind === 'v7' ? () => v7() : kind === 'nil' ? () => NIL : kind === 'max' ? () => MAX : () => v4();
@@ -78,13 +107,15 @@ function variantOf(nibble: number): UuidVariant {
 
 /** Turns 100 ns ticks since the Unix epoch into a timestamp with 7 fractional digits. */
 function fromUnixTicks(ticks: bigint): UuidTimestamp {
-  const ms = ticks / 10_000n;
-  const sub = ticks % 10_000n; // remainder in 100 ns
+  // Floor division, so times before 1970 keep a non-negative sub-millisecond remainder
+  // (-1 tick is 1969-12-31T23:59:59.9999999Z, not 1970-01-01T00:00:00.0000001Z).
+  let ms = ticks / 10_000n;
+  if (ticks % 10_000n < 0n) ms -= 1n;
+  const sub = ticks - ms * 10_000n; // 0 … 9999, in 100 ns
   const msNum = Number(ms);
   const date = new Date(msNum);
   const base = Number.isNaN(date.getTime()) ? '' : date.toISOString();
-  const frac = sub < 0n ? -sub : sub;
-  const iso = base ? base.replace(/\.(\d{3})Z$/, (_m, d: string) => `.${d}${frac.toString().padStart(4, '0')}Z`) : 'Out of range';
+  const iso = base ? base.replace(/\.(\d{3})Z$/, (_m, d: string) => `.${d}${sub.toString().padStart(4, '0')}Z`) : 'Out of range';
   return { unixMs: msNum + Number(sub) / 10_000, iso, date };
 }
 

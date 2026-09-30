@@ -79,6 +79,14 @@ describe('formatNumber / parseNumber', () => {
     expect(formatNumber(2 / 3, { precision: 4 })).toBe('0.6667');
   });
 
+  it('keeps integer digits unless strict significant digits are requested', () => {
+    // Regression: 1234567890123.45 was shown as 1,234,567,890,120 and 1234567890 bit/s as 1,234,570,000.
+    expect(formatNumber(1234567890123.45)).toBe('1,234,567,890,123.45');
+    expect(formatNumber(1234567890, { precision: 6 })).toBe('1,234,567,890');
+    expect(formatNumber(123.456, { precision: 4 })).toBe('123.5');
+    expect(formatNumber(12345.678, { precision: 3, strictPrecision: true })).toBe('12,300');
+  });
+
   it('uses scientific notation for extremes', () => {
     expect(formatNumber(1.5e21)).toBe('1.5e21');
     expect(formatNumber(6.02214076e23)).toBe('6.02214076e23');

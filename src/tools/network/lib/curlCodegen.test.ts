@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { minify } from 'terser';
 import { parseCurl } from './curl';
-import { CODE_TARGETS, generateCode, goString, jsString, phpString, pyLiteral, pyString, type CodeTarget } from './curlCodegen';
+import { CODE_TARGETS, generateCode, goString, jsString, minifyJson, phpString, pyLiteral, pyString, type CodeTarget } from './curlCodegen';
 
 async function assertValidJs(code: string) {
   // Parses as an ES module (top-level await allowed). Throws on syntax errors.
@@ -265,6 +265,34 @@ describe('php', () => {
 
   it('HEAD uses NOBODY', () => {
     expect(generateCode(parseCurl(SAMPLES.head), 'php')).toContain('CURLOPT_NOBODY => true,');
+  });
+
+  it('keeps GET when a body is sent', () => {
+    // Regression: CURLOPT_POSTFIELDS alone turned `curl -X GET -d …` into a POST.
+    const code = generateCode(parseCurl("curl -X GET https://x.test/search -d 'q=1'"), 'php');
+    expect(code).toContain("CURLOPT_CUSTOMREQUEST => 'GET',");
+  });
+});
+
+describe('JSON bodies are never altered', () => {
+  const bigInt = `curl https://x.test -H 'Content-Type: application/json' -d '{"id": 12345678901234567890, "n": 1}'`;
+
+  it('sends bodies verbatim when parsing would change them', () => {
+    // Regression: JSON.parse rounded 12345678901234567890 to 12345678901234567000 in every generator.
+    for (const target of ['fetch', 'axios', 'node', 'python'] as CodeTarget[]) {
+      const code = generateCode(parseCurl(bigInt), target);
+      expect(code, target).toContain('12345678901234567890');
+      expect(code, target).not.toContain('12345678901234567000');
+    }
+    const dup = generateCode(parseCurl(`curl https://x.test -H 'Content-Type: application/json' -d '{"a":1,"a":2}'`), 'python');
+    expect(dup).toContain(`data = '{"a":1,"a":2}'`);
+    expect(dup).toContain("'Content-Type': 'application/json'");
+  });
+
+  it('still pretty-prints bodies that survive a round trip', () => {
+    const code = generateCode(parseCurl(SAMPLES.json), 'python');
+    expect(code).toContain('json_data = {');
+    expect(minifyJson(' { "a" : [1, 2] , "s": "x y\\" z" } ')).toBe('{"a":[1,2],"s":"x y\\" z"}');
   });
 });
 

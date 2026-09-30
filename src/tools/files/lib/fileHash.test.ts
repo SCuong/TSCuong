@@ -106,3 +106,30 @@ describe('verify', () => {
     expect(checksumFile([])).toBe('');
   });
 });
+
+describe('escaped file names (GNU coreutils)', () => {
+  const hash = 'a'.repeat(64);
+  // Built from char codes so the escapes under test can't be confused with source escapes.
+  const BS = String.fromCharCode(92);
+  const LF = String.fromCharCode(10);
+  const CR = String.fromCharCode(13);
+
+  it('parses lines that start with a backslash and unescapes the name', () => {
+    // Regression: a name escaped as "back\\slash" kept the doubled backslash, so the file never matched.
+    expect(parseExpected(`${BS}${hash}  back${BS}${BS}slash${BS}nline.txt`)).toEqual([{ hash, name: `back${BS}slash${LF}line.txt` }]);
+    expect(parseExpected(`${BS}SHA256 (a${BS}${BS}b.txt) = ${hash}`)).toEqual([{ hash, name: `a${BS}b.txt` }]);
+    expect(parseExpected(`${hash} *binary.bin${CR}${LF}${hash}  text.txt`)).toEqual([
+      { hash, name: 'binary.bin' },
+      { hash, name: 'text.txt' },
+    ]);
+  });
+
+  it('escapes such names when writing a list, so it round-trips', () => {
+    const list = checksumFile([
+      { name: `a${BS}b.txt`, hash },
+      { name: 'plain.txt', hash },
+    ]);
+    expect(list).toBe(`${BS}${hash}  a${BS}${BS}b.txt${LF}${hash}  plain.txt${LF}`);
+    expect(parseExpected(list).map((e) => e.name)).toEqual([`a${BS}b.txt`, 'plain.txt']);
+  });
+});

@@ -104,4 +104,22 @@ describe('formatStat', () => {
     expect(formatStat(null)).toBe('—');
     expect(formatStat(1e20)).toBe('1e+20');
   });
+
+  it('keeps every integer digit', () => {
+    // Regression: 12345678901 was shown as 12345678900 (rounded to 10 significant digits).
+    expect(formatStat(12345678901)).toBe('12345678901');
+    expect(formatStat(12345678901.5)).toBe('12345678901.5');
+    expect(formatStat(-9876543210987)).toBe('-9876543210987');
+    expect(formatStat(1234567.891234)).toBe('1234567.891');
+  });
+});
+
+describe('summarize overflow', () => {
+  it('reports the mean even when the sum overflows', () => {
+    // Regression: Neumaier compensation turned an overflowing sum into NaN, so mean and sum showed "—".
+    const s = summarize([1e308, 1e308])!;
+    expect(s.sum).toBe(Infinity);
+    expect(s.mean).toBe(1e308);
+    expect(preciseSum([1e308, 1e308, -1e308])).toBe(Infinity);
+  });
 });

@@ -39,15 +39,17 @@ function NumbersSection() {
   const [count, setCount] = useToolState<number | ''>(TOOL, 'count', 1);
   const [unique, setUnique] = useToolState(TOOL, 'unique', true);
   const [sort, setSort] = useToolState<'none' | 'asc' | 'desc'>(TOOL, 'sort', 'none');
-  const [result, setResult] = useState<{ values: number[] } | { error: string } | null>(null);
+  // The range is stored with the result, so editing Min/Max afterwards can't mislabel an old number.
+  const [result, setResult] = useState<{ values: number[]; min: number; max: number } | { error: string } | null>(null);
   const ids = { min: useId(), max: useId(), count: useId() };
 
   function generate() {
     const r = randomIntegers({ min: num(min), max: num(max), count: num(count), unique, sort });
-    setResult(r.ok ? { values: r.value } : { error: r.error });
+    setResult(r.ok ? { values: r.value, min: num(min), max: num(max) } : { error: r.error });
   }
 
-  const values = result && 'values' in result ? result.values : null;
+  const generated = result && 'values' in result ? result : null;
+  const values = generated?.values ?? null;
   return (
     <>
       <ToolBar>
@@ -80,9 +82,14 @@ function NumbersSection() {
       </ToolBar>
       <ErrorMessage error={result && 'error' in result ? result.error : null} title="Can't generate these numbers" />
       {!result && <IdleHint icon={ListOrdered} text="Set a range and press Generate." />}
-      {values &&
+      {generated &&
+        values &&
         (values.length === 1 ? (
-          <BigResult label={`Random number between ${formatNumber(num(min), 0)} and ${formatNumber(num(max), 0)}`} value={formatNumber(values[0], 0)} copy={String(values[0])} />
+          <BigResult
+            label={`Random number between ${formatNumber(generated.min, 0)} and ${formatNumber(generated.max, 0)}`}
+            value={formatNumber(values[0], 0)}
+            copy={String(values[0])}
+          />
         ) : (
           <OutputPanel
             title={pluralize(values.length, 'number')}
@@ -339,7 +346,12 @@ function CoinSection() {
             <Stat label="Longest streak" value={`${result.longestStreak.length} × ${result.longestStreak.side === 'H' ? 'heads' : 'tails'}`} />
             <Stat label="Difference" value={formatNumber(Math.abs(result.heads - result.tails))} />
           </div>
-          <div className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-line bg-surface-sunken p-3 font-mono text-[12.5px] leading-relaxed tracking-wider break-all text-fg-secondary">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Flip sequence"
+            className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-line bg-surface-sunken p-3 font-mono text-[12.5px] leading-relaxed tracking-wider break-all text-fg-secondary"
+          >
             {result.flips.join('')}
           </div>
           <p className="mt-2 text-[12px] text-fg-muted">H = heads, T = tails, in flip order.</p>

@@ -29,7 +29,7 @@ export function parseNumbers(text: string): ParsedNumbers {
   return { values, ignored, ignoredCount };
 }
 
-/** Neumaier (improved Kahan) summation. */
+/** Neumaier (improved Kahan) summation. Returns ±Infinity (not NaN) when the total overflows. */
 export function preciseSum(values: readonly number[]): number {
   let sum = 0;
   let c = 0;
@@ -39,7 +39,8 @@ export function preciseSum(values: readonly number[]): number {
     else c += v - t + sum;
     sum = t;
   }
-  return sum + c;
+  // After an overflow the compensation term is ±Infinity or NaN; the plain sum is the honest answer.
+  return Number.isFinite(sum) ? sum + c : sum;
 }
 
 /**
@@ -127,7 +128,8 @@ export function summarize(values: readonly number[]): Summary | null {
   return {
     count: n,
     sum,
-    mean: sum / n,
+    // The compensated sum is the most precise mean, but it can overflow (1e308 + 1e308) where Welford's running mean does not.
+    mean: Number.isFinite(sum) ? sum / n : mean,
     median: percentile(sorted, 50),
     modes,
     modeFrequency: top,
@@ -192,15 +194,22 @@ export function histogram(sorted: readonly number[], binCount = suggestBinCount(
   return bins;
 }
 
-/** Compact number formatting for statistics output. */
+/**
+ * Compact number formatting for statistics output. Whole numbers up to 2^53 are shown exactly, and
+ * rounding to `significant` digits never replaces integer digits with zeros (12345678901 stays
+ * 12345678901, not 12345678900); magnitudes from 1e15 up use scientific notation.
+ */
 export function formatStat(value: number | null | undefined, significant = 10): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   if (!Number.isFinite(value)) return value > 0 ? '∞' : '-∞';
-  if (Object.is(value, -0)) return '0';
+  if (value === 0) return '0';
   const abs = Math.abs(value);
-  if (abs !== 0 && (abs >= 1e15 || abs < 1e-6)) {
+  if (Number.isInteger(value) && abs <= 2 ** 53) return String(value);
+  if (abs >= 1e15 || abs < 1e-6) {
     const [m, e] = value.toExponential(significant - 1).split('e');
     return `${m.replace(/\.?0+$/, '')}e${e}`;
   }
-  return String(Number(value.toPrecision(significant)));
+  const intDigits = abs >= 1 ? String(Math.trunc(abs)).length : 0;
+  const rounded = Number(value.toPrecision(Math.min(15, Math.max(significant, intDigits + 2))));
+  return Object.is(rounded, -0) ? '0' : String(rounded);
 }

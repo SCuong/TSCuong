@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_PARTS, moveItem, orderParts, parsePartName, partName, planSplit, type PartRange } from './split';
+import { MAX_PARTS, moveItem, orderParts, parsePartName, partName, planSplit, SIZE_PRESETS, UNIT_LABELS, type PartRange } from './split';
 
 const covers = (parts: PartRange[], size: number) => {
   let pos = 0;
@@ -122,5 +122,18 @@ describe('orderParts', () => {
   it('moves items', () => {
     expect(moveItem([1, 2, 3], 0, 2)).toEqual([2, 3, 1]);
     expect(moveItem([1, 2, 3], 2, 5)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('size presets', () => {
+  it('stay below the limits they claim to fit', () => {
+    // Regression: "25 MB (Gmail)" was 25 MiB = 26,214,400 bytes, over a 25 MB limit even before Base64's 4/3.
+    const base64 = (n: number) => Math.ceil(n / 3) * 4;
+    const email10 = SIZE_PRESETS.find((p) => p.label.includes('10 MB'))!;
+    const email25 = SIZE_PRESETS.find((p) => p.label.includes('25 MB'))!;
+    expect(base64(email10.bytes)).toBeLessThan(10_000_000);
+    expect(base64(email25.bytes)).toBeLessThan(25_000_000);
+    expect(SIZE_PRESETS.find((p) => p.label.includes('FAT32'))!.bytes).toBe(2 ** 32 - 1);
+    expect(UNIT_LABELS.MB).toBe('MiB');
   });
 });

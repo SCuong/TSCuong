@@ -46,9 +46,12 @@ export function toRoman(n: number): RomanResult<string> {
 export function fromRoman(input: string): RomanResult<number> {
   const s = input.trim().toUpperCase();
   if (!s) return { ok: false, error: 'Enter a Roman numeral.' };
-  const bad = [...s].findIndex((c) => !(c in VALUES));
+  // Check the characters as typed (code points), so emoji or letters whose upper case is longer ("ß")
+  // are reported at their real position.
+  const typed = [...input.trim()];
+  const bad = typed.findIndex((c) => !Object.hasOwn(VALUES, c.toUpperCase()));
   if (bad >= 0) {
-    return { ok: false, error: `'${input.trim()[bad]}' at position ${bad + 1} is not a Roman numeral letter (use I, V, X, L, C, D, M).` };
+    return { ok: false, error: `'${typed[bad]}' at position ${bad + 1} is not a Roman numeral letter (use I, V, X, L, C, D, M).` };
   }
   for (const c of ['V', 'L', 'D']) {
     if (s.split(c).length > 2) return { ok: false, error: `'${c}' can appear only once.` };

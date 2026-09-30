@@ -93,14 +93,16 @@ export function parseExpected(input: string): ExpectedHash[] {
   for (const raw of input.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    const bsd = /^[\w-]+\s*\((.+)\)\s*=\s*([0-9a-f]+)$/i.exec(line);
+    const bsd = /^(\\?)[\w-]+\s*\((.+)\)\s*=\s*([0-9a-f]+)$/i.exec(line);
     if (bsd) {
-      out.push({ hash: bsd[2].toLowerCase(), name: bsd[1] });
+      out.push({ hash: bsd[3].toLowerCase(), name: bsd[1] ? unescapeGnuName(bsd[2]) : bsd[2] });
       continue;
     }
-    const gnu = /^\\?([0-9a-f]{8,})\s+[* ]?(.+)$/i.exec(line);
+    const gnu = /^(\\?)([0-9a-f]{8,})\s+[* ]?(.+)$/i.exec(line);
     if (gnu) {
-      out.push({ hash: gnu[1].toLowerCase(), name: gnu[2].trim() });
+      // GNU coreutils starts a line with "\" when the name contains "\", a newline or a CR, and escapes those.
+      const name = gnu[3].trim();
+      out.push({ hash: gnu[2].toLowerCase(), name: gnu[1] ? unescapeGnuName(name) : name });
       continue;
     }
     const bare = /^(?:[\w-]+[:=])?\s*([0-9a-f\s]{8,})$/i.exec(line);
@@ -153,7 +155,22 @@ export function verify(fileName: string, digests: Partial<Record<HashAlgo, strin
   };
 }
 
-/** "hash  name" lines, compatible with `sha256sum -c`. */
+function unescapeGnuName(name: string): string {
+  return name.replace(/\\(.)/g, (_m, c: string) => (c === 'n' ? '\n' : c === 'r' ? '\r' : c));
+}
+
+/**
+ * "hash  name" lines, compatible with `sha256sum -c`. Like GNU coreutils, a name containing "\", a
+ * newline or a CR is escaped and its line starts with "\", so the list can be verified unchanged.
+ */
 export function checksumFile(rows: Array<{ name: string; hash: string }>): string {
-  return rows.map((r) => `${r.hash}  ${r.name}`).join('\n') + (rows.length ? '\n' : '');
+  return (
+    rows
+      .map((r) => {
+        if (!/[\\\n\r]/.test(r.name)) return `${r.hash}  ${r.name}`;
+        const escaped = r.name.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        return `\\${r.hash}  ${escaped}`;
+      })
+      .join('\n') + (rows.length ? '\n' : '')
+  );
 }

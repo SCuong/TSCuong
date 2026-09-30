@@ -30,6 +30,8 @@ export class Fraction {
     if (!s) return null;
     const slash = s.indexOf('/');
     if (slash >= 0) {
+      // "1/2/3" is ambiguous (1/6 or 3/2?), so only a single fraction bar is accepted.
+      if (s.indexOf('/', slash + 1) >= 0) return null;
       const a = Fraction.parse(s.slice(0, slash));
       const b = Fraction.parse(s.slice(slash + 1));
       if (!a || !b || b.isZero()) return null;
@@ -77,30 +79,63 @@ export class Fraction {
     return this.num === o.num && this.den === o.den;
   }
   toNumber(): number {
-    // Scale down huge values to keep precision reasonable.
     const n = this.num;
     const d = this.den;
     const nf = Number(n);
     const df = Number(d);
     if (Number.isFinite(nf) && Number.isFinite(df)) return nf / df;
-    const shift = BigInt(Math.max(0, (d < 0n ? -d : d).toString(2).length - 1000));
+    // Scale both parts by the same power of two so they fit a double (the quotient keeps ~53 bits).
+    const shift = BigInt(Math.max(0, Math.max(bitLength(n), bitLength(d)) - 1000));
     return Number(n >> shift) / Number(d >> shift);
   }
   toString(): string {
     return this.den === 1n ? this.num.toString() : `${this.num}/${this.den}`;
   }
-  /** Decimal string with up to `digits` significant digits (trailing zeros trimmed). */
+  /**
+   * Decimal string with up to `digits` significant digits (trailing zeros trimmed). Integer digits are
+   * never rounded away (12345678901/2 → 6172839450.5, not 6172839500), and values beyond the double
+   * range are formatted exactly from the BigInt parts instead of turning into Infinity.
+   */
   toDecimal(digits = 10): string {
     if (this.den === 1n) return this.num.toString();
     const v = this.toNumber();
     const abs = Math.abs(v);
-    if (abs !== 0 && (abs >= 1e15 || abs < 1e-6)) {
-      const [m, e] = v.toExponential(digits - 1).split('e');
-      return `${m.replace(/\.?0+$/, '')}e${e}`;
-    }
-    const r = Number(v.toPrecision(digits));
+    if (!Number.isFinite(v) || abs === 0 || abs >= 1e15 || abs < 1e-6) return this.toExponential(digits);
+    const intDigits = abs >= 1 ? String(Math.trunc(abs)).length : 0;
+    const r = Number(v.toPrecision(Math.min(15, Math.max(digits, intDigits + 2))));
     return Object.is(r, -0) ? '0' : String(r);
   }
+  /** Scientific notation ("1.25e+400") computed exactly from the BigInt parts, rounded half up. */
+  toExponential(digits = 10): string {
+    if (this.num === 0n) return '0';
+    const negative = this.num < 0n;
+    const num = negative ? -this.num : this.num;
+    const den = this.den;
+    // Estimate the decimal exponent from the digit counts, then correct it.
+    let exp = num.toString().length - den.toString().length;
+    const scaled = (e: number): bigint => {
+      // floor(num / den × 10^(digits − e)) — one extra digit kept for rounding.
+      const shift = digits - e;
+      return shift >= 0 ? (num * 10n ** BigInt(shift)) / den : num / (den * 10n ** BigInt(-shift));
+    };
+    let q = scaled(exp);
+    const upper = 10n ** BigInt(digits + 1);
+    const lower = 10n ** BigInt(digits);
+    while (q >= upper) q = scaled(++exp);
+    while (q < lower) q = scaled(--exp);
+    let rounded = (q + 5n) / 10n;
+    if (rounded >= 10n ** BigInt(digits)) {
+      rounded /= 10n;
+      exp++;
+    }
+    const text = rounded.toString();
+    const mantissa = `${text[0]}${text.length > 1 ? `.${text.slice(1)}` : ''}`.replace(/\.?0+$/, '');
+    return `${negative ? '-' : ''}${mantissa}e${exp >= 0 ? '+' : ''}${exp}`;
+  }
+}
+
+function bitLength(v: bigint): number {
+  return (v < 0n ? -v : v).toString(16).length * 4;
 }
 
 export function gcd(a: bigint, b: bigint): bigint {

@@ -190,6 +190,22 @@ describe('SQL', () => {
     expect(sql).toBe(`INSERT INTO "people" ("id", "name") VALUES (1, 'D''Arcy');\nINSERT INTO "people" ("id", "name") VALUES (2, NULL);`);
     expect(toSql('  ', ['a'], [{ a: 1 }])).toContain('"mock_data"');
   });
+
+  it('writes SQL that MySQL/MariaDB and SQL Server accept', () => {
+    // Regression: only ANSI quoting existed, a syntax error in MySQL's default mode ("id" is a string
+    // there) and TRUE/FALSE do not exist in T-SQL.
+    const rows = [{ id: 1, name: 'C:\\temp O\'Brien', city: 'São Paulo', active: true }];
+    const cols = ['id', 'name', 'city', 'active'];
+    expect(toSql('app.people', cols, rows, 'mysql')).toBe(
+      "INSERT INTO `app`.`people` (`id`, `name`, `city`, `active`) VALUES (1, 'C:\\\\temp O''Brien', 'São Paulo', TRUE);",
+    );
+    expect(toSql('people', cols, rows, 'sqlserver')).toBe(
+      "INSERT INTO [people] ([id], [name], [city], [active]) VALUES (1, 'C:\\temp O''Brien', N'São Paulo', 1);",
+    );
+    expect(sqlIdent('we`ird', 'mysql')).toBe('`we``ird`');
+    expect(sqlIdent('we]ird', 'sqlserver')).toBe('[we]]ird]');
+    expect(formatRows('sql', cols, rows, 'people', 'sqlserver')).toContain('[people]');
+  });
 });
 
 describe('JSON / NDJSON', () => {

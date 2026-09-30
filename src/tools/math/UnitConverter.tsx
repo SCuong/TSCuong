@@ -10,6 +10,7 @@ import { Alert, ErrorMessage } from '@/components/ui/Alert';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { formatNumber, parseNumber } from './shared-a/format';
+import { useRovingRadio } from './shared-a/useRovingRadio';
 import { UNIT_CATEGORIES, convert, getCategory, getUnit, searchUnits, validateValue, type CategoryKey, type Unit, type UnitCategory } from './lib/units';
 
 const TOOL = 'unit-converter';
@@ -47,8 +48,9 @@ export default function UnitConverter() {
   const from = getUnit(category, selection.from) ?? getUnit(category, category.defaultFrom)!;
   const to = getUnit(category, selection.to) ?? getUnit(category, category.defaultTo)!;
   const precision = Number(precisionOpt);
-  const fmt = (v: number) => formatNumber(v, { precision, grouping });
-  const plain = (v: number) => formatNumber(v, { precision, grouping: false });
+  // The user picks the significant digits here, so round strictly (integer digits included).
+  const fmt = (v: number) => formatNumber(v, { precision, grouping, strictPrecision: true });
+  const plain = (v: number) => formatNumber(v, { precision, grouping: false, strictPrecision: true });
 
   const value = input.trim() ? parseNumber(input) : null;
   const inputError = input.trim() && value === null ? `"${input.trim()}" is not a valid number.` : null;
@@ -63,6 +65,7 @@ export default function UnitConverter() {
     setSelection({ category: cat.id, from: cat.defaultFrom, to: cat.defaultTo });
   };
   const swap = () => setSelection({ ...selection, from: to.id, to: from.id });
+  const categoryRadio = useRovingRadio(UNIT_CATEGORIES, category, selectCategory);
 
   const formula = useMemo(() => {
     if (category.id === 'temperature') return TEMPERATURE_FORMULAS[`${from.id}>${to.id}`] ?? null;
@@ -71,18 +74,19 @@ export default function UnitConverter() {
     if (!Number.isFinite(one)) return null;
     if (category.id === 'fuel' && (from.id === 'l100' || to.id === 'l100')) {
       // Reciprocal relationship: value_to = k ÷ value_from, with k = convert(1, from, to).
-      return `${to.symbol} = ${formatNumber(one, { precision })} ÷ ${from.symbol} (reciprocal)`;
+      return `${to.symbol} = ${formatNumber(one, { precision, strictPrecision: true })} ÷ ${from.symbol} (reciprocal)`;
     }
-    return `1 ${from.symbol} = ${formatNumber(one, { precision })} ${to.symbol}`;
+    return `1 ${from.symbol} = ${formatNumber(one, { precision, strictPrecision: true })} ${to.symbol}`;
   }, [category, from, to, precision]);
 
   return (
     <ToolStack>
       <Panel bodyClassName="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Category">
-          {UNIT_CATEGORIES.map((cat) => (
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Category" onKeyDown={categoryRadio.onKeyDown}>
+          {UNIT_CATEGORIES.map((cat, i) => (
             <button
               key={cat.id}
+              {...categoryRadio.optionProps(i)}
               type="button"
               role="radio"
               aria-checked={cat.id === category.id}
@@ -207,7 +211,7 @@ export default function UnitConverter() {
         description={value !== null && !blocked ? `${fmt(value)} ${from.symbol} in every unit. Click a row to convert to it.` : 'Enter a value to fill the table.'}
         bodyClassName="p-0!"
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={`All ${category.name.toLowerCase()} units`}>
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-line text-left text-[12px] text-fg-muted">
@@ -234,7 +238,23 @@ export default function UnitConverter() {
                     )}
                   >
                     <td className="py-1.5 pr-2 pl-4 text-fg">
-                      {unit.name}
+                      {isFrom ? (
+                        unit.name
+                      ) : (
+                        // A real button so the row can also be chosen from the keyboard.
+                        <button
+                          type="button"
+                          aria-pressed={isTo}
+                          title={`Convert to ${unit.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelection({ ...selection, to: unit.id });
+                          }}
+                          className="rounded-sm text-left hover:underline"
+                        >
+                          {unit.name}
+                        </button>
+                      )}
                       <span className="ml-1.5 font-mono text-[12px] text-fg-muted sm:hidden">{unit.symbol}</span>
                       {isFrom && <span className="ml-2 text-[11.5px] text-fg-muted">from</span>}
                       {isTo && <span className="ml-2 text-[11.5px] text-accent-text">to</span>}

@@ -7,6 +7,8 @@ export interface UserAgentInfo {
   engine: { name: string | null; version: string | null };
   os: { name: string | null; version: string | null; versionName: string | null };
   platform: { type: string | null; vendor: string | null; model: string | null };
+  /** Caveats about values that browsers freeze or hide in the User-Agent string. */
+  notes: string[];
 }
 
 export const SAMPLE_USER_AGENTS: Array<{ label: string; ua: string }> = [
@@ -44,23 +46,58 @@ export const SAMPLE_USER_AGENTS: Array<{ label: string; ua: string }> = [
 const orNull = (v: string | undefined) => (v === undefined || v === '' ? null : v);
 
 export function parseUserAgent(ua: string): UserAgentInfo {
-  if (!ua.trim()) throw new Error('Enter a User-Agent string.');
-  const r = Bowser.parse(ua.trim());
+  const text = ua.trim();
+  if (!text) throw new Error('Enter a User-Agent string.');
+  const r = Bowser.parse(text);
   let browser = { name: orNull(r.browser.name), version: orNull(r.browser.version) };
   let fromProductToken = false;
   if (!browser.name) {
     // Non-browser clients usually send a bare product token such as "curl/8.9.1".
-    const m = /^([A-Za-z][\w.-]*)\/([\w.-]+)/.exec(ua.trim());
+    const m = /^([A-Za-z][\w.-]*)\/([\w.-]+)/.exec(text);
     if (m && m[1].toLowerCase() !== 'mozilla') {
       browser = { name: m[1], version: m[2] };
       fromProductToken = true;
     }
   }
-  return {
-    fromProductToken,
-    browser,
-    engine: { name: orNull(r.engine.name), version: orNull(r.engine.version) },
-    os: { name: orNull(r.os.name), version: orNull(r.os.version), versionName: orNull(r.os.versionName) },
-    platform: { type: orNull(r.platform.type), vendor: orNull(r.platform.vendor), model: orNull(r.platform.model) },
-  };
+  const engine = { name: orNull(r.engine.name), version: orNull(r.engine.version) };
+  const os = { name: orNull(r.os.name), version: orNull(r.os.version), versionName: orNull(r.os.versionName) };
+  const platform = { type: orNull(r.platform.type), vendor: orNull(r.platform.vendor), model: orNull(r.platform.model) };
+  const notes: string[] = [];
+
+  // Bowser reports the retired EdgeHTML engine for Edge on Android ("EdgA") and iOS ("EdgiOS").
+  if (/\bEdgA\//.test(text)) {
+    engine.name = 'Blink';
+    engine.version = null;
+  }
+  // Every browser on iOS and iPadOS must use Apple's WebKit engine.
+  if (os.name === 'iOS' || /\((?:iPhone|iPad|iPod)\b/.test(text)) {
+    engine.name = 'WebKit';
+    engine.version = /AppleWebKit\/([\d.]+)/.exec(text)?.[1] ?? engine.version;
+  }
+  // "Gecko/20100101" is a frozen build date, not a version: Gecko's version is the "rv:" value.
+  if (engine.name === 'Gecko') {
+    const rv = /\brv:([\d.]+)/.exec(text);
+    if (rv) engine.version = rv[1];
+  }
+  // Chromebooks are laptops/desktops, which Bowser leaves blank.
+  if (!platform.type && os.name === 'Chrome OS') platform.type = 'desktop';
+
+  if (os.name === 'Windows' && os.version === 'NT 10.0') {
+    os.versionName = '10 or 11';
+    notes.push('Windows 11 still says “Windows NT 10.0” in the User-Agent, so Windows 10 and 11 look the same here. Client Hints (a platform version of 13 or higher) tell them apart.');
+  }
+  if (os.name === 'macOS' && os.version === '10.15.7') {
+    os.versionName = null;
+    notes.push('Browsers freeze the macOS version at 10.15.7, so the Mac may run a newer macOS. iPads in desktop mode send this same Mac string.');
+  }
+  if (os.name === 'Android' && /; K\)/.test(text)) {
+    notes.push('This is Chrome’s reduced User-Agent: “Android 10; K” is a fixed placeholder, not the real Android version or device model.');
+  }
+  if (os.name === 'iOS' && browser.name === 'Safari' && Number.parseInt(browser.version ?? '', 10) >= 26) {
+    notes.push('Safari 26 and later keep an older iOS version in the User-Agent, so the real iOS version may be newer.');
+  }
+  if (/\bChrome\/\d+\.0\.0\.0\b/.test(text)) {
+    notes.push('Chromium-based browsers report only the major version (the rest is “0.0.0”); Client Hints give the full version.');
+  }
+  return { fromProductToken, browser, engine, os, platform, notes };
 }

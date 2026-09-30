@@ -13,6 +13,8 @@ import { evaluateProgram, formatResult, type AngleMode } from './lib/expression'
 
 const TOOL = 'expression-calculator';
 const MAX_HISTORY = 100;
+/** Keeps the error marker visible when the error is at the end of the input. */
+const NBSP = String.fromCharCode(0xa0);
 
 interface HistoryItem {
   id: string;
@@ -114,6 +116,8 @@ export default function ExpressionCalculator() {
           Operators <code className="font-mono text-fg-secondary">+ − * / ^ %</code> (% is remainder), <code className="font-mono text-fg-secondary">!</code>{' '}
           factorial, implicit multiplication like <code className="font-mono text-fg-secondary">2pi</code>. Assign with{' '}
           <code className="font-mono text-fg-secondary">x = 3</code>; <code className="font-mono text-fg-secondary">ans</code> is the last result.
+          Results are double-precision (about 15 significant digits); for exact large integers use the Number Base
+          Converter.
         </p>
       </ToolBar>
 
@@ -146,10 +150,10 @@ export default function ExpressionCalculator() {
           {error ? (
             <div role="alert" className="rounded-lg bg-danger-soft px-3 py-2">
               <p className="text-[13px] font-medium text-danger">{error.message}</p>
-              <p className="mt-1 overflow-x-auto font-mono text-[13px] whitespace-pre text-fg">
+              <p className="mt-1 font-mono text-[13px] break-all whitespace-pre-wrap text-fg">
                 {input.slice(0, error.position)}
                 <span className="rounded-sm bg-danger-soft text-danger underline decoration-danger decoration-wavy underline-offset-4">
-                  {input.slice(error.position, error.position + 1) || ' '}
+                  {input.slice(error.position, error.position + 1) || NBSP}
                 </span>
                 {input.slice(error.position + 1)}
               </p>
@@ -169,7 +173,7 @@ export default function ExpressionCalculator() {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5" aria-label="Insert">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Insert into the expression">
           {KEYS.map((k) => (
             <button
               key={k.label}

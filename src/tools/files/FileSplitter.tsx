@@ -13,7 +13,9 @@ import { toast } from '@/components/ui/Toast';
 import { useAsyncJob, useToolState } from '@/lib/hooks';
 import { cn, downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { checksumFile, createHasher, parseExpected } from './lib/fileHash';
-import { moveItem, orderParts, partName, planSplit, SIZE_PRESETS, UNITS, type PartRange, type Unit } from './lib/split';
+import { existingFiles } from './lib/folderWrite';
+import { useOverwritePrompt } from './components/OverwritePrompt';
+import { moveItem, orderParts, partName, planSplit, SIZE_PRESETS, UNIT_LABELS, UNITS, type PartRange, type Unit } from './lib/split';
 
 const CHUNK = 4 * 1024 * 1024;
 const SHOWN_PARTS = 200;
@@ -24,18 +26,25 @@ type DirPicker = {
   showDirectoryPicker: (o: { mode: string }) => Promise<FileSystemDirectoryHandle>;
 };
 
-async function saveToFolder(files: Array<{ name: string; blob: Blob }>, onProgress: (i: number) => void, signal: AbortSignal) {
-  const root = await (window as unknown as DirPicker).showDirectoryPicker({
-    mode: 'readwrite',
-  });
+async function writeToFolder(
+  root: FileSystemDirectoryHandle,
+  files: Array<{ name: string; blob: Blob }>,
+  skip: Set<string>,
+  onProgress: (i: number) => void,
+  signal: AbortSignal,
+): Promise<number> {
+  let written = 0;
   for (let i = 0; i < files.length; i++) {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     onProgress(i);
+    if (skip.has(files[i].name)) continue;
     const handle = await root.getFileHandle(files[i].name, { create: true });
     const w = await handle.createWritable();
     await w.write(files[i].blob);
     await w.close();
+    written++;
   }
+  return written;
 }
 
 async function downloadSequentially(files: Array<{ name: string; blob: Blob }>) {
@@ -65,6 +74,7 @@ function SplitMode() {
   const [result, setResult] = useState<SplitResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const job = useAsyncJob();
+  const overwrite = useOverwritePrompt();
 
   const plan = useMemo(() => {
     if (!file) return null;
@@ -135,11 +145,28 @@ function SplitMode() {
   const allFiles = result ? [...result.parts.map(({ name, blob }) => ({ name, blob })), ...(manifest ? [manifest] : [])] : [];
 
   async function saveAll() {
+    let root: FileSystemDirectoryHandle;
     try {
-      await job.run(({ signal, progress }) =>
-        saveToFolder(allFiles, (i) => progress(i / allFiles.length, `Saving ${allFiles[i].name}`), signal),
+      root = await (window as unknown as DirPicker).showDirectoryPicker({ mode: 'readwrite' });
+    } catch {
+      return; // cancelled
+    }
+    // Parts of an earlier split with the same names would otherwise be replaced silently.
+    let skip = new Set<string>();
+    try {
+      const existing = await existingFiles(
+        root,
+        allFiles.map((f) => f.name),
       );
-      toast(`Saved ${pluralize(allFiles.length, 'file')}.`);
+      if (existing.length) {
+        const choice = await overwrite.ask(existing);
+        if (choice === 'cancel') return;
+        if (choice === 'skip') skip = new Set(existing);
+      }
+      const written = await job.run(({ signal, progress }) =>
+        writeToFolder(root, allFiles, skip, (i) => progress(i / allFiles.length, `Saving ${allFiles[i].name}`), signal),
+      );
+      toast(`Saved ${pluralize(written, 'file')}${skip.size ? `; kept ${pluralize(skip.size, 'existing file')}` : ''}.`);
     } catch (e) {
       if (e instanceof DOMException && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
       toast(errorMessage(e, 'Could not save the parts.'), 'error');
@@ -148,6 +175,7 @@ function SplitMode() {
 
   return (
     <>
+      {overwrite.dialog}
       <FileDrop
         onFiles={(f) => choose(f[0])}
         icon={Scissors}
@@ -221,8 +249,10 @@ function SplitMode() {
                       setResult(null);
                     }}
                   >
-                    {Object.keys(UNITS).map((u) => (
-                      <option key={u}>{u}</option>
+                    {(Object.keys(UNITS) as Unit[]).map((u) => (
+                      <option key={u} value={u}>
+                        {UNIT_LABELS[u]}
+                      </option>
                     ))}
                   </Select>
                 </div>

@@ -5,6 +5,12 @@ export interface FormatOptions {
   precision?: number;
   /** Thousands separators (",") for the integer part. Default true. */
   grouping?: boolean;
+  /**
+   * Round the integer part too, to exactly `precision` significant digits (12,345 → 12,300 at 3 digits),
+   * for controls where the user picks the number of significant digits. By default every integer digit
+   * is kept, so a large result never shows made-up trailing zeros (1,234,567,890,123.45 stays intact).
+   */
+  strictPrecision?: boolean;
 }
 
 const SCI_HIGH = 1e15;
@@ -44,14 +50,16 @@ export function formatNumber(value: number, options: FormatOptions = {}): string
   if (value === Infinity) return '∞';
   if (value === -Infinity) return '−∞';
   if (value === 0) return '0';
-  const rounded = roundSignificant(value, precision);
+  const intDigits = Math.abs(value) >= 1 && Math.abs(value) < SCI_HIGH ? String(Math.trunc(Math.abs(value))).length : 0;
+  const digits = options.strictPrecision || intDigits <= precision ? precision : Math.min(15, intDigits + 2);
+  const rounded = roundSignificant(value, digits);
   const abs = Math.abs(rounded);
   if (abs >= SCI_HIGH || abs < SCI_LOW) {
     const [mantissa, exponent] = rounded.toExponential(precision - 1).split('e');
     const m = mantissa.includes('.') ? mantissa.replace(/\.?0+$/, '') : mantissa;
     return `${m}e${exponent.replace('+', '')}`;
   }
-  return formatter(precision, grouping).format(rounded);
+  return formatter(digits, grouping).format(rounded);
 }
 
 /** Parse a user-typed decimal number: allows spaces, underscores and "," thousands separators, and a leading "+". */

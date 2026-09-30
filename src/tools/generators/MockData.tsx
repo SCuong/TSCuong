@@ -13,6 +13,7 @@ import {
   FIELD_TYPES,
   FORMAT_META,
   MAX_ROWS,
+  SQL_DIALECTS,
   createRowGenerator,
   defaultOptions,
   formatRows,
@@ -23,6 +24,7 @@ import {
   type MockField,
   type OutputFormat,
   type Row,
+  type SqlDialect,
   type Value,
 } from './lib/mock';
 import { OutputPanel, ToolField } from './components';
@@ -223,10 +225,11 @@ export default function MockData() {
   const [seed, setSeed] = useToolState(TOOL, 'seed', 'localkit');
   const [format, setFormat] = useToolState<OutputFormat>(TOOL, 'format', 'json');
   const [table, setTable] = useToolState(TOOL, 'table', 'mock_data');
+  const [dialect, setDialect] = useToolState<SqlDialect>(TOOL, 'dialect', 'ansi');
   const [result, setResult] = useState<Generated | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const ids = { rows: useId(), seed: useId(), table: useId() };
+  const ids = { rows: useId(), seed: useId(), table: useId(), dialect: useId() };
 
   const errors = useMemo(() => {
     const list = validateSchema(schema);
@@ -234,11 +237,11 @@ export default function MockData() {
     return list;
   }, [schema, rowCount]);
 
-  const requestNow = useMemo(() => ({ schema, rowCount, seed, format, table }), [schema, rowCount, seed, format, table]);
+  const requestNow = useMemo(() => ({ schema, rowCount, seed, format, table, dialect }), [schema, rowCount, seed, format, table, dialect]);
   const request = useDebouncedValue(requestNow, 250);
 
   useEffect(() => {
-    const { schema: fields, rowCount: count, seed: s, format: fmt, table: tbl } = request;
+    const { schema: fields, rowCount: count, seed: s, format: fmt, table: tbl, dialect: sqlDialect } = request;
     if (validateSchema(fields).length > 0 || count === '' || !Number.isInteger(count) || count < 1 || count > MAX_ROWS) return;
     let cancelled = false;
     (async () => {
@@ -258,7 +261,7 @@ export default function MockData() {
         if (showProgress) setProgress(1);
         await nextFrame();
         if (cancelled) return;
-        const text = formatRows(fmt, columns, rows, tbl);
+        const text = formatRows(fmt, columns, rows, tbl, sqlDialect);
         if (cancelled) return;
         setResult({ columns, preview: rows.slice(0, PREVIEW_ROWS), text, count, format: fmt });
         setGenError(null);
@@ -294,7 +297,8 @@ export default function MockData() {
     });
   }
 
-  const stale = result !== null && (result.format !== format || errors.length > 0);
+  // Shown instead of dimming the output (dimmed text fails contrast): the last good result stays readable.
+  const stale = result !== null && errors.length > 0;
 
   return (
     <ToolStack>
@@ -348,9 +352,20 @@ export default function MockData() {
           />
         </div>
         {format === 'sql' && (
-          <ToolField label="Table name" htmlFor={ids.table} className="w-full sm:w-44">
-            <Input id={ids.table} mono value={table} onChange={(e) => setTable(e.target.value)} placeholder="mock_data" />
-          </ToolField>
+          <>
+            <ToolField label="Table name" htmlFor={ids.table} className="w-full sm:w-44">
+              <Input id={ids.table} mono value={table} onChange={(e) => setTable(e.target.value)} placeholder="mock_data" />
+            </ToolField>
+            <ToolField label="SQL dialect" htmlFor={ids.dialect} className="w-full sm:w-48">
+              <Select id={ids.dialect} value={dialect} onChange={(e) => setDialect(e.target.value as SqlDialect)}>
+                {SQL_DIALECTS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </Select>
+            </ToolField>
+          </>
         )}
       </ToolBar>
 
@@ -367,7 +382,8 @@ export default function MockData() {
       {progress !== null && <ProgressBar value={progress} label="Generating rows…" />}
 
       {result && (
-        <div className={cn('flex flex-col gap-4 transition-opacity', stale && 'opacity-60')}>
+        <div className="flex flex-col gap-4">
+          {stale && <p className="px-1 text-[13px] text-fg-secondary">The data below was generated before the current changes. Fix the problems above to update it.</p>}
           <Panel
             title="Preview"
             description={`First ${Math.min(PREVIEW_ROWS, result.count)} of ${formatNumber(result.count)} rows`}

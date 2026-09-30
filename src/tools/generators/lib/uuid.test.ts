@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatUuid, generateUuids, normalizeUuid, parseMany, parseUuid } from './uuid';
+import { NAMESPACES, formatUuid, generateUuids, nameBasedUuids, normalizeUuid, parseMany, parseUuid } from './uuid';
 
 function info(input: string) {
   const r = parseUuid(input);
@@ -138,5 +138,38 @@ describe('generateUuids', () => {
     const id = '017f22e2-79b0-7cc3-98c4-dc0c0c07398f';
     expect(formatUuid(id, { uppercase: true, braces: true, hyphens: false })).toBe('{017F22E279B07CC398C4DC0C0C07398F}');
     expect(formatUuid(id, { uppercase: false, braces: false, hyphens: true })).toBe(id);
+  });
+});
+
+describe('name-based UUIDs (v3, v5)', () => {
+  const dns = NAMESPACES.find((n) => n.id === 'dns')!.uuid;
+
+  it('matches the RFC 9562 test vectors', () => {
+    // RFC 9562 appendix A.2 (v3) and A.4 (v5): namespace DNS, name "www.example.com".
+    expect(nameBasedUuids('v3', dns, ['www.example.com'])).toEqual({ ok: true, ids: ['5df41881-3aed-3515-88a7-2f4a814cf09e'] });
+    expect(nameBasedUuids('v5', dns, ['www.example.com'])).toEqual({ ok: true, ids: ['2ed6657d-e927-568b-95e1-2665a8aea6a2'] });
+  });
+
+  it('hashes names as UTF-8, one UUID per non-empty line, with any namespace spelling', () => {
+    const url = '{6BA7B811-9DAD-11D1-80B4-00C04FD430C8}';
+    // Cross-checked with SHA-1 over the namespace bytes + UTF-8 name (Python's uuid.uuid5 gives the same).
+    expect(nameBasedUuids('v5', url, ['日本', '', 'x '])).toEqual({
+      ok: true,
+      // The trailing space is part of the name.
+      ids: ['b3c301b5-cb5e-5ccb-84d9-afc083cfff97', '4e8cf6b6-2ab1-5c10-bf16-77875a9ec14d'],
+    });
+  });
+
+  it('rejects an invalid namespace', () => {
+    expect(nameBasedUuids('v5', 'not-a-uuid', ['a'])).toEqual({ ok: false, error: expect.stringMatching(/namespace must be a UUID/) });
+  });
+});
+
+describe('timestamps before 1970', () => {
+  it('floors sub-millisecond ticks instead of mirroring them after the epoch', () => {
+    // Regression: one tick before 1970 was shown as 1970-01-01T00:00:00.0000001Z.
+    expect(info('13813fff-1dd2-11b2-8000-000000000000').timestamp?.iso).toBe('1969-12-31T23:59:59.9999999Z');
+    expect(info('13814000-1dd2-11b2-8000-000000000000').timestamp?.iso).toBe('1970-01-01T00:00:00.0000000Z');
+    expect(info('c232ab00-9414-11ec-b3c8-9f6bdeced846').timestamp?.iso).toBe('2022-02-22T19:22:22.0000000Z');
   });
 });

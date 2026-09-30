@@ -22,23 +22,36 @@ function readAll(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> 
 
 const fileOf = (entry: FileSystemFileEntry) => new Promise<File>((resolve, reject) => entry.file(resolve, reject));
 
+export interface CollectedEntries {
+  files: PathedFile[];
+  /** Folders with nothing inside (relative paths), so archives can keep them. */
+  emptyDirs: string[];
+  /** True when more than `limit` files were found and the rest were left out. */
+  truncated: boolean;
+}
+
 /** Recursively collect every file below the given entries. Paths are relative, without a leading slash. */
-export async function collectEntries(entries: FileSystemEntry[], limit = 20000): Promise<PathedFile[]> {
-  const out: PathedFile[] = [];
+export async function collectEntries(entries: FileSystemEntry[], limit = 20000): Promise<CollectedEntries> {
+  const files: PathedFile[] = [];
+  const emptyDirs: string[] = [];
   const stack = [...entries];
+  let truncated = false;
   while (stack.length) {
     const entry = stack.pop()!;
+    const path = entry.fullPath.replace(/^\/+/, '') || entry.name;
     if (entry.isFile) {
-      out.push({
-        file: await fileOf(entry as FileSystemFileEntry),
-        path: entry.fullPath.replace(/^\/+/, '') || entry.name,
-      });
-      if (out.length >= limit) break;
+      if (files.length >= limit) {
+        truncated = true;
+        break;
+      }
+      files.push({ file: await fileOf(entry as FileSystemFileEntry), path });
     } else if (entry.isDirectory) {
-      stack.push(...(await readAll((entry as FileSystemDirectoryEntry).createReader())).reverse());
+      const children = await readAll((entry as FileSystemDirectoryEntry).createReader());
+      if (!children.length) emptyDirs.push(path);
+      stack.push(...children.reverse());
     }
   }
-  return out;
+  return { files, emptyDirs, truncated };
 }
 
 /**

@@ -62,9 +62,13 @@ export function parseHexPattern(input: string): Pattern | { error: string } {
   };
 }
 
+/**
+ * UTF-8 search pattern. "Ignore case" folds ASCII letters only (A–Z), on both sides: lower-casing the
+ * whole needle would turn "Ä" into "ä", whose UTF-8 bytes never match an "Ä" in the file.
+ */
 export function textPattern(text: string, caseInsensitive: boolean): Pattern | { error: string } {
   if (!text) return { error: 'Enter text to search for.' };
-  const bytes = new TextEncoder().encode(caseInsensitive ? text.toLowerCase() : text);
+  const bytes = new TextEncoder().encode(caseInsensitive ? text.replace(/[A-Z]/g, (c) => c.toLowerCase()) : text);
   return { bytes, mask: new Uint8Array(bytes.length).fill(1), caseInsensitive };
 }
 

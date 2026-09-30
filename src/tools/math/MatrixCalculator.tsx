@@ -10,6 +10,7 @@ import { ErrorMessage } from '@/components/ui/Alert';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { Fraction } from './lib/fraction';
+import { useRovingRadio } from './shared-a/useRovingRadio';
 import {
   add,
   determinant,
@@ -113,10 +114,11 @@ function GridEditor({ name, grid, onChange }: { name: string; grid: Grid; onChan
   );
 }
 
-function MatrixView({ m, mode }: { m: Matrix; mode: 'fraction' | 'decimal' }) {
+function MatrixView({ m, mode, label }: { m: Matrix; mode: 'fraction' | 'decimal'; label: string }) {
   const cells = toStrings(m, mode);
   return (
-    <div className="overflow-x-auto">
+    // Exact results can be very wide; the focusable region lets keyboard users scroll them.
+    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={label}>
       <table className="border-separate border-spacing-0 font-mono text-[14px] tabular-nums">
         <tbody>
           {cells.map((row, i) => (
@@ -153,6 +155,11 @@ export default function MatrixCalculator() {
   const [mode, setMode] = useToolState<'fraction' | 'decimal'>(TOOL, 'mode', 'fraction');
 
   const needsB = OPS.find((o) => o.value === op)?.needsB ?? false;
+  const radio = useRovingRadio(
+    OPS.map((o) => o.value),
+    op,
+    setOp,
+  );
 
   const outcome = useMemo((): { ok: true; value: Outcome } | { ok: false; error: string } => {
     try {
@@ -197,10 +204,11 @@ export default function MatrixCalculator() {
       <ToolBar>
         <div className="min-w-0">
           <Label>Operation</Label>
-          <div role="radiogroup" aria-label="Operation" className="flex flex-wrap gap-1">
-            {OPS.map((o) => (
+          <div role="radiogroup" aria-label="Operation" className="flex flex-wrap gap-1" onKeyDown={radio.onKeyDown}>
+            {OPS.map((o, i) => (
               <button
                 key={o.value}
+                {...radio.optionProps(i)}
                 type="button"
                 role="radio"
                 aria-checked={op === o.value}
@@ -274,7 +282,7 @@ export default function MatrixCalculator() {
       >
         {outcome.ok ? (
           outcome.value.kind === 'matrix' ? (
-            <MatrixView m={outcome.value.value} mode={mode} />
+            <MatrixView m={outcome.value.value} mode={mode} label={`Result ${outcome.value.label}`} />
           ) : (
             <div className="grid max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
               <Stat label={outcome.value.label} value={mode === 'decimal' && outcome.value.decimal ? outcome.value.decimal : outcome.value.value} />

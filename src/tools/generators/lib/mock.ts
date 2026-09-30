@@ -284,7 +284,7 @@ interface RowContext {
 function slug(s: string): string {
   return s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '');
 }
@@ -480,27 +480,46 @@ export function toCsv(columns: string[], rows: Row[]): string {
   return lines.join('\r\n');
 }
 
-/** Quote an SQL identifier (ANSI double quotes, embedded quotes doubled). `schema.table` quotes each part. */
-export function sqlIdent(name: string): string {
+/**
+ * SQL flavours with different quoting rules. ANSI double-quoted identifiers are a syntax error in MySQL's
+ * default mode, which also treats "\" as an escape inside strings; SQL Server has no TRUE/FALSE literals
+ * and needs N'…' for text outside ASCII.
+ */
+export type SqlDialect = 'ansi' | 'mysql' | 'sqlserver';
+
+export const SQL_DIALECTS: Array<{ value: SqlDialect; label: string }> = [
+  { value: 'ansi', label: 'PostgreSQL / SQLite' },
+  { value: 'mysql', label: 'MySQL / MariaDB' },
+  { value: 'sqlserver', label: 'SQL Server' },
+];
+
+/** Quote an SQL identifier for the dialect (embedded quote characters doubled). `schema.table` quotes each part. */
+export function sqlIdent(name: string, dialect: SqlDialect = 'ansi'): string {
   return name
     .split('.')
-    .map((part) => `"${part.replace(/"/g, '""')}"`)
+    .map((part) =>
+      dialect === 'mysql' ? `\`${part.replace(/`/g, '``')}\`` : dialect === 'sqlserver' ? `[${part.replace(/]/g, ']]')}]` : `"${part.replace(/"/g, '""')}"`,
+    )
     .join('.');
 }
 
-export function sqlLiteral(v: Value): string {
+export function sqlLiteral(v: Value, dialect: SqlDialect = 'ansi'): string {
   if (v === null) return 'NULL';
-  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (typeof v === 'boolean') return dialect === 'sqlserver' ? (v ? '1' : '0') : v ? 'TRUE' : 'FALSE';
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'NULL';
-  return `'${v.replace(/'/g, "''")}'`;
+  const quoted = v.replace(/'/g, "''");
+  if (dialect === 'mysql') return `'${quoted.replace(/\\/g, '\\\\')}'`;
+  // eslint-disable-next-line no-control-regex
+  if (dialect === 'sqlserver' && /[^\x00-\x7f]/.test(v)) return `N'${quoted}'`;
+  return `'${quoted}'`;
 }
 
-export function toSql(table: string, columns: string[], rows: Row[]): string {
-  const head = `INSERT INTO ${sqlIdent(table.trim() || 'mock_data')} (${columns.map(sqlIdent).join(', ')}) VALUES `;
-  return rows.map((r) => `${head}(${columns.map((c) => sqlLiteral(r[c] ?? null)).join(', ')});`).join('\n');
+export function toSql(table: string, columns: string[], rows: Row[], dialect: SqlDialect = 'ansi'): string {
+  const head = `INSERT INTO ${sqlIdent(table.trim() || 'mock_data', dialect)} (${columns.map((c) => sqlIdent(c, dialect)).join(', ')}) VALUES `;
+  return rows.map((r) => `${head}(${columns.map((c) => sqlLiteral(r[c] ?? null, dialect)).join(', ')});`).join('\n');
 }
 
-export function formatRows(format: OutputFormat, columns: string[], rows: Row[], table: string): string {
+export function formatRows(format: OutputFormat, columns: string[], rows: Row[], table: string, dialect: SqlDialect = 'ansi'): string {
   switch (format) {
     case 'json':
       return toJson(rows);
@@ -509,7 +528,7 @@ export function formatRows(format: OutputFormat, columns: string[], rows: Row[],
     case 'csv':
       return toCsv(columns, rows);
     case 'sql':
-      return toSql(table, columns, rows);
+      return toSql(table, columns, rows, dialect);
   }
 }
 

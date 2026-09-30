@@ -49,12 +49,35 @@ const u16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
 const u32 = (b: Uint8Array, o: number) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 const u64 = (b: Uint8Array, o: number) => u32(b, o) + u32(b, o + 4) * 2 ** 32;
 
+/** IBM code page 437 (the ZIP default for names without the UTF-8 flag), bytes 0x80–0xFF. */
+const CP437_HIGH = [
+  0xc7, 0xfc, 0xe9, 0xe2, 0xe4, 0xe0, 0xe5, 0xe7, 0xea, 0xeb, 0xe8, 0xef, 0xee, 0xec, 0xc4, 0xc5,
+  0xc9, 0xe6, 0xc6, 0xf4, 0xf6, 0xf2, 0xfb, 0xf9, 0xff, 0xd6, 0xdc, 0xa2, 0xa3, 0xa5, 0x20a7, 0x192,
+  0xe1, 0xed, 0xf3, 0xfa, 0xf1, 0xd1, 0xaa, 0xba, 0xbf, 0x2310, 0xac, 0xbd, 0xbc, 0xa1, 0xab, 0xbb,
+  0x2591, 0x2592, 0x2593, 0x2502, 0x2524, 0x2561, 0x2562, 0x2556, 0x2555, 0x2563, 0x2551, 0x2557, 0x255d, 0x255c, 0x255b, 0x2510,
+  0x2514, 0x2534, 0x252c, 0x251c, 0x2500, 0x253c, 0x255e, 0x255f, 0x255a, 0x2554, 0x2569, 0x2566, 0x2560, 0x2550, 0x256c, 0x2567,
+  0x2568, 0x2564, 0x2565, 0x2559, 0x2558, 0x2552, 0x2553, 0x256b, 0x256a, 0x2518, 0x250c, 0x2588, 0x2584, 0x258c, 0x2590, 0x2580,
+  0x3b1, 0xdf, 0x393, 0x3c0, 0x3a3, 0x3c3, 0xb5, 0x3c4, 0x3a6, 0x398, 0x3a9, 0x3b4, 0x221e, 0x3c6, 0x3b5, 0x2229,
+  0x2261, 0xb1, 0x2265, 0x2264, 0x2320, 0x2321, 0xf7, 0x2248, 0xb0, 0x2219, 0xb7, 0x221a, 0x207f, 0xb2, 0x25a0, 0xa0,
+];
+
+export function decodeCp437(bytes: Uint8Array): string {
+  let out = '';
+  for (const b of bytes) out += String.fromCharCode(b < 0x80 ? b : CP437_HIGH[b - 0x80]);
+  return out;
+}
+
+/**
+ * Entry names and comments: UTF-8 when the archive says so (flag bit 11); otherwise UTF-8 if the bytes are
+ * valid UTF-8 (macOS and many tools omit the flag), else the ZIP default, code page 437 — which is what
+ * older Windows versions and DOS tools wrote ("Müller.txt" is 4D 81 6C 6C 65 72).
+ */
 export function decodeName(bytes: Uint8Array, utf8Flag: boolean): string {
   if (utf8Flag) return new TextDecoder('utf-8').decode(bytes);
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    return Array.from(bytes, (c) => String.fromCharCode(c)).join('');
+    return decodeCp437(bytes);
   }
 }
 
@@ -98,22 +121,42 @@ export async function readZipDirectory(size: number, read: ReadRange): Promise<Z
   let count = u16(e, 10);
   let cdSize = u32(e, 12);
   let cdOffset = u32(e, 16);
-  const comment = decodeName(e.subarray(22, 22 + u16(e, 20)), true);
+  const comment = decodeName(e.subarray(22, 22 + u16(e, 20)), false);
   let zip64 = false;
+  /** Where the central directory must end: the ZIP64 end record, or the classic end record. */
+  let cdEnd = eocd;
   if (count === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
     const locRel = eocdRel - 20;
     if (locRel < 0 || u32(tail, locRel) !== 0x07064b50) throw new ZipError('The ZIP64 archive is corrupt (missing ZIP64 locator).');
-    const recOffset = u64(tail, locRel + 8);
-    const rec = await read(recOffset, recOffset + 56);
-    if (u32(rec, 0) !== 0x06064b50) throw new ZipError('The ZIP64 archive is corrupt (bad ZIP64 end record).');
+    let recOffset = u64(tail, locRel + 8);
+    let rec = recOffset + 56 <= size ? await read(recOffset, recOffset + 56) : new Uint8Array(0);
+    if (rec.length < 56 || u32(rec, 0) !== 0x06064b50) {
+      // Data prepended to the archive shifts every offset; the record normally sits right before the locator.
+      recOffset = tailStart + locRel - 56;
+      rec = recOffset >= 0 ? await read(recOffset, recOffset + 56) : new Uint8Array(0);
+      if (rec.length < 56 || u32(rec, 0) !== 0x06064b50) throw new ZipError('The ZIP64 archive is corrupt (bad ZIP64 end record).');
+    }
     count = u64(rec, 32);
     cdSize = u64(rec, 40);
     cdOffset = u64(rec, 48);
     zip64 = true;
+    cdEnd = recOffset;
   }
-  if (cdOffset + cdSize > eocd || cdOffset > size)
-    throw new ZipError('The ZIP archive is truncated or corrupt (central directory out of range).');
   if (count > 1_000_000) throw new ZipError('This archive lists more than a million entries; it is too large to browse here.');
+  // Self-extracting archives (and ZIPs with anything else prepended) keep offsets relative to where the
+  // archive began. The central directory really ends where the end record starts, so derive the shift.
+  let shift = 0;
+  const actualCd = cdEnd - cdSize;
+  if (count > 0 && actualCd > cdOffset) {
+    const head = cdOffset + 4 <= size ? await read(cdOffset, cdOffset + 4) : new Uint8Array(0);
+    if (head.length < 4 || u32(head, 0) !== 0x02014b50) {
+      const probe = await read(actualCd, actualCd + 4);
+      if (probe.length === 4 && u32(probe, 0) === 0x02014b50) shift = actualCd - cdOffset;
+    }
+  }
+  cdOffset += shift;
+  if (cdOffset + cdSize > cdEnd || cdOffset > size)
+    throw new ZipError('The ZIP archive is truncated or corrupt (central directory out of range).');
   const cd = await read(cdOffset, cdOffset + cdSize);
   const entries: ZipEntry[] = [];
   let o = 0;
@@ -131,14 +174,15 @@ export async function readZipDirectory(size: number, read: ReadRange): Promise<Z
     const extraLen = u16(cd, o + 30);
     const commentLen = u16(cd, o + 32);
     let localHeaderOffset = u32(cd, o + 42);
-    const name = decodeName(cd.subarray(o + 46, o + 46 + nameLen), Boolean(flags & 0x800));
-    // ZIP64 extended information extra field.
+    const rawName = cd.subarray(o + 46, o + 46 + nameLen);
+    let name = decodeName(rawName, Boolean(flags & 0x800));
     let x = o + 46 + nameLen;
     const xEnd = x + extraLen;
     while (x + 4 <= xEnd) {
       const id = u16(cd, x);
       const len = u16(cd, x + 2);
       if (id === 0x0001) {
+        // ZIP64 extended information.
         let p = x + 4;
         if (uncompressed === 0xffffffff) {
           uncompressed = u64(cd, p);
@@ -149,9 +193,13 @@ export async function readZipDirectory(size: number, read: ReadRange): Promise<Z
           p += 8;
         }
         if (localHeaderOffset === 0xffffffff) localHeaderOffset = u64(cd, p);
+      } else if (id === 0x7075 && len >= 5 && cd[x + 4] === 1 && !(flags & 0x800) && x + 4 + len <= xEnd) {
+        // Info-ZIP Unicode Path: the UTF-8 name, valid while its CRC matches the legacy name it replaces.
+        if (u32(cd, x + 5) === crc32(rawName)) name = new TextDecoder('utf-8').decode(cd.subarray(x + 9, x + 4 + len));
       }
       x += 4 + len;
     }
+    localHeaderOffset += shift;
     const encrypted = Boolean(flags & 1) || method === 99;
     const isDirectory = name.endsWith('/') || name.endsWith('\\');
     entries.push({
@@ -182,6 +230,47 @@ export async function entryDataRange(entry: ZipEntry, size: number, read: ReadRa
   const end = start + entry.compressedSize;
   if (end > size) throw new ZipError(`“${entry.name}” is truncated: the archive ends before its data.`);
   return [start, end];
+}
+
+/**
+ * Inflate raw DEFLATE data into at most `limit` bytes (the entry's declared size). A forged size can't
+ * make the page allocate gigabytes ("zip bomb"): decompression stops as soon as the output would exceed
+ * the declared size. Input is fed in small slices with pauses so the UI stays responsive.
+ */
+export async function inflateLimited(raw: Uint8Array, limit: number, signal?: AbortSignal): Promise<Uint8Array> {
+  const { Inflate } = await import('fflate');
+  const out = new Uint8Array(limit);
+  let length = 0;
+  let overflow = false;
+  const inflater = new Inflate((chunk) => {
+    if (overflow) return;
+    if (length + chunk.length > limit) {
+      overflow = true;
+      return;
+    }
+    out.set(chunk, length);
+    length += chunk.length;
+  });
+  // DEFLATE expands at most ~1032:1, so a 32 KB slice produces at most ~33 MB before the check below runs.
+  const SLICE = 32 * 1024;
+  let lastPause = performance.now();
+  let pos = 0;
+  do {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const end = Math.min(raw.length, pos + SLICE);
+    try {
+      inflater.push(raw.subarray(pos, end), end >= raw.length);
+    } catch {
+      throw new ZipError('The compressed data is corrupt.');
+    }
+    if (overflow) throw new ZipError('The data expands beyond the size the archive declares (a possible “zip bomb”), so it was not extracted.');
+    pos = end;
+    if (performance.now() - lastPause > 30) {
+      await new Promise((r) => setTimeout(r, 0));
+      lastPause = performance.now();
+    }
+  } while (pos < raw.length);
+  return length === limit ? out : out.subarray(0, length);
 }
 
 let crcTable: Uint32Array | null = null;

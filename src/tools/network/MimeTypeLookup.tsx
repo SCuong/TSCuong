@@ -61,10 +61,14 @@ export default function MimeTypeLookup() {
 
   const kind = classifyQuery(debounced);
   const results = useMemo(() => (entries ? searchMime(entries, debounced) : []), [entries, debounced]);
-  const extLookup = useMemo(
-    () => (entries && kind === 'extension' ? lookupExtension(entries, debounced) : null),
-    [entries, kind, debounced],
-  );
+  const extLookup = useMemo(() => {
+    if (!entries || kind !== 'extension') return null;
+    const lookup = lookupExtension(entries, debounced);
+    // A bare word such as "font" is usually a search term, not an extension: only report
+    // "no MIME type for .font" when the user clearly typed an extension or a file name.
+    const explicit = /^\.|\S\.\S/.test(debounced.trim());
+    return lookup.preferred || explicit ? lookup : null;
+  }, [entries, kind, debounced]);
   const typeLookup = useMemo(() => (entries && kind === 'type' ? lookupType(entries, debounced) : null), [entries, kind, debounced]);
 
   if (loadError) return <ErrorMessage error={loadError} title="Could not load the MIME database" />;

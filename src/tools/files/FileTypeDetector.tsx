@@ -58,6 +58,7 @@ export default function FileTypeDetector() {
 
   const mismatch = (r: Row) => Boolean(r.type && !extensionMatches(r.type, r.file.name));
   const mismatches = rows.filter(mismatch).length;
+  const unreadable = rows.filter((r) => r.error).length;
   const shown = onlyMismatch ? rows.filter(mismatch) : rows;
 
   return (
@@ -77,9 +78,10 @@ export default function FileTypeDetector() {
             {pluralize(rows.length, 'file')}
             {mismatches > 0 ? (
               <span className="ml-2 font-medium text-warning">· {pluralize(mismatches, 'extension mismatch', 'extension mismatches')}</span>
-            ) : (
+            ) : unreadable === 0 ? (
               <span className="ml-2 text-success">· all extensions match</span>
-            )}
+            ) : null}
+            {unreadable > 0 && <span className="ml-2 text-danger">· {pluralize(unreadable, 'file')} could not be read</span>}
           </p>
           <div className="flex items-center gap-3">
             <Checkbox label="Only mismatches" checked={onlyMismatch} onChange={setOnlyMismatch} />
@@ -148,8 +150,9 @@ export default function FileTypeDetector() {
                         <span className="text-[12px] text-fg-muted">First {Math.min(32, r.head.length)} bytes</span>
                         <CopyButton value={hexPreview(r.head, 32)} iconOnly label="Copy hex" />
                       </div>
-                      <p className="overflow-x-auto font-mono text-[12.5px] whitespace-nowrap text-fg">{hexPreview(r.head, 32)}</p>
-                      <p className="overflow-x-auto font-mono text-[12.5px] whitespace-pre text-fg-muted">{asciiPreview(r.head, 32)}</p>
+                      {/* Wrapped rather than scrolled, so narrow screens need no keyboard-scrollable region. */}
+                      <p className="font-mono text-[12.5px] break-words text-fg">{hexPreview(r.head, 32)}</p>
+                      <p className="font-mono text-[12.5px] break-all whitespace-pre-wrap text-fg-muted">{asciiPreview(r.head, 32)}</p>
                     </div>
                   )}
                 </div>

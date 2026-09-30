@@ -68,7 +68,7 @@ describe('known conversions', () => {
     expect(fmt('length', 1, 'mi', 'ft')).toBe('5280');
     expect(fmt('length', 1, 'nmi', 'm')).toBe('1852');
     expect(fmt('length', 100, 'cm', 'in')).toBe('39.3700787402');
-    expect(fmt('length', 1, 'ly', 'km')).toBe('9460730472580');
+    expect(fmt('length', 1, 'ly', 'km')).toBe('9460730472580.8'); // exact: 9,460,730,472,580.8 km
     expect(fmt('length', 1, 'm', 'nm')).toBe('1000000000');
   });
 

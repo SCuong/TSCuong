@@ -155,6 +155,14 @@ describe('ports', () => {
     expect(PORTS.find((p) => p.port === 51820)?.protocol).toBe('UDP');
   });
 
+  it('matches the IANA registry on assignment status', () => {
+    // 1521 is IANA's ncube-lm and 2181 is eforward, so Oracle and ZooKeeper use them by convention;
+    // 8008 is registered as http-alt.
+    expect(PORTS.find((p) => p.port === 1521)?.unofficial).toBe(true);
+    expect(PORTS.find((p) => p.port === 2181)?.unofficial).toBe(true);
+    expect(PORTS.find((p) => p.port === 8008)?.unofficial).toBeUndefined();
+  });
+
   it('parses queries', () => {
     expect(parsePortQuery('')).toEqual({ kind: 'empty' });
     expect(parsePortQuery(' 443 ')).toEqual({ kind: 'port', port: 443 });
@@ -193,7 +201,9 @@ describe('user agent', () => {
     expect(get('Chrome · Windows')).toMatchObject({ browser: { name: 'Chrome', version: '129.0.0.0' }, os: { name: 'Windows' }, platform: { type: 'desktop' } });
     expect(get('Safari · iPhone')).toMatchObject({ browser: { name: 'Safari' }, os: { name: 'iOS', version: '17.6' }, platform: { type: 'mobile', vendor: 'Apple' } });
     expect(get('Firefox · Linux')).toMatchObject({ browser: { name: 'Firefox' }, engine: { name: 'Gecko' }, os: { name: 'Linux' } });
-    expect(get('Edge · macOS')).toMatchObject({ browser: { name: 'Microsoft Edge' }, os: { name: 'macOS', versionName: 'Catalina' } });
+    // Browsers freeze macOS at 10.15.7, so "Catalina" would usually be wrong: no version name, and a note says why.
+    expect(get('Edge · macOS')).toMatchObject({ browser: { name: 'Microsoft Edge' }, os: { name: 'macOS', version: '10.15.7', versionName: null } });
+    expect(get('Edge · macOS').notes.join(' ')).toMatch(/freeze the macOS version/);
     expect(get('Safari · iPad').platform.type).toBe('tablet');
     expect(get('Googlebot').platform.type).toBe('bot');
   });
@@ -209,7 +219,29 @@ describe('user agent', () => {
     const r = parseUserAgent('garbage 🎉');
     expect(r.browser.name).toBeNull();
     expect(r.fromProductToken).toBe(false);
+    expect(r.notes).toEqual([]);
     expect(() => parseUserAgent('  ')).toThrow(/Enter a User-Agent/);
+  });
+
+  it('corrects engines that the underlying parser gets wrong', () => {
+    // Regression: Edge on Android/iOS was reported with the retired EdgeHTML engine.
+    const edgeAndroid = parseUserAgent(
+      'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 EdgA/140.0.0.0',
+    );
+    expect(edgeAndroid.browser.name).toBe('Microsoft Edge');
+    expect(edgeAndroid.engine.name).toBe('Blink');
+    expect(edgeAndroid.notes.join(' ')).toMatch(/Android 10; K/);
+    const edgeIos = parseUserAgent(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 EdgiOS/140.0.3485.94 Mobile/15E148 Safari/605.1.15',
+    );
+    expect(edgeIos.engine).toEqual({ name: 'WebKit', version: '605.1.15' });
+    // Regression: Firefox's frozen "Gecko/20100101" build date was shown as the engine version.
+    const firefox = parseUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0');
+    expect(firefox.engine).toEqual({ name: 'Gecko', version: '143.0' });
+    expect(firefox.os.versionName).toBe('10 or 11');
+    expect(firefox.notes.join(' ')).toMatch(/Windows 11 still says/);
+    const chromebook = parseUserAgent('Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36');
+    expect(chromebook.platform.type).toBe('desktop');
   });
 });
 

@@ -365,10 +365,15 @@ const V6_TYPES: Array<{ base: string; prefix: number; label: string; isPublic?: 
   { base: '::1', prefix: 128, label: 'Loopback' },
   { base: '::ffff:0:0', prefix: 96, label: 'IPv4-mapped (RFC 4291)' },
   { base: '64:ff9b::', prefix: 96, label: 'IPv4/IPv6 translation (RFC 6052)' },
+  { base: '64:ff9b:1::', prefix: 48, label: 'IPv4/IPv6 translation, local use (RFC 8215)' },
   { base: '100::', prefix: 64, label: 'Discard-only (RFC 6666)' },
   { base: '2001:db8::', prefix: 32, label: 'Documentation (RFC 3849)' },
+  { base: '3fff::', prefix: 20, label: 'Documentation (RFC 9637)' },
   { base: '2001::', prefix: 32, label: 'Teredo (RFC 4380)' },
+  { base: '2001:2::', prefix: 48, label: 'Benchmarking (RFC 5180)' },
+  { base: '2001::', prefix: 23, label: 'IETF protocol assignments (RFC 2928)' },
   { base: '2002::', prefix: 16, label: '6to4 (RFC 3056)' },
+  { base: '5f00::', prefix: 16, label: 'Segment Routing SIDs (RFC 9602)' },
   { base: 'fe80::', prefix: 10, label: 'Link-local unicast (RFC 4291)' },
   { base: 'fc00::', prefix: 7, label: 'Unique local address (RFC 4193)' },
   { base: 'ff00::', prefix: 8, label: 'Multicast (RFC 4291)' },
@@ -457,14 +462,38 @@ export interface ContainsResult {
   contains: boolean;
   family: IpFamily;
   network: string;
+  /** True when an IPv4-mapped IPv6 address (::ffff:a.b.c.d) was compared as its IPv4 address. */
+  mapped?: boolean;
 }
 
-/** Does `cidrText` contain `ipText`? Both must be the same family. */
+/** The embedded IPv4 address of an IPv4-mapped IPv6 address (::ffff:a.b.c.d), or null. */
+export function ipv4FromMapped(value: bigint): number | null {
+  return value >> 32n === 0xffffn ? Number(value & 0xffffffffn) : null;
+}
+
+/**
+ * Does `cidrText` contain `ipText`? Both must be the same family, except that an IPv4-mapped IPv6
+ * address (::ffff:10.1.2.3, as dual-stack servers log IPv4 clients) is the same host as its IPv4
+ * address (RFC 4291 §2.5.5.2) and is compared as one.
+ */
 export function cidrContains(cidrText: string, ipText: string): ContainsResult {
   const cf = detectFamily(cidrText);
   const af = detectFamily(ipText);
   if (!cidrText.trim()) throw new IpError('Enter a CIDR block.');
   if (!ipText.trim()) throw new IpError('Enter an IP address to check.');
+  if (cf === 4 && af === 6) {
+    const embedded = ipv4FromMapped(parseIPv6(ipText).value);
+    if (embedded !== null) {
+      const block = parseIPv4Cidr(cidrText);
+      const mask = prefixToMask(block.prefix);
+      return {
+        contains: ((embedded & mask) >>> 0) === ((block.ip & mask) >>> 0),
+        family: 4,
+        network: `${formatIPv4((block.ip & mask) >>> 0)}/${block.prefix}`,
+        mapped: true,
+      };
+    }
+  }
   if (cf !== af) {
     throw new IpError(`The CIDR block is IPv${cf} but the address is IPv${af}; they can never match.`);
   }

@@ -457,6 +457,20 @@ describe('auth and flags', () => {
   it('throws when a value is missing', () => {
     expect(() => parseCurl('curl https://x.test -H')).toThrow(/needs a value/);
   });
+
+  it('moves credentials out of the URL into Basic auth, as curl does', () => {
+    // Regression: the credentials stayed in the URL, so the generated fetch() code threw
+    // "Request cannot be constructed from a URL that includes credentials".
+    const r = parseCurl('curl https://ada:p%40ss:w@api.x.test:8443/v1?q=1');
+    expect(r.url).toBe('https://api.x.test:8443/v1?q=1');
+    expect(r.auth).toEqual({ type: 'basic', user: 'ada', password: 'p@ss:w' });
+    expect(r.warnings.join()).toMatch(/Basic authentication/);
+    // -u wins over URL credentials; both are removed from the URL.
+    const both = parseCurl('curl -u bob:pw https://ada:x@api.x.test/');
+    expect(both.auth).toEqual({ type: 'basic', user: 'bob', password: 'pw' });
+    expect(both.url).toBe('https://api.x.test/');
+    expect(parseCurl('curl http://[::1]:8080/x').auth).toBeNull();
+  });
 });
 
 describe('real-world commands', () => {

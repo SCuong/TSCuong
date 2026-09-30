@@ -346,6 +346,15 @@ describe('ipv6Info', () => {
     ['::ffff:10.0.0.1', /IPv4-mapped/],
     ['2606:4700::1111', /Global unicast/],
     ['4000::1', /Reserved/],
+    // Newer special-purpose blocks that used to show as public global unicast or reserved.
+    ['3fff::1', /Documentation \(RFC 9637\)/],
+    ['3fff:fff::1', /Documentation \(RFC 9637\)/],
+    ['3fff:1000::1', /Global unicast/],
+    ['2001:2::1', /Benchmarking/],
+    ['2001:4:112::1', /IETF protocol assignments/],
+    ['2001::1', /Teredo/],
+    ['64:ff9b:1::a', /local use/],
+    ['5f00:1::1', /Segment Routing/],
   ])('type of %s', (ip, label) => {
     expect(ipv6Type(v6(ip)).label).toMatch(label);
   });
@@ -373,6 +382,14 @@ describe('cidrContains', () => {
 
   it('rejects mixed families', () => {
     expect(() => cidrContains('10.0.0.0/8', '::1')).toThrow(/IPv4 but the address is IPv6/);
+  });
+
+  it('compares IPv4-mapped IPv6 addresses as IPv4', () => {
+    // Regression: "::ffff:10.1.2.3" (how dual-stack servers log IPv4 clients) was rejected against 10.0.0.0/8.
+    expect(cidrContains('10.0.0.0/8', '::ffff:10.1.2.3')).toEqual({ contains: true, family: 4, network: '10.0.0.0/8', mapped: true });
+    expect(cidrContains('10.0.0.0/8', '::ffff:192.168.0.1').contains).toBe(false);
+    expect(cidrContains('10.0.0.0/8', '[::ffff:a01:203]').contains).toBe(true);
+    expect(() => cidrContains('10.0.0.0/8', '::1:10.1.2.3')).toThrow(/never match/);
   });
 
   it('rejects empty inputs', () => {

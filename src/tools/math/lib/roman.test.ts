@@ -59,4 +59,11 @@ describe('roman numerals', () => {
     expect(toRoman(2.5).ok).toBe(false);
     expect(toRoman(-3).ok).toBe(false);
   });
+
+  it('names the offending character at its real position', () => {
+    // Regression: code-unit indexing pointed at half of the emoji, and "ß" (upper case "SS") shifted positions.
+    expect(fromRoman('XIV😀I')).toMatchObject({ ok: false, error: expect.stringMatching(/^'😀' at position 4 /) });
+    expect(fromRoman('ßX')).toMatchObject({ ok: false, error: expect.stringMatching(/^'ß' at position 1 /) });
+    expect(fromRoman('xiv')).toMatchObject({ ok: true, value: 14 });
+  });
 });

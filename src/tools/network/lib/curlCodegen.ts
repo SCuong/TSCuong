@@ -28,8 +28,11 @@ export function jsString(value: string): string {
     else if (ch === '\n') out += '\\n';
     else if (ch === '\r') out += '\\r';
     else if (ch === '\t') out += '\\t';
-    else if (ch === ' ') out += '\\u2028';
-    else if (ch === ' ') out += '\\u2029';
+    // U+2028/U+2029 (line and paragraph separators) end a line in older JavaScript parsers and are
+    // invisible in an editor, so they are always escaped. Compared by code point so the source keeps
+    // no literal separators.
+    else if (ch.charCodeAt(0) === 0x2028) out += '\\u2028';
+    else if (ch.charCodeAt(0) === 0x2029) out += '\\u2029';
     else if (ch < ' ' || ch === '\x7f') out += escapeControl(ch);
     else out += ch;
   }
@@ -126,10 +129,34 @@ function mergedHeaders(headers: CurlHeader[]): CurlHeader[] {
   return out;
 }
 
-function parsedJson(req: ParsedCurl): { ok: true; value: unknown } | { ok: false } {
+/** JSON text without the insignificant whitespace between tokens (string contents are kept verbatim). */
+export function minifyJson(text: string): string {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      out += ch;
+      if (ch === '\\') out += text[++i] ?? '';
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      inString = true;
+      out += ch;
+    } else if (ch !== ' ' && ch !== '\t' && ch !== '\n' && ch !== '\r') out += ch;
+  }
+  return out;
+}
+
+/**
+ * The JSON body as a value, but only when re-serializing it is lossless. Big integers such as
+ * 12345678901234567890 (beyond 2^53), duplicate keys, 1e400 or escapes like "é" would change when
+ * parsed and written again, so those bodies are sent verbatim instead.
+ */
+export function parsedJson(req: ParsedCurl): { ok: true; value: unknown } | { ok: false } {
   if (req.bodyType !== 'json' || req.body == null) return { ok: false };
   try {
-    return { ok: true, value: JSON.parse(req.body) };
+    const value: unknown = JSON.parse(req.body);
+    return JSON.stringify(value) === minifyJson(req.body) ? { ok: true, value } : { ok: false };
   } catch {
     return { ok: false };
   }
@@ -536,7 +563,10 @@ function toPhp(req: ParsedCurl): string {
   if (req.method === 'HEAD') opts.push('    CURLOPT_NOBODY => true,');
   else if (req.method === 'POST' && hasBody) {
     /* POSTFIELDS implies POST */
-  } else if (req.method !== 'GET') opts.push(`    CURLOPT_CUSTOMREQUEST => ${phpString(req.method)},`);
+  } else if (req.method !== 'GET' || hasBody) {
+    // CURLOPT_POSTFIELDS switches libcurl to POST, so any other method (even GET with a body) is set explicitly.
+    opts.push(`    CURLOPT_CUSTOMREQUEST => ${phpString(req.method)},`);
+  }
   const headers = effectiveHeaders(req);
   if (headers.length) {
     opts.push('    CURLOPT_HTTPHEADER => [');

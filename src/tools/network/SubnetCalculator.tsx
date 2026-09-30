@@ -125,7 +125,7 @@ function SplitPanel({ cidr }: { cidr: IPv4Cidr }) {
       }
       bodyClassName="p-0"
     >
-      <div className="max-h-[420px] overflow-auto">
+      <div className="max-h-[420px] overflow-auto" tabIndex={0} role="region" aria-label="Subnets">
         <table className="w-full min-w-[560px] text-left text-[13px]">
           <thead className="sticky top-0 bg-surface-raised text-[12px] text-fg-muted">
             <tr className="border-b border-line">
@@ -196,7 +196,8 @@ function ContainsPanel() {
             )}
             <span className="min-w-0 break-all text-fg">
               <span className="font-mono">{ip.trim()}</span> is {result.contains ? '' : 'not '}inside{' '}
-              <span className="font-mono">{result.network}</span>.
+              <span className="font-mono">{result.network}</span>
+              {result.mapped ? ' (compared as its IPv4 address: it is an IPv4-mapped IPv6 address).' : '.'}
             </span>
           </div>
         )}

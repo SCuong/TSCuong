@@ -8,6 +8,7 @@ import { ErrorMessage } from '@/components/ui/Alert';
 import { useToolState } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { groupDigits, type Result } from './lib/base';
+import { useRovingRadio } from './shared-a/useRovingRadio';
 import {
   OPS,
   applyOp,
@@ -35,6 +36,11 @@ export default function BitwiseCalculator() {
   const [bText, setBText] = useToolState(TOOL, 'b', '172');
   const width = Number(widthOpt) as Width;
   const info = opInfo(op);
+  const radio = useRovingRadio(
+    OPS.map((o) => o.id),
+    op,
+    setOp,
+  );
 
   const a = useMemo(() => (aText.trim() ? parseOperand(aText, radix, width, signed) : null), [aText, radix, width, signed]);
   const b = useMemo((): Result<bigint> | null => {
@@ -106,10 +112,11 @@ export default function BitwiseCalculator() {
       </ToolBar>
 
       <Panel title="Operation" bodyClassName="flex flex-col gap-4">
-        <div role="radiogroup" aria-label="Operation" className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-          {OPS.map((o) => (
+        <div role="radiogroup" aria-label="Operation" className="grid grid-cols-3 gap-1.5 sm:grid-cols-6" onKeyDown={radio.onKeyDown}>
+          {OPS.map((o, i) => (
             <button
               key={o.id}
+              {...radio.optionProps(i)}
               type="button"
               role="radio"
               aria-checked={op === o.id}
@@ -153,7 +160,7 @@ export default function BitwiseCalculator() {
       {a?.ok && out !== null && (
         <>
           <Panel title="Bits" description="1 bits are highlighted; bit 0 is on the right." bodyClassName="p-0!">
-            <div className="overflow-x-auto px-4 py-3">
+            <div className="overflow-x-auto px-4 py-3" tabIndex={0} role="region" aria-label="Bit grid">
               <BitGrid
                 width={width}
                 rows={[
@@ -262,7 +269,9 @@ function BitTable({ width, top, count, rows, large }: { width: Width; top: numbe
     <table className={cn('border-separate border-spacing-0 font-mono', large ? 'text-[13px]' : 'text-[12px]')}>
       <thead>
         <tr>
-          <th className="sticky left-0 z-10 bg-surface pr-3" />
+          <th className="sticky left-0 z-10 bg-surface pr-3">
+            <span className="sr-only">Value</span>
+          </th>
           {Array.from({ length: nibbles }, (_, n) => {
             const high = top - 1 - n * 4;
             return (

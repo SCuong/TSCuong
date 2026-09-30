@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { inflateSync, strToU8, zipSync } from 'fflate';
-import { buildTree, crc32, dosDateTime, entryDataRange, readZipDirectory, safeEntryPath, savedPercent, ZipError } from './zip';
+import { deflateSync, inflateSync, strToU8, zipSync } from 'fflate';
+import {
+  buildTree,
+  crc32,
+  decodeCp437,
+  dosDateTime,
+  entryDataRange,
+  inflateLimited,
+  readZipDirectory,
+  safeEntryPath,
+  savedPercent,
+  ZipError,
+} from './zip';
 
 const reader = (bytes: Uint8Array) => async (s: number, e: number) => bytes.slice(s, e);
 
@@ -137,5 +148,117 @@ describe('helpers', () => {
     expect(safeEntryPath('../evil.txt')).toBeNull();
     expect(safeEntryPath('a/../../evil')).toBeNull();
     expect(safeEntryPath('C:/Windows/x')).toBeNull();
+  });
+});
+
+/** A minimal ZIP writer with full control over name bytes, flags and extra fields (fflate always writes UTF-8). */
+function rawZip(entries: Array<{ name: Uint8Array; data: Uint8Array; flags?: number; extra?: Uint8Array }>, prefix = new Uint8Array(0)) {
+  const parts: Uint8Array[] = [prefix];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  for (const e of entries) {
+    const extra = e.extra ?? new Uint8Array(0);
+    const lh = new Uint8Array(30);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(6, e.flags ?? 0, true);
+    lv.setUint32(14, crc32(e.data), true);
+    lv.setUint32(18, e.data.length, true);
+    lv.setUint32(22, e.data.length, true);
+    lv.setUint16(26, e.name.length, true);
+    lv.setUint16(28, extra.length, true);
+    parts.push(lh, e.name, extra, e.data);
+    const ch = new Uint8Array(46);
+    const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(8, e.flags ?? 0, true);
+    cv.setUint32(16, crc32(e.data), true);
+    cv.setUint32(20, e.data.length, true);
+    cv.setUint32(24, e.data.length, true);
+    cv.setUint16(28, e.name.length, true);
+    cv.setUint16(30, extra.length, true);
+    cv.setUint32(42, offset, true); // relative to the archive start, as SFX builders write them
+    central.push(ch, e.name, extra);
+    offset += 30 + e.name.length + extra.length + e.data.length;
+  }
+  const cdSize = central.reduce((n, c) => n + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+  const all = [...parts, ...central, eocd];
+  const out = new Uint8Array(all.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of all) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+
+describe('names without the UTF-8 flag', () => {
+  it('decodes code page 437, the ZIP default, instead of Latin-1', async () => {
+    // Regression: "Müller.txt" (81 = ü in CP437) showed as "Mller.txt" with an invisible U+0081.
+    const zip = rawZip([{ name: Uint8Array.from([0x4d, 0x81, 0x6c, 0x6c, 0x65, 0x72, 0x2e, 0x74, 0x78, 0x74]), data: strToU8('x') }]);
+    expect((await dir(zip)).entries[0].name).toBe('Müller.txt');
+    expect(decodeCp437(Uint8Array.from([0x84, 0x94, 0xe1, 0x9c, 0xff]))).toBe(`äöß£${String.fromCharCode(0xa0)}`);
+  });
+
+  it('prefers valid UTF-8, and the Info-ZIP Unicode Path field when its CRC matches', async () => {
+    const legacy = Uint8Array.from([0x53, 0x84, 0x75, 0x72, 0x65, 0x2e, 0x74, 0x78, 0x74]); // "Säure.txt" in CP437
+    const unicode = strToU8('Säure-ü.txt');
+    const field = (crc: number) => {
+      const f = new Uint8Array(9 + unicode.length);
+      const v = new DataView(f.buffer);
+      v.setUint16(0, 0x7075, true);
+      v.setUint16(2, 5 + unicode.length, true);
+      f[4] = 1;
+      v.setUint32(5, crc, true);
+      f.set(unicode, 9);
+      return f;
+    };
+    const zip = rawZip([
+      { name: strToU8('plain-utf8-ü.txt'), data: strToU8('a') },
+      { name: legacy, data: strToU8('b'), extra: field(crc32(legacy)) },
+      { name: legacy, data: strToU8('c'), extra: field(12345) },
+    ]);
+    const names = (await dir(zip)).entries.map((e) => e.name);
+    expect(names).toEqual(['plain-utf8-ü.txt', 'Säure-ü.txt', 'Säure.txt']);
+  });
+});
+
+describe('self-extracting archives', () => {
+  it('finds entries when data is prepended to the archive', async () => {
+    // Regression: offsets are relative to the archive start, so SFX files were reported as corrupt.
+    const zip = rawZip([{ name: strToU8('inside.txt'), data: strToU8('inside sfx') }], new Uint8Array(4096).fill(0x4d));
+    const d = await dir(zip);
+    expect(d.entries[0].name).toBe('inside.txt');
+    const [s, e] = await entryDataRange(d.entries[0], zip.length, reader(zip));
+    expect(new TextDecoder().decode(zip.slice(s, e))).toBe('inside sfx');
+  });
+});
+
+describe('inflateLimited', () => {
+  const data = strToU8('abc'.repeat(10_000));
+  const compressed = deflateSync(data);
+
+  it('inflates to the declared size', async () => {
+    const out = await inflateLimited(compressed, data.length);
+    expect(out.length).toBe(data.length);
+    expect(new TextDecoder().decode(out)).toBe('abc'.repeat(10_000));
+    expect(crc32(out)).toBe(crc32(data));
+  });
+
+  it('refuses output beyond the declared size (zip bomb)', async () => {
+    // Regression: a 64 KB entry declaring 10 bytes was inflated to 64 MB in memory before the size check.
+    const bomb = deflateSync(new Uint8Array(8 * 1024 * 1024));
+    await expect(inflateLimited(bomb, 10)).rejects.toThrow(/expands beyond the size the archive declares/);
+  });
+
+  it('reports corrupt data in words', async () => {
+    await expect(inflateLimited(Uint8Array.from([0xff, 0xff, 0xff, 0xff]), 100)).rejects.toThrow('The compressed data is corrupt.');
   });
 });

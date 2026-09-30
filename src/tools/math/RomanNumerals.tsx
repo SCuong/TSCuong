@@ -21,7 +21,7 @@ function Breakdown({ parts }: { parts: RomanPart[] }) {
     } else groups.push({ ...p });
   }
   return (
-    <div className="flex flex-wrap items-stretch gap-1.5" aria-label="Breakdown">
+    <div className="flex flex-wrap items-stretch gap-1.5" role="group" aria-label="Symbol breakdown">
       {groups.map((g, i) => (
         <div key={i} className="flex items-center gap-1.5">
           {i > 0 && <span className="text-fg-muted">+</span>}

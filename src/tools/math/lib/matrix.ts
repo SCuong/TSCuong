@@ -10,6 +10,13 @@ export class MatrixError extends Error {
 }
 
 export const MAX_SIZE = 6;
+/** Longest accepted cell text (a 60-digit number or a long fraction still fits). */
+export const MAX_CELL_LENGTH = 64;
+/**
+ * Exact arithmetic slows down quadratically as numbers grow, so powers stop before any entry would need
+ * more than this many bits (numerator + denominator, roughly 2,400 decimal digits).
+ */
+export const MAX_ENTRY_BITS = 8_000;
 
 export function dims(m: Matrix): [number, number] {
   return [m.length, m[0]?.length ?? 0];
@@ -25,6 +32,9 @@ export function parseMatrix(cells: string[][], name: string): Matrix {
   return cells.map((row, i) =>
     row.map((cell, j) => {
       if (!cell.trim()) throw new MatrixError(`${name}[${i + 1},${j + 1}] is empty.`);
+      if (cell.trim().length > MAX_CELL_LENGTH) {
+        throw new MatrixError(`${name}[${i + 1},${j + 1}] is too long (at most ${MAX_CELL_LENGTH} characters).`);
+      }
       const f = Fraction.parse(cell);
       if (!f) throw new MatrixError(`${name}[${i + 1},${j + 1}] "${cell.trim()}" is not a number (use 3, -1.5 or 2/3).`);
       return f;
@@ -158,12 +168,40 @@ export function power(a: Matrix, exp: number): Matrix {
   let base = exp < 0 ? inverse(a) : a;
   let e = Math.abs(exp);
   let result = identity(a.length);
+  const guard = (x: Matrix, y: Matrix) => {
+    // A product's entries need at most about bits(x) + bits(y) bits (plus a few for the sums).
+    if (entryBits(x) + entryBits(y) > MAX_ENTRY_BITS) {
+      throw new MatrixError(
+        `A^${exp} is too large to compute exactly: its entries would have more than about ${Math.round(MAX_ENTRY_BITS * Math.log10(2)).toLocaleString('en-US')} digits. Use a smaller exponent or smaller entries.`,
+      );
+    }
+  };
   while (e > 0) {
-    if (e & 1) result = multiply(result, base);
-    base = multiply(base, base);
+    if (e & 1) {
+      guard(result, base);
+      result = multiply(result, base);
+    }
     e >>= 1;
+    // The last squaring is never used, and it is the most expensive one.
+    if (e > 0) {
+      guard(base, base);
+      base = multiply(base, base);
+    }
   }
   return result;
+}
+
+/** Largest numerator + denominator size, in bits, over the entries of `m`. */
+export function entryBits(m: Matrix): number {
+  let max = 0;
+  for (const row of m) {
+    for (const v of row) {
+      const n = v.num < 0n ? -v.num : v.num;
+      const bits = n.toString(16).length * 4 + v.den.toString(16).length * 4;
+      if (bits > max) max = bits;
+    }
+  }
+  return max;
 }
 
 export function toStrings(m: Matrix, mode: 'fraction' | 'decimal', digits = 8): string[][] {

@@ -132,6 +132,7 @@ function ScaleCard() {
   const [value, setValue] = useToolState(TOOL, 'scaleValue', '1280');
 
   const result = useMemo(() => {
+    if (!ratio.trim()) return null;
     const r = parseRatio(ratio);
     if (!r.ok) return r;
     if (r.value.length !== 2) return { ok: false as const, error: 'Use a two-term ratio (width:height) for scaling.' };
@@ -152,6 +153,7 @@ function ScaleCard() {
           <button
             key={p}
             type="button"
+            aria-pressed={ratio.replace(/\s/g, '') === p}
             onClick={() => setRatio(p)}
             className={cn(
               'h-7 rounded-md border px-2 font-mono text-[12.5px]',

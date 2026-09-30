@@ -187,6 +187,23 @@ describe('formatResult', () => {
     expect(formatResult(1.5e-12)).toBe('1.5e-12');
     expect(formatResult(2 ** 53)).toBe('9007199254740992');
   });
+
+  it('never replaces integer digits with made-up zeros', () => {
+    // Regression: rounding to 12 significant digits turned these into 123456789012000 and 1234567890120.
+    expect(formatResult(evaluate('123456789012345 + 0.5'))).toBe('123456789012346');
+    expect(formatResult(evaluate('1234567890123.25'))).toBe('1234567890123.25');
+    expect(formatResult(evaluate('123456789012 + 0.25'))).toBe('123456789012.25');
+    expect(formatResult(-1234567890123.25)).toBe('-1234567890123.25');
+  });
+
+  it('uses scientific notation beyond exact double precision instead of wrong digits', () => {
+    // 2^64 used to print as 18446744073709552000 and 3^40 as 12157665459056929000.
+    expect(formatResult(evaluate('2^64'))).toBe('1.84467440737e+19');
+    expect(formatResult(evaluate('3^40'))).toBe('1.21576654591e+19');
+    expect(formatResult(evaluate('10^15'))).toBe('1000000000000000');
+    expect(formatResult(evaluate('10^16'))).toBe('1e+16');
+    expect(formatResult(1234567890123456.5)).toBe('1.23456789012e+15');
+  });
 });
 
 describe('tokenize', () => {

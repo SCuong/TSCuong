@@ -500,17 +500,30 @@ export function evaluateNode(node: Node, vars: ReadonlyMap<string, number>, opts
   return result;
 }
 
-/** Remove floating point noise: 0.1 + 0.2 → 0.3, while keeping up to 12 significant digits. */
+/** Largest magnitude up to which every whole number is exactly representable as a double. */
+const EXACT_INTEGER_LIMIT = 2 ** 53;
+
+/**
+ * Display a double without binary floating-point noise (0.1 + 0.2 → 0.3) and without inventing digits:
+ * - whole numbers up to 2^53 are exact and shown in full;
+ * - other values keep `significant` digits, but never round away digits of the integer part
+ *   (123456789012.25 stays 123456789012.25 instead of becoming 123456789012);
+ * - magnitudes from 1e15 up (where doubles no longer hold every digit, e.g. 2^64) and tiny ones use
+ *   scientific notation, so the display never shows made-up trailing digits such as 18446744073709552000.
+ */
 export function formatResult(value: number, significant = 12): string {
-  if (Object.is(value, -0)) return '0';
-  if (Number.isInteger(value) && Math.abs(value) < 1e21) return value.toString();
+  if (value === 0) return '0';
   const abs = Math.abs(value);
-  if (abs !== 0 && (abs >= 1e21 || abs < 1e-9)) {
+  if (Number.isInteger(value) && abs <= EXACT_INTEGER_LIMIT) return value.toString();
+  if (abs >= 1e15 || abs < 1e-9) {
     const [mantissa, exp] = value.toExponential(significant - 1).split('e');
     return `${mantissa.replace(/\.?0+$/, '')}e${exp}`;
   }
-  const rounded = Number(value.toPrecision(significant));
-  return rounded.toString();
+  // Keep every integer digit plus two decimals, capped at the ~15 digits a double reliably holds.
+  const intDigits = abs >= 1 ? String(Math.trunc(abs)).length : 0;
+  const digits = Math.min(15, Math.max(significant, intDigits + 2));
+  const rounded = Number(value.toPrecision(digits));
+  return Object.is(rounded, -0) ? '0' : rounded.toString();
 }
 
 export interface LineResult {

@@ -74,16 +74,21 @@ export function partName(fileName: string, index: number, total: number): string
   return `${fileName}.${String(index + 1).padStart(width, '0')}`;
 }
 
+/** Binary multiples (the keys are kept for saved settings; the UI shows KiB, MiB and GiB). */
 export const UNITS = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 } as const;
 export type Unit = keyof typeof UNITS;
+export const UNIT_LABELS: Record<Unit, string> = { B: 'bytes', KB: 'KiB', MB: 'MiB', GB: 'GiB' };
 
-/** Presets that fit common limits (email attachments, FAT32, discs). */
+/**
+ * Presets that really fit common limits. Email attachments are Base64-encoded (about 4/3 larger) and the
+ * limit counts the encoded message, so a part must stay well below the advertised size.
+ */
 export const SIZE_PRESETS: Array<{ label: string; bytes: number }> = [
-  { label: '10 MB (email)', bytes: 10 * UNITS.MB },
-  { label: '25 MB (Gmail)', bytes: 25 * UNITS.MB },
-  { label: '100 MB', bytes: 100 * UNITS.MB },
-  { label: '700 MB (CD)', bytes: 700 * UNITS.MB },
-  { label: '4 GB − 1 (FAT32)', bytes: 4 * UNITS.GB - 1 },
+  { label: '7 MiB (fits 10 MB email limits)', bytes: 7 * UNITS.MB },
+  { label: '17 MiB (fits 25 MB email limits)', bytes: 17 * UNITS.MB },
+  { label: '100 MiB', bytes: 100 * UNITS.MB },
+  { label: '700 MiB (CD)', bytes: 700 * UNITS.MB },
+  { label: '4 GiB − 1 byte (FAT32 maximum)', bytes: 4 * UNITS.GB - 1 },
 ];
 
 export interface PartInfo<T> {

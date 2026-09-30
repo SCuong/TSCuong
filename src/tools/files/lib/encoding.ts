@@ -173,19 +173,36 @@ export function detectEncoding(bytes: Uint8Array, truncated = false): Detection 
       break;
     }
   }
-  if (ascii)
+  if (ascii) {
+    // 7-bit Japanese mail/news text switches character sets with escape sequences (ESC $ B … ESC ( B).
+    if (hasIso2022JpEscapes(sample))
+      return {
+        encoding: 'iso-2022-jp',
+        bom: null,
+        reason: 'ISO-2022-JP escape sequences (7-bit Japanese).',
+        confidence: 'high',
+      };
     return {
       encoding: 'utf-8',
       bom: null,
       reason: 'Plain ASCII: identical in UTF-8 and most legacy encodings.',
       confidence: 'high',
     };
+  }
   if (isValidUtf8(bytes, truncated))
     return {
       encoding: 'utf-8',
       bom: null,
       reason: 'Valid UTF-8 with multi-byte characters.',
       confidence: 'high',
+    };
+  const legacy = guessLegacyEncoding(sample, truncated || sample.length < bytes.length);
+  if (legacy)
+    return {
+      encoding: legacy.label,
+      bom: null,
+      reason: `Not valid UTF-8. The bytes read as ${legacy.what} in ${encodingName(legacy.label)}, but that is a guess: pick another encoding if the preview looks wrong.`,
+      confidence: 'guess',
     };
   return {
     encoding: 'windows-1252',
@@ -194,6 +211,99 @@ export function detectEncoding(bytes: Uint8Array, truncated = false): Detection 
       'Not valid UTF-8, so this is a legacy 8-bit encoding. Western (Windows-1252) is a guess: pick another if the preview looks wrong.',
     confidence: 'guess',
   };
+}
+
+function hasIso2022JpEscapes(bytes: Uint8Array): boolean {
+  for (let i = 0; i + 2 < bytes.length; i++) {
+    if (bytes[i] !== 0x1b) continue;
+    const a = bytes[i + 1];
+    const b = bytes[i + 2];
+    // ESC $ @ / ESC $ B (JIS X 0208) and ESC ( J (JIS X 0201 Roman).
+    if ((a === 0x24 && (b === 0x40 || b === 0x42)) || (a === 0x28 && b === 0x4a)) return true;
+  }
+  return false;
+}
+
+/** A regex character class from code point ranges (built at run time so the source stays ASCII). */
+const charClass = (...ranges: Array<[number, number]>) =>
+  new RegExp(`[${ranges.map(([a, b]) => `${String.fromCharCode(a)}-${String.fromCharCode(b)}`).join('')}]`);
+/** Hiragana and Katakana. */
+const KANA = charClass([0x3040, 0x30ff]);
+/** Hangul syllables and compatibility jamo. */
+const HANGUL = charClass([0xac00, 0xd7af], [0x3130, 0x318f]);
+/** CJK punctuation, CJK ideographs (incl. extension A) and full-width forms. */
+const HAN_OR_CJK_PUNCTUATION = charClass([0x3000, 0x303f], [0x3400, 0x4dbf], [0x4e00, 0x9fff], [0xff00, 0xffef]);
+const LATIN_LETTER = /[A-Za-z]/;
+
+/** Strict decode, tolerating a multi-byte character cut off at the end of a truncated sample. */
+function strictDecode(bytes: Uint8Array, label: string, truncated: boolean): string | null {
+  const decoder = new TextDecoder(label, { fatal: true });
+  for (let cut = 0; cut <= (truncated ? 2 : 0) && cut < bytes.length; cut++) {
+    try {
+      return decoder.decode(bytes.subarray(0, bytes.length - cut));
+    } catch {
+      // try a shorter slice
+    }
+  }
+  return null;
+}
+
+/**
+ * Conservative guesses for common non-Western legacy encodings. Returns null (keep the Western guess)
+ * unless the evidence is strong: East Asian text must decode without a single error, be dense in
+ * non-ASCII bytes and read as runs of CJK characters (misread Western text puts "CJK" next to Latin
+ * letters); Cyrillic single-byte text is almost entirely high bytes.
+ */
+export function guessLegacyEncoding(bytes: Uint8Array, truncated = false): { label: string; what: string } | null {
+  let high = 0;
+  let letters = 0;
+  for (const b of bytes) {
+    if (b >= 0x80) high++;
+    else if ((b | 0x20) >= 0x61 && (b | 0x20) <= 0x7a) letters++;
+  }
+  if (high < 4) return null;
+  const density = high / bytes.length;
+  /** `script` must make up at least `minShare` of the CJK characters (kana in Japanese, Hangul in Korean). */
+  const eastAsian = (label: string, script: RegExp, minShare: number): boolean => {
+    if (density < 0.2) return false;
+    const text = strictDecode(bytes, label, truncated);
+    if (text === null) return false;
+    let cjk = 0;
+    let wanted = 0;
+    let touchingLatin = 0;
+    const chars = Array.from(text);
+    chars.forEach((ch, i) => {
+      if (ch.charCodeAt(0) < 0x80) return;
+      if (HAN_OR_CJK_PUNCTUATION.test(ch) || KANA.test(ch) || HANGUL.test(ch)) {
+        cjk++;
+        if (LATIN_LETTER.test(chars[i - 1] ?? '') || LATIN_LETTER.test(chars[i + 1] ?? '')) touchingLatin++;
+      }
+      if (script.test(ch)) wanted++;
+    });
+    const nonAscii = chars.filter((c) => c.charCodeAt(0) >= 0x80).length;
+    return nonAscii >= 2 && cjk / nonAscii >= 0.9 && wanted / cjk >= minShare && touchingLatin / cjk < 0.2;
+  };
+  // Chinese bytes also decode as (mostly Hanja) Korean or (kanji) Japanese, so those need their own script.
+  if (eastAsian('shift_jis', KANA, 0.2)) return { label: 'shift_jis', what: 'Japanese text' };
+  if (eastAsian('euc-jp', KANA, 0.2)) return { label: 'euc-jp', what: 'Japanese text' };
+  // Modern Korean is ~95% Hangul; Chinese read as EUC-KR comes out about half Hangul, half Hanja.
+  if (eastAsian('euc-kr', HANGUL, 0.8)) return { label: 'euc-kr', what: 'Korean text' };
+  if (eastAsian('gbk', HAN_OR_CJK_PUNCTUATION, 0.9)) return { label: 'gbk', what: 'Chinese text' };
+  if (eastAsian('big5', HAN_OR_CJK_PUNCTUATION, 0.9)) return { label: 'big5', what: 'Chinese text' };
+  // Russian, Ukrainian, Bulgarian…: words are made of high bytes only. Lowercase letters dominate text;
+  // they are 0xE0–0xFF in Windows-1251 but 0xC0–0xDF in KOI8-R.
+  if (high / (high + letters) >= 0.6) {
+    let upperHalf = 0;
+    let lowerHalf = 0;
+    for (const b of bytes) {
+      if (b >= 0xe0) upperHalf++;
+      else if (b >= 0xc0) lowerHalf++;
+    }
+    if (upperHalf + lowerHalf >= high * 0.8) {
+      return upperHalf >= lowerHalf ? { label: 'windows-1251', what: 'Cyrillic text' } : { label: 'koi8-r', what: 'Cyrillic text' };
+    }
+  }
+  return null;
 }
 
 export interface Decoded {

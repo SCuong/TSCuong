@@ -148,3 +148,15 @@ describe('inspectBytes', () => {
     expect(byteToChar(0)).toBe('·');
   });
 });
+
+describe('case-insensitive text search', () => {
+  it('finds non-ASCII text in any ASCII case', async () => {
+    // Regression: the whole needle was lower-cased, so "Ärger" became "ärger", whose UTF-8 bytes never match "Ärger".
+    const buf = new TextEncoder().encode('xx Hello Ärger xx');
+    const p = textPattern('hello ärger', true) as Pattern;
+    expect(findAll(buf, p)).toEqual([]);
+    const q = textPattern('HELLO Ärger', true) as Pattern;
+    expect(findAll(buf, q)).toEqual([3]);
+    expect(await searchFile(async (s, e) => buf.slice(s, e), buf.length, q, 0, 'forward', { chunkSize: 4 })).toBe(3);
+  });
+});

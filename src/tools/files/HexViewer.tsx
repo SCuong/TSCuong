@@ -306,6 +306,7 @@ export default function HexViewer() {
   const inspectRows = inspectBytes(inspect);
   const u8 = utf8At(inspect);
   const selLen = selEnd - selStart + 1;
+  const cursorByte = size ? cache?.byte(cursor) : undefined;
 
   return (
     <ToolStack>
@@ -331,9 +332,12 @@ export default function HexViewer() {
                 ref={viewRef}
                 id="hex-dump"
                 tabIndex={0}
-                role="grid"
+                // Not a grid: rows are drawn on demand, so a focusable region plus an announced status line
+                // (offset, value, selection) is what screen readers can actually use.
+                role="region"
+                aria-roledescription="hex dump"
                 aria-label="Hex dump. Use arrow keys, Page Up/Down, Home/End; Shift extends the selection."
-                aria-rowcount={totalRows}
+                aria-describedby="hex-status"
                 onKeyDown={onKeyDown}
                 onWheel={onWheel}
                 onPointerDown={(e) => {
@@ -404,10 +408,19 @@ export default function HexViewer() {
                 />
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 font-mono text-[12px] text-fg-muted">
+            <div
+              id="hex-status"
+              aria-live="polite"
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 font-mono text-[12px] text-fg-muted"
+            >
               <span>
                 Offset <span className="text-fg">0x{toHex(cursor, offWidth)}</span> ({cursor.toLocaleString()})
               </span>
+              {cursorByte !== undefined && (
+                <span>
+                  Value <span className="text-fg">0x{toHex(cursorByte, 2)}</span> ({cursorByte})
+                </span>
+              )}
               {selLen > 1 && (
                 <span>
                   Selection <span className="text-fg">{selLen.toLocaleString()}</span> bytes (0x{toHex(selStart, offWidth)}–0x

@@ -22,6 +22,8 @@ import {
   type SortMode,
 } from './lib/rename';
 import { buildZip } from './lib/zipBuild';
+import { existingFiles } from './lib/folderWrite';
+import { useOverwritePrompt } from './components/OverwritePrompt';
 
 interface Item {
   id: number;
@@ -55,6 +57,7 @@ export default function BatchRenamer() {
   const [error, setError] = useState<string | null>(null);
   const patternRef = useRef<HTMLInputElement>(null);
   const job = useAsyncJob();
+  const overwrite = useOverwritePrompt();
   const o: RenameOptions = { ...DEFAULT_OPTIONS, ...opts };
   const set = <K extends keyof RenameOptions>(key: K, value: RenameOptions[K]) =>
     setOpts((prev) => ({ ...DEFAULT_OPTIONS, ...prev, [key]: value }));
@@ -128,20 +131,45 @@ export default function BatchRenamer() {
     } catch {
       return;
     }
+    // Never replace files silently: in the originals' own folder that could destroy an original that
+    // hasn't been copied yet (a→b while b is still waiting to be copied).
+    let existing: Set<string>;
+    try {
+      existing = new Set(await existingFiles(root, computed.names));
+    } catch (e) {
+      setError(errorMessage(e, 'The folder could not be read.'));
+      return;
+    }
+    let keepExisting = false;
+    if (existing.size) {
+      const choice = await overwrite.ask(
+        [...existing],
+        'If this is the folder the originals are in, choose another folder: replacing can overwrite originals before they are copied.',
+      );
+      if (choice === 'cancel') return;
+      keepExisting = choice === 'skip';
+    }
+    let saved = 0;
+    let kept = 0;
     try {
       await job.run(async ({ signal, progress }) => {
         for (let i = 0; i < sorted.length; i++) {
           if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
           progress(i / sorted.length, computed.names[i]);
+          if (keepExisting && existing.has(computed.names[i])) {
+            kept++;
+            continue;
+          }
           const handle = await root.getFileHandle(computed.names[i], {
             create: true,
           });
           const w = await handle.createWritable();
           await w.write(sorted[i].file);
           await w.close();
+          saved++;
         }
       });
-      toast(`Saved ${pluralize(sorted.length, 'renamed copy', 'renamed copies')}.`);
+      toast(`Saved ${pluralize(saved, 'renamed copy', 'renamed copies')}${kept ? `; kept ${pluralize(kept, 'existing file')}` : ''}.`);
     } catch (e) {
       if (!(e instanceof DOMException && e.name === 'AbortError')) setError(errorMessage(e, 'Could not save the files.'));
     }
@@ -149,6 +177,7 @@ export default function BatchRenamer() {
 
   return (
     <ToolStack>
+      {overwrite.dialog}
       <FileDrop
         multiple
         onFiles={add}
@@ -320,7 +349,9 @@ export default function BatchRenamer() {
                     <th className="w-10 px-2 py-2 text-right font-medium sm:px-3">#</th>
                     <th className="hidden px-3 py-2 font-medium sm:table-cell">Original</th>
                     <th className="px-3 py-2 font-medium">New name</th>
-                    <th className="w-8 px-2 py-2" />
+                    <th className="w-8 px-2 py-2">
+                      <span className="sr-only">Remove</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -328,7 +359,8 @@ export default function BatchRenamer() {
                     const name = computed.names[i];
                     const p = problems[i];
                     return (
-                      <tr key={it.id} className={cn('border-b border-line last:border-0', p.length > 0 && 'bg-danger-soft')}>
+                      // No row tint: the red badges on a tinted row fell below 4.5:1 contrast. The name and badges carry it.
+                      <tr key={it.id} className="border-b border-line last:border-0">
                         <td className="px-2 py-1.5 text-right align-top font-mono text-[12px] text-fg-muted tabular-nums sm:px-3 sm:align-middle">
                           {i + 1}
                         </td>

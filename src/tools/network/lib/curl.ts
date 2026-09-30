@@ -886,6 +886,30 @@ export function parseCurl(command: string): ParsedCurl {
   } catch {
     throw new CurlParseError(`"${urls[0]}" is not a valid URL.`);
   }
+  // curl sends "user:password@" from the URL as Basic auth unless -u is given. The generated code must not
+  // keep them in the URL: fetch() refuses such URLs and other libraries would leak them into logs.
+  const userinfo = /^([a-z][a-z0-9+.-]*:\/\/)([^/?#]*)@/i.exec(url);
+  if (userinfo) {
+    url = userinfo[1] + url.slice(userinfo[0].length);
+    if (auth) {
+      warnings.push('The credentials in the URL were dropped because -u takes precedence (as in curl).');
+    } else {
+      const decode = (s: string) => {
+        try {
+          return decodeURIComponent(s);
+        } catch {
+          return s;
+        }
+      };
+      const colon = userinfo[2].indexOf(':');
+      auth = {
+        type: 'basic',
+        user: decode(colon < 0 ? userinfo[2] : userinfo[2].slice(0, colon)),
+        password: colon < 0 ? '' : decode(userinfo[2].slice(colon + 1)),
+      };
+      warnings.push('The user name and password in the URL are sent as Basic authentication, as curl does.');
+    }
+  }
 
   if (userAgent !== undefined && !hasHeader(headers, 'User-Agent')) headers.push({ name: 'User-Agent', value: userAgent });
   if (referer !== undefined && !hasHeader(headers, 'Referer')) headers.push({ name: 'Referer', value: referer });

@@ -251,6 +251,7 @@ function Presets({ items, onPick }: { items: Array<{ label: string; title?: stri
           key={item.label}
           type="button"
           title={item.title}
+          aria-pressed={item.active}
           onClick={() => onPick(i)}
           className={cn(
             'h-7 rounded-md border px-2 text-[12.5px] whitespace-nowrap',

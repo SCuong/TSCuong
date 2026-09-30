@@ -184,4 +184,42 @@ describe('matrix operations', () => {
     const inv = inverse(big);
     expect(S(multiply(big, inv))).toEqual(S(identity(6)));
   });
+
+  it('stops huge exact powers instead of freezing the page', () => {
+    // Regression: a 6x6 matrix with a 1e400/7 cell raised to the 64th power ran for over 10 minutes.
+    const grid = (corner: string) =>
+      Array.from({ length: 6 }, (_, i) => Array.from({ length: 6 }, (_, j) => (i === 0 && j === 0 ? corner : `${i * 6 + j + 1}/${(i % 5) + 2}`)));
+    const started = Date.now();
+    expect(() => power(M(grid('1e400/7')), 64)).toThrow(/too large to compute exactly/);
+    expect(Date.now() - started).toBeLessThan(2000);
+    // Ordinary powers still work.
+    expect(power(M(grid('1/7')), 64)[0][0].isZero()).toBe(false);
+  });
+
+  it('rejects overlong cells', () => {
+    expect(() => parseMatrix([['1'.repeat(65)]], 'A')).toThrow('A[1,1] is too long (at most 64 characters).');
+  });
+});
+
+describe('Fraction formatting', () => {
+  it('rejects ambiguous chained fraction bars', () => {
+    // Regression: "1/2/3" silently parsed as 1 / (2/3) = 3/2.
+    expect(Fraction.parse('1/2/3')).toBeNull();
+    expect(Fraction.parse('-1.5/2')?.toString()).toBe('-3/4');
+  });
+
+  it('keeps integer digits in decimal mode', () => {
+    // Regression: 12345678901/2 showed as 6172839500.
+    expect(new Fraction(12345678901n, 2n).toDecimal(8)).toBe('6172839450.5');
+    expect(new Fraction(-1n, 3n).toDecimal(6)).toBe('-0.333333');
+  });
+
+  it('formats values beyond the double range exactly', () => {
+    // Regression: these rendered as "Infinityeundefined" and "0".
+    expect(new Fraction(10n ** 400n, 3n).toDecimal(8)).toBe('3.3333333e+399');
+    expect(new Fraction(-(10n ** 400n) * 2n, 3n).toDecimal(4)).toBe('-6.667e+399');
+    expect(new Fraction(1n, 3n * 10n ** 400n).toDecimal(8)).toBe('3.3333333e-401');
+    expect(new Fraction(999999n, 1000000n * 10n ** 20n).toExponential(3)).toBe('1e-20');
+    expect(new Fraction(1n, 3n).toExponential(5)).toBe('3.3333e-1');
+  });
 });

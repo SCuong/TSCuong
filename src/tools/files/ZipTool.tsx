@@ -23,13 +23,16 @@ import { EmptyState, ProgressBar, Spinner } from '@/components/ui/Feedback';
 import { Dialog } from '@/components/ui/Dialog';
 import { toast } from '@/components/ui/Toast';
 import { useAsyncJob, useObjectUrl } from '@/lib/hooks';
-import { cn, downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
+import { downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { RangeField } from './components/RangeField';
+import { useOverwritePrompt } from './components/OverwritePrompt';
 import { collectEntries, droppedDirectories } from './lib/folderDrop';
+import { ensureFolder, existingFiles } from './lib/folderWrite';
 import {
   buildTree,
   crc32,
   entryDataRange,
+  inflateLimited,
   readZipDirectory,
   safeEntryPath,
   savedPercent,
@@ -38,13 +41,13 @@ import {
   type ZipDirectory,
   type ZipEntry,
 } from './lib/zip';
-import { buildZip, uniquePaths } from './lib/zipBuild';
+import { buildZip, uniquePaths, zipLimitProblem } from './lib/zipBuild';
 import { detectFileType } from './lib/magic';
 
 const MAX_EXTRACT = 1024 * 1024 * 1024;
 const PREVIEW_TEXT = 256 * 1024;
 
-async function extract(file: File, entry: ZipEntry): Promise<Uint8Array> {
+async function extract(file: File, entry: ZipEntry, signal?: AbortSignal): Promise<Uint8Array> {
   if (entry.encrypted) throw new ZipError('This entry is encrypted (password-protected). Encrypted ZIP entries are not supported.');
   if (!entry.supported)
     throw new ZipError(`This entry uses ${entry.methodName} compression, which is not supported here (only Stored and Deflate).`);
@@ -52,19 +55,16 @@ async function extract(file: File, entry: ZipEntry): Promise<Uint8Array> {
   const read = async (s: number, e: number) => new Uint8Array(await file.slice(s, e).arrayBuffer());
   const [start, end] = await entryDataRange(entry, file.size, read);
   const raw = await read(start, end);
-  let data: Uint8Array;
-  if (entry.method === 0) data = raw;
-  else {
-    const { inflate, inflateSync } = await import('fflate');
-    data =
-      raw.length < 512 * 1024
-        ? inflateSync(raw)
-        : await new Promise<Uint8Array>((resolve, reject) =>
-            inflate(raw, (err, out) => (err ? reject(new ZipError('The compressed data is corrupt.')) : resolve(out))),
-          );
-  }
+  // Inflate into at most the declared size, so a forged size can't exhaust memory.
+  const data = entry.method === 0 ? raw : await inflateLimited(raw, entry.size, signal);
   if (data.length !== entry.size || crc32(data) !== entry.crc32) throw new ZipError(`“${entry.name}” is corrupt (checksum mismatch).`);
   return data;
+}
+
+interface ExtractReport {
+  written: number;
+  kept: number;
+  problems: string[];
 }
 
 function isUtf8(bytes: Uint8Array): boolean {
@@ -177,13 +177,16 @@ export function OpenMode() {
     blob?: Blob;
     note?: string;
   } | null>(null);
+  const [report, setReport] = useState<ExtractReport | null>(null);
   const job = useAsyncJob();
   const previewUrl = useObjectUrl(preview?.blob);
+  const overwrite = useOverwritePrompt();
 
   async function load(f: File) {
     setLoading(true);
     setError(null);
     setDir(null);
+    setReport(null);
     setFile(f);
     try {
       const d = await readZipDirectory(f.size, async (s, e) => new Uint8Array(await f.slice(s, e).arrayBuffer()));
@@ -200,6 +203,8 @@ export function OpenMode() {
   const tree = useMemo(() => (dir ? buildTree(dir.entries) : null), [dir]);
   const encrypted = dir?.entries.filter((e) => e.encrypted).length ?? 0;
   const unsupported = dir?.entries.filter((e) => !e.encrypted && !e.supported && !e.isDirectory).length ?? 0;
+  // Names such as "../../x" or "C:/x" would escape the target folder ("zip slip").
+  const unsafe = useMemo(() => dir?.entries.filter((e) => safeEntryPath(e.name) === null).map((e) => e.name) ?? [], [dir]);
 
   async function download(e: ZipEntry) {
     try {
@@ -264,43 +269,67 @@ export function OpenMode() {
     } catch {
       return; // user cancelled
     }
-    const files = dir.entries.filter((e) => !e.isDirectory);
-    let written = 0;
-    const failed: string[] = [];
+    const plan = dir.entries.map((e) => ({ e, safe: safeEntryPath(e.name) }));
+    const files = plan.filter((p) => !p.e.isDirectory);
+    const folders = plan.filter((p) => p.e.isDirectory && p.safe);
+    // Ask before replacing anything that is already in the chosen folder.
+    let existing: Set<string>;
+    try {
+      existing = new Set(await existingFiles(root, files.filter((p) => p.safe && p.e.supported).map((p) => p.safe!)));
+    } catch (e) {
+      toast(errorMessage(e, 'The folder could not be read.'), 'error');
+      return;
+    }
+    let keepExisting = false;
+    if (existing.size) {
+      const choice = await overwrite.ask([...existing]);
+      if (choice === 'cancel') return;
+      keepExisting = choice === 'skip';
+    }
+    const result: ExtractReport = { written: 0, kept: 0, problems: [] };
+    setReport(null);
     try {
       await job.run(async ({ signal, progress }) => {
+        // Empty folders exist only as directory entries.
+        for (const { safe } of folders) await ensureFolder(root, safe!);
         for (let i = 0; i < files.length; i++) {
           if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-          const e = files[i];
+          const { e, safe } = files[i];
           progress(i / files.length, e.name);
-          const safe = safeEntryPath(e.name);
-          if (!safe || !e.supported) {
-            failed.push(e.name);
+          if (!safe) {
+            result.problems.push(`${e.name}: unsafe path (it would be written outside the folder)`);
+            continue;
+          }
+          if (!e.supported) {
+            result.problems.push(`${e.name}: ${e.encrypted ? 'encrypted' : `${e.methodName} compression is not supported`}`);
+            continue;
+          }
+          if (keepExisting && existing.has(safe)) {
+            result.kept++;
             continue;
           }
           try {
-            const data = await extract(file, e);
-            const parts = safe.split('/');
-            let folder = root;
-            for (const p of parts.slice(0, -1)) folder = await folder.getDirectoryHandle(p, { create: true });
-            const handle = await folder.getFileHandle(parts[parts.length - 1], {
-              create: true,
-            });
+            const data = await extract(file, e, signal);
+            const slash = safe.lastIndexOf('/');
+            const folder = await ensureFolder(root, slash >= 0 ? safe.slice(0, slash) : '');
+            const handle = await folder.getFileHandle(safe.slice(slash + 1), { create: true });
             const w = await handle.createWritable();
             await w.write(data as Uint8Array<ArrayBuffer>);
             await w.close();
-            written++;
-          } catch {
-            failed.push(e.name);
+            result.written++;
+          } catch (err) {
+            if (signal.aborted) throw err;
+            result.problems.push(`${e.name}: ${errorMessage(err, 'could not be written')}`);
           }
         }
       });
-      toast(
-        `Extracted ${pluralize(written, 'file')}${failed.length ? `, ${failed.length} skipped` : ''}.`,
-        failed.length ? 'info' : 'success',
-      );
+      setReport(result);
+      toast(`Extracted ${pluralize(result.written, 'file')}.`, result.problems.length ? 'info' : 'success');
     } catch (e) {
-      toast(errorMessage(e, 'Extraction failed.'), 'error');
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setReport(result);
+        toast(`Stopped after ${pluralize(result.written, 'file')}.`, 'info');
+      } else toast(errorMessage(e, 'Extraction failed.'), 'error');
     }
   }
 
@@ -359,9 +388,36 @@ export function OpenMode() {
               here.
             </Alert>
           )}
+          {unsafe.length > 0 && (
+            <Alert tone="warning" title={`${pluralize(unsafe.length, 'entry', 'entries')} with an unsafe path`}>
+              {unsafe.slice(0, 3).map((n, i) => (
+                <span key={n}>
+                  {i > 0 && ', '}
+                  <code className="font-mono break-all">{n}</code>
+                </span>
+              ))}
+              {unsafe.length > 3 && '…'} would be written outside the chosen folder (a “zip slip”), so “Extract all” skips{' '}
+              {unsafe.length === 1 ? 'it' : 'them'}. Downloading one file saves it under its plain file name.
+            </Alert>
+          )}
           {dir.comment && (
             <Alert tone="info" title="Archive comment">
               {dir.comment}
+            </Alert>
+          )}
+          {report && (
+            <Alert
+              tone={report.problems.length ? 'warning' : 'success'}
+              title={`Extracted ${pluralize(report.written, 'file')}${report.kept ? `, kept ${pluralize(report.kept, 'existing file')}` : ''}${report.problems.length ? `, ${report.problems.length} not extracted` : ''}`}
+            >
+              {report.problems.length > 0 && (
+                <ul className="list-disc space-y-0.5 pl-4 break-all">
+                  {report.problems.slice(0, 20).map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                  {report.problems.length > 20 && <li>…and {report.problems.length - 20} more.</li>}
+                </ul>
+              )}
             </Alert>
           )}
           <Panel
@@ -427,6 +483,7 @@ export function OpenMode() {
           </Panel>
         </>
       )}
+      {overwrite.dialog}
       <Dialog
         open={Boolean(preview)}
         onClose={() => setPreview(null)}
@@ -464,11 +521,16 @@ interface Item {
 }
 let itemSeq = 0;
 
+const SHOWN_ITEMS = 500;
+
 export function CreateMode() {
   const [items, setItems] = useState<Item[]>([]);
+  /** Empty folders from dropped folders (the folder picker never reports them). */
+  const [emptyFolders, setEmptyFolders] = useState<string[]>([]);
   const [level, setLevel] = useState(6);
   const [name, setName] = useState('archive.zip');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const job = useAsyncJob();
   const folderInput = useRef<HTMLInputElement>(null);
 
@@ -495,14 +557,24 @@ export function CreateMode() {
     skipDrop.current = true;
     setTimeout(() => (skipDrop.current = false), 0);
     setScanning(true);
+    setNotice(null);
     collectEntries(dropped.entries)
-      .then(addPathed)
+      .then(({ files, emptyDirs, truncated }) => {
+        addPathed(files);
+        setEmptyFolders((list) => [...new Set([...list, ...emptyDirs])]);
+        if (truncated) setNotice(`The folder has more than ${files.length.toLocaleString()} files; only the first ${files.length.toLocaleString()} were added.`);
+      })
       .catch((e: unknown) => setError(errorMessage(e, 'Could not read the dropped folder.')))
       .finally(() => setScanning(false));
   }
 
   const total = items.reduce((n, i) => n + i.file.size, 0);
-  const paths = uniquePaths(items.map((i) => i.path));
+  const paths = useMemo(() => uniquePaths(items.map((i) => i.path)), [items]);
+  const renamed = paths.some((p, i) => p !== items[i].path);
+  const limitProblem = zipLimitProblem(
+    items.map((i) => ({ path: i.path, file: i.file })),
+    emptyFolders.length,
+  );
 
   async function create() {
     setError(null);
@@ -513,6 +585,7 @@ export function CreateMode() {
           level,
           (f) => progress(f, 'Compressing…'),
           signal,
+          emptyFolders,
         ),
       );
       const out = name.trim() ? (name.toLowerCase().endsWith('.zip') ? name.trim() : `${name.trim()}.zip`) : 'archive.zip';
@@ -549,7 +622,8 @@ export function CreateMode() {
         />
         <span className="text-[12.5px] text-fg-muted">Folder structure is kept when you add a folder.</span>
       </div>
-      <ErrorMessage error={error} />
+      <ErrorMessage error={error ?? limitProblem} />
+      {notice && <Alert tone="warning">{notice}</Alert>}
       {items.length > 0 && (
         <>
           <ToolBar>
@@ -566,40 +640,59 @@ export function CreateMode() {
               <Label htmlFor="zip-name">Archive name</Label>
               <Input id="zip-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <Button variant="primary" icon={FileArchive} loading={job.running} onClick={create}>
+            <Button variant="primary" icon={FileArchive} loading={job.running} disabled={Boolean(limitProblem)} onClick={create}>
               Create ZIP
             </Button>
           </ToolBar>
           {job.running && <ProgressBar value={job.progress} label={job.label || 'Compressing…'} onCancel={job.cancel} />}
           <Panel
             title={`${pluralize(items.length, 'file')} · ${formatBytes(total)}`}
+            description={[
+              emptyFolders.length ? `plus ${pluralize(emptyFolders.length, 'empty folder')}` : '',
+              renamed ? 'Files with the same path as another file are renamed.' : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
             bodyClassName="p-0"
             actions={
-              <Button size="sm" variant="ghost" onClick={() => setItems([])}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={job.running}
+                onClick={() => {
+                  setItems([]);
+                  setEmptyFolders([]);
+                  setNotice(null);
+                }}
+              >
                 Clear
               </Button>
             }
           >
             <ul className="max-h-[420px] divide-y divide-line overflow-y-auto">
-              {items.map((it, i) => (
+              {items.slice(0, SHOWN_ITEMS).map((it, i) => (
                 <li key={it.id} className="flex items-center gap-2 px-4 py-1.5 text-[13px]">
                   <FileIcon size={14} className="shrink-0 text-fg-muted" aria-hidden />
-                  <span
-                    className={cn('min-w-0 flex-1 truncate font-mono text-[12.5px]', paths[i] !== it.path ? 'text-warning' : 'text-fg')}
-                    title={paths[i]}
-                  >
+                  <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-fg" title={paths[i]}>
                     {paths[i]}
                   </span>
+                  {paths[i] !== it.path && <Badge tone="warning">renamed</Badge>}
                   <span className="font-mono text-[12px] text-fg-muted">{formatBytes(it.file.size)}</span>
                   <IconButton
                     icon={X}
                     size="sm"
                     label={`Remove ${it.path}`}
+                    disabled={job.running}
                     onClick={() => setItems((l) => l.filter((x) => x.id !== it.id))}
                   />
                 </li>
               ))}
             </ul>
+            {items.length > SHOWN_ITEMS && (
+              <p className="border-t border-line px-4 py-2 text-[12.5px] text-fg-muted">
+                Showing the first {SHOWN_ITEMS} of {items.length.toLocaleString()} files. All of them go into the ZIP.
+              </p>
+            )}
           </Panel>
         </>
       )}
