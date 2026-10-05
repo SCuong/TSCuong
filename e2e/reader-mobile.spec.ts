@@ -54,6 +54,43 @@ test('polished library and full reader fit the phone, with real selectable text'
   expect(a11y.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious')).toEqual([]);
 });
 
+for (const width of [320, 360]) {
+  test(`small phone ${width}px keeps reading controls and sheets usable`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 740 });
+    const file = { ...(await readingPdf()), name: 'Field notes — a long document title for a small phone.pdf' };
+    await open(page, file);
+    const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(await overflow()).toBeLessThanOrEqual(0);
+    for (const name of ['Back to library', 'Search document', 'Bookmark this page', 'Reading options']) {
+      const bounds = await page.getByRole('button', { name, exact: true }).boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    }
+    await page.getByRole('button', { name: 'Reading options', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Fit width', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fit page', exact: true })).toBeVisible();
+    expect(await page.getByRole('dialog').evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+    await page.getByRole('dialog').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    await page.screenshot({ path: `test-results/reader-small-${width}-options.png` });
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    await page.getByRole('button', { name: 'Pages', exact: true }).click();
+    await page.getByRole('button', { name: 'Go to page 5', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Jump to page', exact: true })).toHaveText('5 / 12');
+    await page.getByRole('button', { name: 'Search document', exact: true }).click();
+    await page.getByRole('searchbox', { name: 'Search in PDF' }).fill('documents close');
+    await expect(page.getByText('1 of 12 matches')).toBeVisible();
+    expect(await overflow()).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `test-results/reader-small-${width}-search.png` });
+    await page.getByRole('button', { name: 'Close search' }).click();
+    await page.getByRole('button', { name: 'Back to library' }).click();
+    await expect(page.getByRole('heading', { name: 'PDF Reader', exact: true })).toBeVisible();
+    expect(await overflow()).toBeLessThanOrEqual(0);
+  });
+}
+
 test('jump, favorites, page bookmarks, thumbnails and contents work and survive reopen', async ({ page }) => {
   await open(page);
   await jump(page, 5);
@@ -63,6 +100,9 @@ test('jump, favorites, page bookmarks, thumbnails and contents work and survive 
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'Pages', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Go to page 5', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: 'Go to page 5', exact: true }).locator('img').waitFor();
+  await page.getByRole('dialog').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  await page.screenshot({ path: 'test-results/reader-thumbnails.png' });
   await page.getByRole('button', { name: 'Bookmarks', exact: true }).click();
   await page.getByRole('button', { name: 'Page 5', exact: true }).click();
   await page.getByRole('button', { name: 'Pages', exact: true }).click();
@@ -132,6 +172,8 @@ test('double tap and pinch re-render sharply, fit modes and night reading work',
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await expect(page.locator('.reader-viewer')).toHaveClass(/reader-mode-night/);
   await expect(page.getByRole('button', { name: 'Zoom and appearance' })).toContainText('100%');
+  await expect(page.locator('[data-page="1"] canvas')).toBeVisible();
+  await page.screenshot({ path: 'test-results/reader-night.png' });
   await page.getByRole('button', { name: 'Reading options', exact: true }).click();
   await page.getByRole('button', { name: 'Fit width', exact: true }).click();
   await page.getByRole('button', { name: 'Sepia', exact: true }).click();
@@ -265,6 +307,7 @@ test('Vietnamese library and reader fit the phone and translate controls', async
   await expect(page.getByRole('button', { name: 'Về thư viện' })).toBeVisible();
   await page.getByRole('button', { name: 'Tùy chọn đọc', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Vừa chiều rộng' })).toBeVisible();
+  await page.getByRole('dialog').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   await page.screenshot({ path: 'test-results/reader-vietnamese.png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
 });

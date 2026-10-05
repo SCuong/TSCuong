@@ -11,6 +11,7 @@ src/main.tsx           fonts, global CSS, theme bootstrap, <App/>
 src/app/               router, shell layout, sidebar, command palette, pages, update prompt
 src/components/        shared UI primitives (ui/), CodeMirror wrapper (editor/), tool layout helpers (tool/)
 src/lib/               search, theme, persistence, backup, hooks, utilities, remote-content blocking
+src/reader/            standalone mobile PDF library, reader, OPFS cache, and reading metadata
 src/tools/types.ts     ToolDefinition — the registry contract
 src/tools/registry/    one metadata file per category + index.ts (aggregation, routing, search)
 src/tools/<category>/  tool components (default export) + lib/ (pure, unit-tested logic) + workers
@@ -53,8 +54,11 @@ phrase and word-order bonuses ("csv json" prefers CSV → JSON); and a small `pr
 | Favorites, pins, recents, usage, searches, settings | Versioned `localStorage` stores (`createPersistentStore`) | Validation + migrations; cross-tab sync via `storage` events. |
 | Small per-tool inputs and options | `useToolState` | Debounced, flushed on unmount/pagehide, size-capped, can be disabled in Settings. |
 | Notes, snippets, diagrams, API collections/environments/history, file indexes | IndexedDB (`src/lib/storage/db.ts`) | Ordered schema migrations, BroadcastChannel change notifications, in-memory fallback with a visible warning. |
+| PDF reader library, positions, favorites, bookmarks | Separate IndexedDB (`localkit-reader`) | SHA-256 document identities; serialized updates. |
+| Saved PDF copies | OPFS (`reader-files/`) | Bounded 20-PDF / 500 MiB cache; favorites protected from application eviction. |
 
-Settings → Backup exports/imports everything except file-search indexes (they hold file handles).
+Settings → Backup exports/imports LocalKit's original stores except file-search indexes (they hold file handles).
+The separate reader database and PDF binaries are excluded.
 
 ## Heavy work and engines
 
@@ -70,12 +74,18 @@ data) are copied from `node_modules` by `scripts/copy-engine-assets.mjs` into ve
 ## Build, bundles and offline
 
 - `vite.config.ts` routes chunks and workers that contain heavy engines to `assets/lazy/`.
-- The service worker (vite-plugin-pwa / Workbox, `registerType: 'prompt'`) precaches the shell and every light
-  chunk (~3.9 MB) and runtime-caches everything else under `/assets/`, `/pdfjs/` and `/ocr/` cache-first on first use.
+- The service worker (vite-plugin-pwa / Workbox, `registerType: 'prompt'`) precaches the shell, every light
+  chunk, and the PDF reader engine/worker/fonts/CMaps/WASM (~9.1 MB). It runtime-caches other engines under
+  `/assets/`, `/pdfjs/` and `/ocr/` cache-first on first use.
   Those URLs are content-hashed or versioned, so cache-first is always safe. API-client traffic is never cached.
 - `scripts/analyze-bundle.mjs` attributes the bytes of any chunk to source packages using source maps.
 - `e2e/pwa.spec.ts` verifies the manifest, the offline shell, and that Mermaid, SQLite and pdf-lib keep working
   offline after their first use.
+- The standalone `/read` and `/read/doc` routes reuse the PDF subsystem through `src/reader/`. PDF bytes live
+  only in OPFS; library metadata lives in the separate `localkit-reader` IndexedDB database. The saved-file cache
+  is bounded to 20 PDFs / 500 MiB and evicts non-favorites by last-opened time. The service-worker Share Target
+  stages incoming files locally. `e2e/reader-mobile.spec.ts` verifies first-ever offline PDF opening, position
+  recovery, local sharing, touch gestures, and small-phone layouts. See `MOBILE-PDF-READER.md` for the full design.
 
 ## Security and privacy boundaries
 

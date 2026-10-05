@@ -2,6 +2,8 @@
 
 Phase 1 adds a mobile reading experience to LocalKit. The desktop PDF Viewer and editing tools remain available at their existing routes. LocalKit still starts at its normal home page.
 
+**Phase 1 status: complete.** The build, unit tests, mobile/desktop e2e tests, offline tests, and Chrome device-emulation UX review have passed. Physical Android hardware and ADB are not required for this acceptance.
+
 ## Run this worktree
 
 The completed feature lives at:
@@ -16,7 +18,28 @@ Open http://localhost:4317/read. Node 20 or newer is required. Dependencies are 
 
 Development: `npm run dev`. Use the production preview for installation, offline operation, and Share Target testing; Vite development mode intentionally has no service worker.
 
-## Install on Android without publishing the site
+## Validate Phase 1 entirely in Chrome
+
+Physical Android hardware, USB debugging, and ADB are **not Phase 1 completion requirements**. Build/unit checks, the mobile/desktop e2e suite, offline tests, and Chrome DevTools device-emulation UX review are the acceptance gates.
+
+For a manual browser review, open `http://localhost:4317/read` in Chrome, press **F12**, then **Ctrl+Shift+M** to toggle the device toolbar. Select a phone preset or use Responsive mode at **412 × 839**, **360 × 740**, and **320 × 740**. Enable mobile/touch emulation and check portrait and landscape. Open a local PDF, scroll, zoom, select text, search, jump, bookmark, and inspect the navigation and appearance sheets. Long filenames and narrow screens should fit without horizontal overflow.
+
+For an offline review, wait for **Ready for offline reading**, then choose **Offline** in DevTools Network. Reload, reopen a saved PDF, and open a new local PDF. Check that the saved reading position survives. DevTools device emulation is sufficient for this stage; OS installation/share registration remains a browser platform capability rather than a hardware validation gate.
+
+The existing Playwright setup also supports installed Google Chrome while retaining the Pixel 7 device profile and native DevTools Protocol multi-touch input:
+
+```powershell
+$env:E2E_BROWSER_CHANNEL = 'chrome'
+$env:E2E_PORT = '4318'
+npm run test:e2e -- e2e/reader-mobile.spec.ts e2e/mobile.spec.ts e2e/pwa.spec.ts e2e/shell.spec.ts e2e/audit-pdf.spec.ts e2e/tools.spec.ts --workers=2
+Remove-Item Env:E2E_BROWSER_CHANNEL
+```
+
+Omit `E2E_BROWSER_CHANNEL` to use Playwright's bundled Chromium. No phone or ADB is involved in either configuration.
+
+## Optional later Android installation without publishing the site
+
+These instructions are for trying the completed PWA on a phone later, not a prerequisite for validation or Phase 1 completion.
 
 1. Download Google's [SDK Platform Tools for Windows](https://developer.android.com/tools/releases/platform-tools). Extract the `platform-tools` folder into `C:\Android`.
 2. On the phone, enable Developer options (tap Build number seven times) and USB debugging. Connect it by USB and accept the computer's debugging authorization.
@@ -92,11 +115,11 @@ npm run test:e2e -- e2e/reader-mobile.spec.ts e2e/mobile.spec.ts e2e/pwa.spec.ts
 
 The default e2e configuration builds and serves the production application automatically. The mobile project uses Chromium with Pixel 7 viewport/touch emulation. Native Chromium multi-touch input verifies pinch behavior; screenshots are inspected separately. This is browser emulation, not a claimed physical-phone test.
 
-Final validation passed: **207 unit-test files / 3,858 tests**, typecheck, ESLint with zero warnings, contrast/source checks, production build, and **65 production mobile/desktop e2e tests**. The first-ever offline PDF/reload scenario also passed five consecutive repeats. The reader accessibility scan reported no serious or critical violations. Portrait, landscape, Vietnamese, night, search, and thumbnail views were inspected from actual browser screenshots.
+Final validation passed: **207 unit-test files / 3,858 tests**, typecheck, ESLint with zero warnings, contrast/source checks, production build, and **67 production mobile/desktop e2e tests in installed Chrome 154.0.8037.97**. The suite uses Pixel 7 emulation plus 320px/360px small-phone checks and native DevTools Protocol multi-touch input. The first-ever offline PDF/reload scenario also passed five consecutive repeats during the initial release verification. The reader accessibility scan reported no serious or critical violations. Portrait, landscape, Vietnamese, night, search, and thumbnail views were inspected from actual browser screenshots.
 
 The broad regression run exposed an existing Diagram Studio assertion that expected `Line 2:` while the current parser reports `Line 2, column 10:`. That failure was reproduced on the unchanged base commit. Only the test assertion was corrected to accept the column detail; no unrelated tool implementation changed.
 
-Generated logs, HTML reports, screenshots, and traces remain in the worktree's ignored log/report directories. The mobile suite creates `test-results/reader-library-mobile.png`, `reader-document-mobile.png`, `reader-landscape.png`, and `reader-vietnamese.png`. Additional visual review saved `reader-night.png`, `reader-search.png`, and `reader-thumbnails.png`. Final logs are `reader-check-final.log` and `reader-release-e2e.log`.
+Generated logs, HTML reports, screenshots, and traces remain in the worktree's ignored log/report directories. The mobile suite creates `test-results/reader-library-mobile.png`, `reader-document-mobile.png`, `reader-landscape.png`, `reader-vietnamese.png`, `reader-night.png`, `reader-thumbnails.png`, and `reader-small-{320,360}-{options,search}.png`. Current completion logs are `reader-phase1-check.log` and `reader-phase1-chrome-e2e.log`; initial release logs are `reader-check-final.log` and `reader-release-e2e.log`.
 
 ## Platform boundaries
 

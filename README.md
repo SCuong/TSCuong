@@ -12,7 +12,10 @@ Open it, search for what you need (`Ctrl/⌘ K`), use the tool. Files never leav
   plus a keyboard-first command palette.
 - **Favorites, pins, recent tools, usage history, recent searches**, all stored locally, with backup/restore.
 - **Dark, light and system themes** with no flash on startup.
-- **Installable PWA** with offline support. Heavy engines (PDF.js, pdf-lib, Tesseract OCR, SQLite WASM, Mermaid) are
+- **Mobile PDF Reader** at `/read`: continuous scrolling, touch zoom, search, selectable text, contents, thumbnails,
+  bookmarks, favorites, saved reading positions, and English/Vietnamese. Files stay in local device storage.
+- **Installable PWA** with offline support. The PDF reader engine is precached for first-use offline reading.
+  Other heavy engines (pdf-lib, Tesseract OCR, SQLite WASM, Mermaid) are
   lazy-loaded and cached the first time you use them.
 
 ## Development
@@ -39,6 +42,9 @@ E2E_DEV=1 npx playwright test   # E2E against a running dev server
 
 On first use, install Playwright's browser with `npx playwright install chromium`.
 
+See [the mobile reader guide](docs/MOBILE-PDF-READER.md) for Chrome DevTools device-emulation review and the
+installed-Chrome e2e command. Phase 1 validation requires no physical phone or ADB.
+
 ## Architecture
 
 ```
@@ -46,6 +52,7 @@ src/
   app/            shell: router, layout, sidebar, command palette, pages (home, all tools, category, tool, settings…)
   components/     shared UI primitives (ui/), CodeMirror editor (editor/), tool layout helpers (tool/)
   lib/            search, theme, persistence (localStorage stores + IndexedDB), backup, hooks, utils
+  reader/         mobile PDF library, continuous reader, OPFS cache, reading positions and bookmarks
   tools/
     types.ts      ToolDefinition — the registry contract
     categories.ts category metadata
