@@ -149,6 +149,10 @@ export function HomePage() {
           )}
         </div>
 
+        <Link to="/read" className="mx-auto mt-8 flex max-w-2xl items-center justify-between gap-4 rounded-xl border border-accent-line bg-accent-soft p-5 text-fg">
+          <span><strong className="block text-[15px]">{t('PDF Reader')}</strong><span className="mt-1 block text-[13px] text-fg-secondary">{t('Open, read and keep your PDFs offline. Pick up where you left off.')}</span></span>
+          <ArrowRight size={22} aria-hidden className="shrink-0 text-accent-text" />
+        </Link>
         <div className="mt-12 sm:mt-14">
           {query.trim() ? (
             <Section title={results.length ? (results.length === 1) ? t('{count} matching tool', { count: results.length }) : t('{count} matching tools', { count: results.length }) : t('No matches')}>

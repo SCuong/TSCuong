@@ -5,6 +5,12 @@ import { RouteError } from './pages/RouteError';
 
 const routes: Parameters<typeof createBrowserRouter>[0] = [
   {
+    path: '/read/*',
+    lazy: async () => ({ Component: (await import('@/reader/ReaderApp')).ReaderApp }),
+    errorElement: <RouteError />,
+    hydrateFallbackElement: <div className="min-h-dvh" />,
+  },
+  {
     path: '/',
     element: <Layout />,
     errorElement: <RouteError />,

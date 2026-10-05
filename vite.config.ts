@@ -22,7 +22,6 @@ const HEAVY_MODULES = [
   'langium',
   'chevrotain',
   'd3-',
-  'pdfjs-dist',
   'pdf-lib',
   'tesseract',
   'sql.js',
@@ -80,7 +79,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'reader-share.js'],
       manifest: {
         name: 'LocalKit — Local-first toolbox',
         short_name: 'LocalKit',
@@ -91,6 +90,13 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
+        shortcuts: [{ name: 'PDF Reader', short_name: 'Reader', url: '/read', icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }] }],
+        share_target: {
+          action: '/read/share',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: { files: [{ name: 'pdf', accept: ['application/pdf', '.pdf'] }] },
+        },
         categories: ['developer', 'productivity', 'utilities'],
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -99,8 +105,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        globIgnores: ['assets/lazy/**', 'ocr/**', 'pdfjs/**'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico,woff2}', 'pdfjs/**/*.{bcmap,wasm,pfb,ttf}'],
+        globIgnores: ['assets/lazy/**', 'ocr/**'],
+        importScripts: ['/reader-share.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
@@ -131,6 +138,8 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    // Linked dependencies in isolated worktrees must keep their local asset URLs.
+    preserveSymlinks: true,
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
@@ -162,6 +171,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Bound jsdom/PDF concurrency on development machines and CI.
+    maxWorkers: 4,
     environment: 'jsdom',
     globals: false,
     setupFiles: ['./src/test/setup.ts'],

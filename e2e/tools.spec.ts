@@ -168,7 +168,7 @@ test.describe('Diagram Studio', () => {
     await source.click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('flowchart TD\n  A --> B -->');
-    await expect(page.getByText(/Line 2:/)).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText(/Line 2(?:, column \d+)?:/);
     await expect(page.getByRole('button', { name: 'Go to line' })).toBeVisible();
     // The last valid diagram stays visible while the source is broken.
     await expect(page.getByRole('img', { name: 'Diagram preview' }).locator('svg')).toBeVisible();

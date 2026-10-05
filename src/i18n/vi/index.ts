@@ -7,8 +7,9 @@ import text from './text';
 import encoding from './encoding';
 import data from './data';
 import web from './web';
+import reader from './reader';
 
 /** Vietnamese interface text, keyed by the English source text passed to `t()`. */
-const vi: Record<string, string> = Object.assign({}, shell, tools, pdf, image, json, text, encoding, data, web);
+const vi: Record<string, string> = Object.assign({}, shell, tools, pdf, image, json, text, encoding, data, web, reader);
 
 export default vi;
