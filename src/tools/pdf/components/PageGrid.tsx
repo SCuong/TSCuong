@@ -20,7 +20,7 @@ export interface GridItem {
 
 /** Live-region text after a reorder; `to` is the new 0-based index. */
 export function moveAnnouncement(label: string, to: number, count: number): string {
-  return `${label} moved to position ${to + 1} of ${count}.`;
+  return t('{label} moved to position {position} of {count}.', { label, position: to + 1, count });
 }
 
 export function arrayMove<T>(list: readonly T[], from: number, to: number): T[] {
@@ -234,7 +234,7 @@ export function PageGrid({
         /* ignore */
       }
       const rect = cards.current[p.index]?.getBoundingClientRect();
-      setDrag({ from: p.index, slot: p.index, x: event.clientX, y: event.clientY, width: rect?.width ?? thumbWidth });
+      setDrag({ from: p.index, slot: slotAt(event.clientX, event.clientY), x: event.clientX, y: event.clientY, width: rect?.width ?? thumbWidth });
       startAutoScroll();
       return;
     }
@@ -274,8 +274,8 @@ export function PageGrid({
   const interactive = selectable || Boolean(onMove);
 
   function cardLabel(item: GridItem): string {
-    const rotation = item.rotation ? `, rotated ${((item.rotation % 360) + 360) % 360} degrees` : '';
-    return `${item.label}${item.sublabel ? `, ${item.sublabel}` : ''}${rotation}${item.state === 'removed' ? ', marked for removal' : ''}`;
+    const rotation = item.rotation ? ', ' + t('rotated {degrees} degrees', { degrees: ((item.rotation % 360) + 360) % 360 }) : '';
+    return `${item.label}${item.sublabel ? `, ${item.sublabel}` : ''}${rotation}${item.state === 'removed' ? ', ' + t('marked for removal') : ''}`;
   }
 
   function cardContent(item: GridItem, isSelected: boolean) {
@@ -341,7 +341,11 @@ export function PageGrid({
               onPointerMove={onPointerMove}
               onPointerUp={() => endDrag(true)}
               onPointerCancel={() => endDrag(false)}
-              onLostPointerCapture={() => endDrag(true)}
+              onLostPointerCapture={(event) => {
+                // Touch starts with implicit capture on the grip's SVG. Moving capture to
+                // the card emits a bubbling loss from that SVG; the card still owns the drag.
+                if (event.target === event.currentTarget) endDrag(true);
+              }}
               className={cn(
                 'group relative flex min-w-0 flex-col rounded-xl border bg-surface p-1.5 shadow-card transition-[border-color,background-color,opacity] duration-100',
                 isSelected

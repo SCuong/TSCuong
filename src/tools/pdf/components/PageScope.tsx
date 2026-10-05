@@ -6,7 +6,8 @@ import { pluralize } from '@/lib/utils';
 import { formatPageList, parsePageRange } from '../lib/ranges';
 import type { LoadedPdf } from './usePdfFile';
 import { PageGrid, type GridItem } from './PageGrid';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
+import { pageRangeMessage } from '../lib/rangeMessage';
 
 export type ScopeMode = 'all' | 'range' | 'pick';
 
@@ -30,7 +31,7 @@ export function usePageScope(pageCount: number, initial: ScopeMode = 'all', init
     return { pages, error: null };
   }, [mode, range, picked, pageCount]);
 
-  return { mode, setMode, range, setRange, picked, setPicked, pageCount, ...result };
+  return { mode, setMode, range, setRange, picked, setPicked, pageCount, ...result, error: result.error && pageRangeMessage(result.error) };
 }
 
 export type PageScopeState = ReturnType<typeof usePageScope>;
@@ -52,12 +53,12 @@ export function PageScopeControl({
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div>
-        <Label>{label}</Label>
+        <Label>{t(label)}</Label>
         <Segmented
-          label={label}
+          label={t(label)}
           value={scope.mode}
           onChange={scope.setMode}
-          options={modes.map((m) => ({ value: m, label: names[m] }))}
+          options={modes.map((m) => ({ value: m, label: t(names[m]) }))}
         />
       </div>
       {scope.mode === 'range' && (
@@ -139,6 +140,7 @@ export function PagePicker({
   /** Pages rendered as "removed" (e.g. delete preview). */
   removed?: (index: number) => boolean;
 }) {
+  const locale = getLocale();
   const items = useMemo<GridItem[]>(
     () =>
       Array.from({ length: pdf.pageCount }, (_, i) => ({
@@ -149,7 +151,9 @@ export function PagePicker({
         label: t('Page {i}', { i: i + 1 }),
         state: removed?.(i) ? 'removed' : 'normal',
       })),
-    [pdf, rotation, removed],
+    // t() reads the current locale implicitly; cached page labels must follow language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pdf, rotation, removed, locale],
   );
   return (
     <div className="flex flex-col gap-3">

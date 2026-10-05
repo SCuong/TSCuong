@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import vi from './vi';
 import { TOOLS } from '@/tools/registry';
 import { CATEGORIES } from '@/tools/categories';
+import { PDF_PROGRESS_LABELS } from '@/tools/pdf/lib/progressText';
 
 /** Every source file that can call t(). */
 const sources = import.meta.glob(['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/i18n/**'], {
@@ -52,6 +53,8 @@ describe('Vietnamese dictionary', () => {
 
   it('translates every tool and category name and description', () => {
     const texts = [
+      ...PDF_PROGRESS_LABELS,
+      ...['/src/reader/PdfToolkit.tsx', '/src/reader/PdfAnnotate.tsx'].flatMap((file) => [...sources[file].matchAll(/(?:name|description|title|label): '([^']+)'/g)].map((match) => match[1])),
       ...TOOLS.flatMap((tool) => [tool.name, tool.description, ...(tool.networkNote ? [tool.networkNote] : [])]),
       ...CATEGORIES.flatMap((category) => [category.name, category.description]),
     ];

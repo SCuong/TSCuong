@@ -15,9 +15,10 @@ import { docId } from './lib/thumbnails';
 import { PdfInput } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PageScopeControl, usePageScope } from './components/PageScope';
-import { JobProgress } from './components/Results';
+import { JobProgress, ShareResult } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { t } from '@/lib/i18n';
+import { usePdfWorkspace } from './components/PdfWorkspaceContext';
 
 export default function ExtractText() {
   const controller = usePdfFile();
@@ -31,6 +32,7 @@ export default function ExtractText() {
 }
 
 function TextWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const workspace = usePdfWorkspace();
   const scope = usePageScope(pdf.pageCount, 'all');
   const [separators, setSeparators] = useState(true);
   const [pages, setPages] = useState<PageText[] | null>(null);
@@ -93,7 +95,7 @@ function TextWorkspace({ pdf }: { pdf: LoadedPdf }) {
           title={allEmpty ? t('No text layer found') : t('{count} without text', { count: pluralize(empty.length, t('page'), t('pages')) })}
           action={
             <Link
-              to="/tools/pdf/ocr"
+              to={workspace ? '/read/tools/pdf-ocr' : '/tools/pdf/ocr'}
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface-raised px-2.5 text-[13px] font-medium text-fg shadow-card hover:bg-surface-hover"
             >
               <ScanText size={14} aria-hidden />{' '}{t('Open OCR')}
@@ -108,6 +110,7 @@ function TextWorkspace({ pdf }: { pdf: LoadedPdf }) {
       {pages && (
         <EditorPanel
           title={t('Extracted text')}
+          actions={<ShareResult files={[{ name: outputName(pdf.file.name, '', 'txt'), data: new Blob([text], { type: 'text/plain;charset=utf-8' }), type: 'text/plain' }]} />}
           value={text}
           readOnly
           height="520px"

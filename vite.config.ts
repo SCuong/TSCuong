@@ -22,7 +22,6 @@ const HEAVY_MODULES = [
   'langium',
   'chevrotain',
   'd3-',
-  'pdf-lib',
   'tesseract',
   'sql.js',
   'prettier',
@@ -38,7 +37,6 @@ const HEAVY_MODULES = [
   'mime-db',
   'sql-formatter',
   'upng-js',
-  'pako',
   'hash-wasm',
   'exifr',
   'jsbarcode',
@@ -76,6 +74,23 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: 'localkit-ocr-offline-manifest',
+      generateBundle(_options, bundle) {
+        const files = new Set<string>();
+        const visit = (name: string) => {
+          if (files.has(name)) return;
+          const chunk = bundle[name];
+          if (!chunk || chunk.type !== 'chunk') return;
+          files.add(name);
+          // Static imports are required to open OCR. Dynamic imports in the shared
+          // application shell include every unrelated tool and must not fill this pack.
+          chunk.imports.forEach(visit);
+        };
+        Object.values(bundle).filter((entry) => entry.type === 'chunk' && ['OcrPdf', 'ImageOcr'].includes(entry.name)).forEach((entry) => visit(entry.fileName));
+        this.emitFile({ type: 'asset', fileName: engineDirs.ocr + 'chunks.json', source: JSON.stringify([...files]) });
+      },
+    },
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
@@ -105,7 +120,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico,woff2}', 'pdfjs/**/*.{bcmap,wasm,pfb,ttf}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico,woff2}', 'pdfjs/**/*.{bcmap,wasm,pfb,ttf}', 'qpdf/**/*.wasm'],
         globIgnores: ['assets/lazy/**', 'ocr/**'],
         importScripts: ['/reader-share.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
@@ -128,6 +143,9 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'localkit-engines',
+              // Immutable same-origin assets have identical bytes for module,
+              // worker and fetch requests, even when the static server adds Vary: Origin.
+              matchOptions: { ignoreVary: true },
               expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 120 },
               cacheableResponse: { statuses: [200] },
             },
@@ -150,7 +168,7 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
-    // Workers that bundle heavy engines (pdf-lib, SheetJS, hash-wasm, ...) are cached on first use, not precached.
+    // PDF editing workers are precached; optional heavy engines remain cached on first use.
     rolldownOptions: {
       output: {
         entryFileNames: (chunk) => lazyName(chunk.moduleIds, 'assets/[name]-[hash].js'),

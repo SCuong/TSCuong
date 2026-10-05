@@ -1,5 +1,5 @@
 import { Languages } from 'lucide-react';
-import { getLocale, LOCALES, setLocale, t } from '@/lib/i18n';
+import { getLocale, LOCALES, setLocale, t, type Locale } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 /**
@@ -38,12 +38,12 @@ export function LanguageSwitcher({ className }: { className?: string }) {
 }
 
 /** Header shortcut: one button that names the other language. */
-export function LanguageToggle({ className }: { className?: string }) {
+export function LanguageToggle({ className, onChange }: { className?: string; onChange?: (locale: Locale) => void }) {
   const other = LOCALES.find((option) => option.id !== getLocale()) ?? LOCALES[0];
   return (
     <button
       type="button"
-      onClick={() => setLocale(other.id)}
+      onClick={() => onChange ? onChange(other.id) : setLocale(other.id)}
       title={t('Change language')}
       className={cn(
         'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg',

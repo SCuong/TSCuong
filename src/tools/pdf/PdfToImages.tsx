@@ -18,6 +18,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { t } from '@/lib/i18n';
+import { MobileRasterNotice, useRasterLimits } from './components/MobileRasterNotice';
 
 type Format = 'png' | 'jpeg' | 'webp';
 const MIME: Record<Format, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' };
@@ -43,6 +44,8 @@ function supportsEncoding(type: string): boolean {
 }
 
 function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const limits = useRasterLimits();
+  const maxArea = limits.maxPixels ?? MAX_CANVAS_AREA, maxSide = limits.maxSide ?? MAX_CANVAS_SIDE;
   const scope = usePageScope(pdf.pageCount, 'all');
   const [format, setFormat] = useState<Format>('png');
   const [quality, setQuality] = useState(0.9);
@@ -55,7 +58,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const webpOk = useMemo(() => supportsEncoding('image/webp'), []);
 
   const dpi = preset === 'custom' ? (customDpi === '' ? 0 : customDpi) : Number(preset);
-  const dpiError = preset === 'custom' && (!dpi || dpi < 18 || dpi > 1200) ? 'Choose a DPI between 18 and 1200.' : null;
+  const dpiError = preset === 'custom' && (!dpi || dpi < 18 || dpi > 1200) ? t('Choose a DPI between 18 and 1200.') : null;
 
   // Page sizes for the memory estimate (cheap: no rendering).
   useEffect(() => {
@@ -88,12 +91,12 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
       const h = s.h * scale;
       const px = w * h;
       largest = Math.max(largest, px);
-      if (w > MAX_CANVAS_SIDE || h > MAX_CANVAS_SIDE || px > MAX_CANVAS_AREA) clamped++;
-      pixels += Math.min(px, MAX_CANVAS_AREA);
+      if (w > maxSide || h > maxSide || px > maxArea) clamped++;
+      pixels += Math.min(px, maxArea);
     }
     const bytesPerPixel = format === 'png' ? 0.9 : 0.12 + quality * 0.25;
     return { pixels, largest, clamped, bytes: pixels * bytesPerPixel };
-  }, [sizes, dpi, scope.pages, format, quality]);
+  }, [sizes, dpi, scope.pages, format, quality, maxArea, maxSide]);
 
   const heavy = estimate && (estimate.bytes > 400 * 1024 * 1024 || estimate.largest > 40e6);
 
@@ -111,7 +114,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
         throwIfAborted(signal);
         progress(k / pages.length, `Rendering page ${pages[k] + 1} (${k + 1} of ${pages.length})`);
         const page = await pdf.doc.getPage(pages[k] + 1);
-        const canvas = await renderPageToCanvas(page, { scale: dpi / 72, signal, intent: 'print' });
+        const canvas = await renderPageToCanvas(page, { scale: dpi / 72, signal, intent: 'print', ...limits });
         try {
           const blob = await canvasToBlob(canvas, type, format === 'png' ? undefined : quality);
           files.push({ name: outputName(pdf.file.name, `page-${padIndex(pages[k] + 1, pdf.pageCount)}`, EXT[format]), data: blob, type });
@@ -129,6 +132,7 @@ function ImagesWorkspace({ pdf }: { pdf: LoadedPdf }) {
     <>
       <Panel title={t('Image settings')}>
         <div className="flex flex-col gap-4">
+          <MobileRasterNotice />
           <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
             <div>
               <Label>{t('Format')}</Label>

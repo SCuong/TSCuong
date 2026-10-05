@@ -21,6 +21,7 @@ import { useKeyedResult } from './components/useKeyedResult';
 import { sizeChange } from './lib/sizeChange';
 import { verifyEncryptedEdit } from './components/verifyEdit';
 import { t } from '@/lib/i18n';
+import { MobileRasterNotice, useRasterLimits } from './components/MobileRasterNotice';
 
 type Mode = 'lossless' | 'rasterize';
 
@@ -42,6 +43,7 @@ export default function CompressPdf() {
 }
 
 function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const limits = useRasterLimits();
   const [mode, setMode] = useState<Mode>('lossless');
   const [dpi, setDpi] = useState<'72' | '100' | '150' | '200'>('150');
   const [quality, setQuality] = useState(0.7);
@@ -80,7 +82,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
         progress(((i - 1) / pdf.pageCount) * 0.85, `Rendering page ${i} of ${pdf.pageCount}`);
         const page = await pdf.doc.getPage(i);
         const vp = page.getViewport({ scale: 1 });
-        const canvas = await renderPageToCanvas(page, { scale, signal, intent: 'print' });
+        const canvas = await renderPageToCanvas(page, { scale, signal, intent: 'print', ...limits });
         try {
           if (grayscale) {
             const ctx = canvas.getContext('2d');
@@ -125,6 +127,7 @@ function CompressWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
   return (
     <>
+      {mode === 'rasterize' && <MobileRasterNotice />}
       {gate.notice}
       <Panel title={t('Compression method')}>
         <div className="flex flex-col gap-4">

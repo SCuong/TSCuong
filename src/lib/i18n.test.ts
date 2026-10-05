@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { getLocale, setMessagesForTests, t } from './i18n';
+import { getLocale, setMessagesForTests, setLocaleInPlace, t } from './i18n';
 
 afterEach(() => setMessagesForTests('en', null));
 
 describe('t', () => {
+  it('changes the PDF workspace language and saved preference without reloading', async () => {
+    await setLocaleInPlace('vi'); expect(document.documentElement.lang).toBe('vi'); expect(t('Open file')).toBe('Mở tệp');
+    await setLocaleInPlace('en'); expect(document.documentElement.lang).toBe('en'); expect(t('Open file')).toBe('Open file');
+  });
   it('returns the English text when no dictionary is loaded', () => {
     expect(t('Open file')).toBe('Open file');
     expect(getLocale()).toBe('en');

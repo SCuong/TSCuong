@@ -17,6 +17,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { t } from '@/lib/i18n';
+import { pageRangeMessage } from './lib/rangeMessage';
 
 type Mode = 'single' | 'every' | 'ranges';
 
@@ -119,7 +120,7 @@ function SplitWorkspace({ pdf }: { pdf: LoadedPdf }) {
               </p>
             </div>
           )}
-          <ErrorMessage error={plan.error} />
+          <ErrorMessage error={plan.error && pageRangeMessage(plan.error)} />
           {plan.groups.length > 0 && (
             <div>
               <p className="mb-2 text-[12.5px] font-medium text-fg-secondary">

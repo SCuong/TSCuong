@@ -73,6 +73,8 @@ export interface RenderOptions {
   signal?: AbortSignal;
   /** 'print' renders form fields and print-only annotations like a printer would. */
   intent?: 'display' | 'print';
+  maxPixels?: number;
+  maxSide?: number;
 }
 
 /** Hard canvas limits shared by all major browsers (Safari is the tightest). */
@@ -81,14 +83,17 @@ export const MAX_CANVAS_AREA = 16384 * 16384 * 0.25; // ~67 MP keeps Safari/iOS 
 
 /** Render a page into a new canvas. Cancels the render if the signal aborts. */
 export async function renderPageToCanvas(page: PDFPageProxy, options: RenderOptions): Promise<HTMLCanvasElement> {
+  if (options.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
   const rotation = (((page.rotate + (options.rotation ?? 0)) % 360) + 360) % 360;
   let viewport = page.getViewport({ scale: options.scale, rotation });
+  const maxArea = options.maxPixels ?? MAX_CANVAS_AREA;
+  const maxSide = options.maxSide ?? MAX_CANVAS_SIDE;
   const area = viewport.width * viewport.height;
-  if (viewport.width > MAX_CANVAS_SIDE || viewport.height > MAX_CANVAS_SIDE || area > MAX_CANVAS_AREA) {
+  if (viewport.width > maxSide || viewport.height > maxSide || area > maxArea) {
     const factor = Math.min(
-      MAX_CANVAS_SIDE / viewport.width,
-      MAX_CANVAS_SIDE / viewport.height,
-      Math.sqrt(MAX_CANVAS_AREA / area),
+      maxSide / viewport.width,
+      maxSide / viewport.height,
+      Math.sqrt(maxArea / area),
     );
     viewport = page.getViewport({ scale: options.scale * factor * 0.999, rotation });
   }

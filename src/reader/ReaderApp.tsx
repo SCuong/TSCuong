@@ -2,18 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ArrowLeft, BookOpen, CloudOff, FileText, FolderOpen, HardDrive, Info, Star, Trash2 } from 'lucide-react';
 import { usePdfFile } from '@/tools/pdf/components/usePdfFile';
-import { readerRepository as repository, fingerprint, CACHE_LIMIT, type ReaderDocument } from './storage';
+import { readerRepository as repository, fingerprint, pdfDrafts, CACHE_LIMIT, type ReaderDocument } from './storage';
 import { readerPlatform } from './platform';
 import { readerErrorMessage } from './errorMessage';
 import { MobileReader } from './MobileReader';
+import { PdfToolkit } from './PdfToolkit';
+import { OfflineOcr } from './OfflineOcr';
 import { Dialog, ConfirmDialog } from '@/components/ui/Dialog';
 import { Spinner } from '@/components/ui/Feedback';
 import { Logo } from '@/components/Logo';
 import { LanguageToggle } from '@/app/LanguageSwitcher';
 import { cycleTheme } from '@/lib/theme';
 import { UpdatePrompt } from '@/app/UpdatePrompt';
-import { Toaster } from '@/components/ui/Toast';
-import { t } from '@/lib/i18n';
+import { toast, Toaster } from '@/components/ui/Toast';
+import { t, setLocaleInPlace, type Locale } from '@/lib/i18n';
 import './reader.css';
 
 export function ReaderApp() {
@@ -24,6 +26,10 @@ export function ReaderApp() {
   const [documents, setDocuments] = useState<ReaderDocument[]>([]);
   const [record, setRecord] = useState<ReaderDocument | null>(null);
   const [notice, setNotice] = useState('');
+  const [, setLanguageRevision] = useState(0);
+  const changeLanguage = useCallback((next: Locale) => {
+    void setLocaleInPlace(next).then(() => setLanguageRevision((revision) => revision + 1)).catch(() => toast(t('Could not change language. Open LocalKit online once and try again.'), 'error'));
+  }, []);
   const [preparing, setPreparing] = useState(false);
   const [libraryTab, setLibraryTab] = useState<'recent' | 'favorites'>('recent');
   const [query, setQuery] = useState('');
@@ -32,7 +38,11 @@ export function ReaderApp() {
   const [remove, setRemove] = useState<ReaderDocument | null>(null);
   const [offlineReady, setOfflineReady] = useState(false);
   const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [draftCount, setDraftCount] = useState(0);
+  const [clearDrafts, setClearDrafts] = useState(false);
+  const [estimate, setEstimate] = useState<StorageEstimate | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const [toolFile, setToolFile] = useState<File | null>(null);
   const current = useRef(record);
   current.current = record;
   const prepared = useRef<typeof pdf>(null);
@@ -40,6 +50,22 @@ export function ReaderApp() {
   const shareId = new URLSearchParams(location.search).get('share');
   const shareError = new URLSearchParams(location.search).has('shareError');
   const inReader = location.pathname === '/read/doc';
+  const inToolkit = location.pathname.startsWith('/read/tools');
+
+  function enterToolkit(id?: string) {
+    setToolFile(pdf?.file ?? null);
+    reset();
+    setRecord(null);
+    prepared.current = null;
+    navigate('/read/tools' + (id ? '/' + id : ''));
+  }
+  const readResult = useCallback((file: File) => {
+    setToolFile(null);
+    setRecord(null);
+    prepared.current = null;
+    navigate('/read');
+    void open(file);
+  }, [navigate, open]);
 
   useEffect(() => {
     if (shareError) {
@@ -51,13 +77,17 @@ export function ReaderApp() {
   const refresh = useCallback(async () => {
     try {
       setDocuments((await repository.list()).sort((a, b) => b.lastOpened - a.lastOpened));
+      setDraftCount(await pdfDrafts.count());
     } catch {
       setNotice(t('Local storage is unavailable. You can still read, but your library will not be saved.'));
     }
   }, []);
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, location.pathname]);
+  useEffect(() => {
+    if (settings) void navigator.storage?.estimate?.().then(setEstimate).catch(() => {});
+  }, [settings]);
   useEffect(() => {
     const refreshOnFocus = () => void refresh();
     window.addEventListener('focus', refreshOnFocus);
@@ -253,13 +283,14 @@ export function ReaderApp() {
           }
         }}
       />
-      {inReader && pdf && record && !preparing ? (
+      {inToolkit ? <PdfToolkit file={toolFile} onRead={readResult} onSource={setToolFile} onLanguage={changeLanguage} /> : inReader && pdf && record && !preparing ? (
         <>
           <MobileReader
             key={record.id}
             pdf={pdf}
             record={record}
             update={update}
+            onTools={enterToolkit}
             onLibrary={() => {
               navigate('/read');
               document.title = t('PDF Reader') + ' · LocalKit';
@@ -275,12 +306,13 @@ export function ReaderApp() {
               <Logo />
             </Link>
             <div className="reader-header-actions">
-              <LanguageToggle />
+              <LanguageToggle onChange={changeLanguage} />
               <button className="reader-icon" onClick={() => setSettings(true)} aria-label={t('Reader settings')}>
                 <Info size={21} />
               </button>
             </div>
           </header>
+          <nav className="reader-product-nav" aria-label={t('PDF workspace')}><span aria-current="page">{t('PDF library')}</span><button onClick={() => enterToolkit()}>{t('PDF Toolkit')}</button></nav>
           <section className="reader-hero">
             <div className="reader-eyebrow">
               <BookOpen size={16} />
@@ -489,6 +521,9 @@ export function ReaderApp() {
             })}
           </p>
           <progress value={cachedBytes} max={CACHE_LIMIT.bytes} aria-label={t('PDF cache usage')} />
+          {estimate?.quota !== undefined && <p className="reader-muted">{t('{used} of {quota} MB used by LocalKit and offline engines', { used: ((estimate.usage ?? 0) / 1048576).toFixed(1), quota: (estimate.quota / 1048576).toFixed(0) })}</p>}
+          <p>{t('{count} document editing drafts saved', { count: draftCount })}</p>
+          <button className="reader-row" disabled={!draftCount} onClick={() => setClearDrafts(true)}>{t('Clear annotation and form drafts')}</button>
           <p className="reader-muted">
             {t(
               'Least recently opened PDFs are removed from the cache when it fills up. Favorites are protected. Reading positions and bookmarks remain.',
@@ -524,6 +559,7 @@ export function ReaderApp() {
           >
             {persisted ? t('Persistent storage enabled') : t('Request persistent storage')}
           </button>
+          <OfflineOcr />
           <h3>{t('Install on your phone')}</h3>
           <p>
             {t(
@@ -564,8 +600,11 @@ export function ReaderApp() {
         confirmLabel={t('Remove document')}
       >
         {t(
-          'This removes its saved copy, reading position and bookmarks from LocalKit. The original file in Files or Downloads is kept.',
+          'This removes its saved copy, reading position, bookmarks and editing draft from LocalKit. The original file in Files or Downloads is kept.',
         )}
+      </ConfirmDialog>
+      <ConfirmDialog open={clearDrafts} onCancel={() => setClearDrafts(false)} onConfirm={() => void pdfDrafts.clear().then(() => { setClearDrafts(false); void refresh(); }).catch(() => setNotice(t('Could not clear saved edits. Please try again.')))} title={t('Clear all editing drafts?')} confirmLabel={t('Clear drafts')}>
+        {t('This removes local annotation and form drafts. Exported PDFs, originals, reading positions and bookmarks are kept. Export any edits you want to keep first.')}
       </ConfirmDialog>
       <UpdatePrompt />
       <Toaster />

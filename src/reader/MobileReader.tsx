@@ -22,7 +22,10 @@ import { cycleTheme } from '@/lib/theme';
 import { PageSurface } from './PageSurface';
 import { boundedZoom, fitScale, pageAt, pageLayout, type PageSize } from './geometry';
 import { readerPlatform } from './platform';
-import type { ReaderDocument } from './storage';
+import { pdfDrafts, type ReaderDocument } from './storage';
+import type { PdfMark } from './annotations';
+import { downloadOutput } from '@/tools/pdf/components/Results';
+import { shareOutputs, supportsFileSharing } from '@/tools/pdf/lib/share';
 
 type NightMode = 'paper' | 'sepia' | 'night';
 type Sheet = 'pages' | 'jump' | 'view' | null;
@@ -37,11 +40,13 @@ export function MobileReader({
   record,
   update,
   onLibrary,
+  onTools,
 }: {
   pdf: LoadedPdf;
   record: ReaderDocument;
   update(patch: Partial<Pick<ReaderDocument, 'page' | 'offset' | 'favorite' | 'bookmarks'>>): Promise<void>;
   onLibrary(): void;
+  onTools(id?: string): void;
 }) {
   const { doc, pageCount } = pdf;
   const root = useRef<HTMLDivElement>(null);
@@ -74,6 +79,13 @@ export function MobileReader({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [message, setMessage] = useState('');
+  const [marks, setMarks] = useState<PdfMark[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => { void pdfDrafts.get(record.id).then((draft) => { if (alive) setMarks(draft?.marks ?? []); }).catch(() => {}); };
+    refresh(); window.addEventListener('focus', refresh);
+    return () => { alive = false; window.removeEventListener('focus', refresh); };
+  }, [record.id]);
   const scales = useMemo(
     () => sizes.map((size) => fitScale(size, view.width, view.height, fit) * zoom),
     [sizes, view.width, view.height, fit, zoom],
@@ -473,7 +485,7 @@ export function MobileReader({
           {searchError && (
             <p role="status">
               {t(
-                'Some pages could not be searched. Scanned pages without text need OCR, which is outside this reader.',
+                'Some pages could not be searched. Use PDF OCR in the toolkit for scanned pages without text.',
               )}
             </p>
           )}
@@ -555,6 +567,7 @@ export function MobileReader({
                 scale={scales[index]}
                 query={searched}
                 activeMatch={activeHit?.page === index + 1 ? activeHit.match : -1}
+                marks={marks.filter((mark) => mark.page === index + 1)}
               />
             </div>
           ))}
@@ -635,6 +648,10 @@ export function MobileReader({
         className="reader-sheet"
       >
         <div className="reader-settings">
+          <button className="reader-row" onClick={async () => { capturePosition(); await update(savedPosition.current); onTools(); }}>{t('Edit and export this PDF')}</button>
+          <button className="reader-row" onClick={async () => { capturePosition(); await update(savedPosition.current); onTools('pdf-annotate'); }}>{t('Annotate & sign')}</button>
+          <button className="reader-row" onClick={() => downloadOutput({ name: pdf.file.name, type: 'application/pdf', data: pdf.file })}>{t('Download original PDF')}</button>
+          {supportsFileSharing() && <button className="reader-row" onClick={() => void shareOutputs([{ name: pdf.file.name, type: 'application/pdf', data: pdf.file }]).catch((error: unknown) => { if ((error as Error).name !== 'AbortError') setMessage(t('Sharing failed. You can still download your files.')); })}>{t('Share original PDF')}</button>}
           <p className="reader-muted" style={{ overflowWrap: 'anywhere' }}>
             {record.name} · {t('Page {page} of {pages}', { page: currentPage, pages: pageCount })}
           </p>

@@ -13,6 +13,7 @@ import {
   PDFNumber,
   PDFRawStream,
   PDFRef,
+  PDFHexString,
   PDFStream,
   StandardFonts,
   TextRenderingMode,
@@ -48,6 +49,7 @@ import {
   type Position,
 } from './geometry';
 import { infoDict, removeAllMetadata, writeMetadata, type MetadataFields } from './metadata';
+import { markBounds, type PdfMark } from '@/reader/annotations';
 
 export interface OpContext {
   progress: (fraction: number, label?: string) => void;
@@ -880,7 +882,43 @@ export async function inspectStructure(
 
 // ---------------------------------------------------------------------------
 
+/** Export a separate copy with visible vector markup and native text comments. */
+export async function annotate(args: { bytes: Uint8Array; marks: PdfMark[] }, ctx = noopContext) {
+  const doc = await loadDoc(args.bytes);
+  const isolated = new Set<number>();
+  for (const [index, mark] of args.marks.entries()) {
+    ctx.checkCancelled();
+    const page = doc.getPage(mark.page - 1);
+    if (!isolated.has(mark.page)) { isolateExistingContent(doc, page); isolated.add(mark.page); }
+    const hex = /^#[a-f0-9]{6}$/i.test(mark.color) ? mark.color.slice(1) : '2563eb';
+    const color = rgb(parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255);
+    const box = markBounds(mark.points);
+    if (mark.kind === 'highlight') page.drawRectangle({ ...box, color, opacity: 0.28 });
+    else if (mark.kind === 'note') {
+      if (mark.image) {
+        const image = await doc.embedPng(mark.image);
+        const [tl, tr, , bl] = mark.points;
+        page.drawImage(image, { x: bl[0], y: bl[1], width: Math.hypot(tr[0] - tl[0], tr[1] - tl[1]), height: Math.hypot(bl[0] - tl[0], bl[1] - tl[1]), rotate: degrees(normalizeRotation(page.getRotation().angle)) });
+      }
+      const comment = doc.context.register(doc.context.obj({
+        Type: 'Annot', Subtype: 'Text', Rect: [box.x, box.y, box.x + 18, box.y + 18],
+        Contents: PDFHexString.fromText(mark.text ?? ''), T: PDFHexString.fromText('LocalKit'),
+        NM: PDFHexString.fromText(mark.id), C: [1, 0.8, 0], F: 4,
+      }));
+      page.node.addAnnot(comment);
+    } else {
+      for (let i = 1; i < mark.points.length; i++) {
+        page.drawLine({ start: { x: mark.points[i - 1][0], y: mark.points[i - 1][1] }, end: { x: mark.points[i][0], y: mark.points[i][1] }, thickness: mark.kind === 'signature' ? 1.7 : 1.4, color });
+      }
+    }
+    ctx.progress((index + 1) / args.marks.length, 'Exporting annotations');
+  }
+  doc.setModificationDate(new Date());
+  return save(doc);
+}
+
 export const OPS = {
+  annotate,
   merge,
   split,
   selectPages,

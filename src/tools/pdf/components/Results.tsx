@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Download, ExternalLink, FileArchive, FileCheck } from 'lucide-react';
+import { BookOpen, Download, ExternalLink, FileArchive, FileCheck, Share2 } from 'lucide-react';
 import { Button, IconButton } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/Feedback';
 import { toast } from '@/components/ui/Toast';
 import { downloadBlob, errorMessage, formatBytes, pluralize } from '@/lib/utils';
 import { zipFiles, type OutputFile } from '../lib/files';
 import { t } from '@/lib/i18n';
+import { usePdfWorkspace } from './PdfWorkspaceContext';
+import { outputToFile, shareOutputs, supportsFileSharing } from '../lib/share';
 
 function toBlob(file: OutputFile): Blob {
   return file.data instanceof Blob ? file.data : new Blob([file.data as Uint8Array<ArrayBuffer>], { type: file.type });
@@ -13,6 +15,19 @@ function toBlob(file: OutputFile): Blob {
 
 function sizeOf(file: OutputFile): number {
   return file.data instanceof Blob ? file.data.size : file.data.byteLength;
+}
+
+/** Native sharing for text/editor outputs inside the mobile workspace. */
+export function ShareResult({ files }: { files: OutputFile[] }) {
+  const workspace = usePdfWorkspace();
+  const [sharing, setSharing] = useState(false);
+  if (!workspace || !files.length || !supportsFileSharing(files[0].type)) return null;
+  return <Button variant="ghost" icon={Share2} loading={sharing} onClick={() => {
+    setSharing(true);
+    void shareOutputs(files).then((shared) => { if (!shared) toast(t('This browser cannot share these files. Use Download instead.'), 'info'); })
+      .catch((error: unknown) => { if ((error as Error).name !== 'AbortError') toast(t('Sharing failed. You can still download your files.'), 'error'); })
+      .finally(() => setSharing(false));
+  }}>{t('Share file')}</Button>;
 }
 
 export function downloadOutput(file: OutputFile) {
@@ -49,7 +64,9 @@ export function ResultFiles({
   /** 'neutral' for results that are valid but not an improvement (e.g. no size reduction). */
   tone?: 'success' | 'neutral';
 }) {
+  const workspace = usePdfWorkspace();
   const [zipping, setZipping] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const ref = useRef<HTMLElement>(null);
   // Bring a fresh result into view (it may appear below a long page grid).
   const first = files[0]?.data;
@@ -76,6 +93,15 @@ export function ResultFiles({
     }
   }
 
+  async function share(list: OutputFile[]) {
+    setSharing(true);
+    try {
+      if (!await shareOutputs(list)) toast(t('This browser cannot share these files. Use Download instead.'), 'info');
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') toast(t('Sharing failed. You can still download your files.'), 'error');
+    } finally { setSharing(false); }
+  }
+
   if (files.length === 1) {
     const file = files[0];
     const canOpen = file.type === 'application/pdf' || file.type.startsWith('image/');
@@ -98,7 +124,9 @@ export function ResultFiles({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {canOpen && (
+            {workspace && file.type === 'application/pdf' ? (
+              <Button variant="secondary" icon={BookOpen} onClick={() => workspace.openResult(outputToFile(file))}>{t('Read exported PDF')}</Button>
+            ) : canOpen && (
               <Button variant="secondary" icon={ExternalLink} onClick={() => openInTab(file)}>
                 {t('Open')}
               </Button>
@@ -106,6 +134,7 @@ export function ResultFiles({
             <Button variant="primary" icon={Download} onClick={() => downloadOutput(file)}>
               {t('Download')}
             </Button>
+            {workspace && supportsFileSharing(file.type) && <Button icon={Share2} loading={sharing} onClick={() => void share([file])}>{t('Share file')}</Button>}
           </div>
         </div>
         {children}
@@ -122,9 +151,12 @@ export function ResultFiles({
             {t('{count} · {size} total', { count: pluralize(files.length, t('file'), t('files')), size: formatBytes(total) })}
           </p>
         </div>
+        <div className="flex flex-wrap gap-2">
         <Button variant="primary" icon={FileArchive} loading={zipping} onClick={() => void downloadZip()}>
           {t('Download all (ZIP)')}
         </Button>
+        {workspace && supportsFileSharing(files[0].type) && <Button icon={Share2} loading={sharing} onClick={() => void share(files)}>{t('Share files')}</Button>}
+        </div>
       </header>
       {children && <div className="border-b border-line px-4 py-3">{children}</div>}
       {showList && (
@@ -137,6 +169,7 @@ export function ResultFiles({
             </span>
             <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">{formatBytes(sizeOf(file))}</span>
             <IconButton icon={Download} label={t('Download {name}', { name: file.name })} size="sm" onClick={() => downloadOutput(file)} />
+            {workspace && file.type === 'application/pdf' && <IconButton icon={BookOpen} label={t('Read {name}', { name: file.name })} size="sm" onClick={() => workspace.openResult(outputToFile(file))} />}
           </li>
         ))}
       </ul>

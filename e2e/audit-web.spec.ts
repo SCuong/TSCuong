@@ -144,7 +144,8 @@ test.describe('Previews of untrusted content', () => {
         '![Chart](https://remote-images.test/chart.png)',
       ].join('\n'),
     );
-    await expect(page.getByText('1 remote image from remote-images.test not loaded', { exact: false })).toBeVisible();
+    // The remote-content scanner also counts the two URLs in the CSS input.
+    await expect(page.getByText('3 remote images from remote-images.test not loaded', { exact: false })).toBeVisible();
     const preview = page.frameLocator('iframe[title="Rendered Markdown preview"]');
     await expect(preview.getByRole('heading', { name: 'Title' })).toBeVisible();
     expect(await page.locator('main').evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');

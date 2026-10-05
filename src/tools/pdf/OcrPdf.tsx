@@ -20,9 +20,10 @@ import { docId } from './lib/thumbnails';
 import { PdfInput, useEncryptionGate } from './components/PdfInput';
 import { usePdfFile, type LoadedPdf } from './components/usePdfFile';
 import { PageScopeControl, usePageScope } from './components/PageScope';
-import { JobProgress, ResultFiles } from './components/Results';
+import { JobProgress, ResultFiles, ShareResult } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { t } from '@/lib/i18n';
+import { MobileRasterNotice, useRasterLimits } from './components/MobileRasterNotice';
 
 type Dpi = '150' | '200' | '300';
 
@@ -89,6 +90,7 @@ export default function OcrPdf() {
 }
 
 function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const limits = useRasterLimits();
   const scope = usePageScope(pdf.pageCount, 'all');
   const [dpi, setDpi] = useState<Dpi>('300');
   const [searchable, setSearchable] = useState(true);
@@ -142,7 +144,7 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
               }
             }
             progress(base * share, `Rendering page ${pageNo}`);
-            const canvas = await renderPageToCanvas(page, { scale: Number(dpi) / 72, signal, intent: 'print' });
+            const canvas = await renderPageToCanvas(page, { scale: Number(dpi) / 72, signal, intent: 'print', ...limits });
             try {
               if (!engine.current) {
                 engine.current = await startEngine(signal, (_v, label) => progress(base * share, label));
@@ -201,6 +203,7 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
 
   return (
     <>
+      <MobileRasterNotice />
       {gate.notice}
       <Panel>
         <div className="flex flex-col gap-4">
@@ -266,6 +269,7 @@ function OcrWorkspace({ pdf }: { pdf: LoadedPdf }) {
       )}
       {pages && (
         <EditorPanel
+          actions={<ShareResult files={[{ name: outputName(pdf.file.name, 'ocr', 'txt'), data: new Blob([text], { type: 'text/plain' }), type: 'text/plain' }]} />}
           title={
             <span className="inline-flex items-center gap-2">
               {t('Recognized text')}

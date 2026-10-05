@@ -79,7 +79,7 @@ export function SortableList<T>({
       const to = d.slot > d.from ? d.slot - 1 : d.slot;
       if (e.type === 'pointerup' && to !== d.from) {
         onMove(d.from, to);
-        setAnnouncement(`${getLabel(items[d.from])} moved to position ${to + 1} of ${items.length}.`);
+        setAnnouncement(t('{label} moved to position {position} of {count}.', { label: getLabel(items[d.from]), position: to + 1, count: items.length }));
       }
     };
     window.addEventListener('pointermove', onMovePointer, { passive: false });
@@ -95,7 +95,7 @@ export function SortableList<T>({
   function move(from: number, to: number) {
     if (to < 0 || to >= items.length || to === from) return;
     onMove(from, to);
-    setAnnouncement(`${getLabel(items[from])} moved to position ${to + 1} of ${items.length}.`);
+    setAnnouncement(t('{label} moved to position {position} of {count}.', { label: getLabel(items[from]), position: to + 1, count: items.length }));
     requestAnimationFrame(() => handles.current[to]?.focus());
   }
 

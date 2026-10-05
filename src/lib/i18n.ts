@@ -56,6 +56,16 @@ export function setLocale(next: Locale) {
   if (next !== locale) window.location.reload();
 }
 
+/** Mobile PDF workspaces switch without discarding open files or editing state. */
+export async function setLocaleInPlace(next: Locale) {
+  const dictionary = next === 'vi' ? (await import('@/i18n/vi')).default : null;
+  messages = dictionary ? new Map(Object.entries(dictionary)) : null;
+  locale = next;
+  ready = true;
+  writeRaw(LOCALE_KEY, next);
+  document.documentElement.lang = next;
+}
+
 function format(template: string, params: Params): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => (Object.hasOwn(params, key) ? String(params[key]) : match));
 }

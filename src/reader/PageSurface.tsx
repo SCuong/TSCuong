@@ -1,5 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { TextLayer, releaseCanvas, type PDFDocumentProxy } from '@/tools/pdf/lib/pdfjs';
+import { TextLayer, releaseCanvas, type PDFDocumentProxy, type PDFPageProxy } from '@/tools/pdf/lib/pdfjs';
+import type { PdfMark } from './annotations';
+import { PdfMarks } from './PdfMarks';
 import { buildPageIndex, findMatches, itemsInRange, type PageTextIndex } from '@/tools/pdf/lib/search';
 import { t } from '@/lib/i18n';
 import '@/tools/pdf/components/viewer.css';
@@ -11,12 +13,14 @@ export const PageSurface = memo(function PageSurface({
   scale,
   query,
   activeMatch,
+  marks,
 }: {
   doc: PDFDocumentProxy;
   pageNumber: number;
   scale: number;
   query: string;
   activeMatch: number;
+  marks?: PdfMark[];
 }) {
   const host = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLDivElement>(null);
@@ -25,6 +29,7 @@ export const PageSurface = memo(function PageSurface({
   const [retry, setRetry] = useState(0);
   const [index, setIndex] = useState<PageTextIndex | null>(null);
   const divs = useRef<HTMLElement[]>([]);
+  const [viewport, setViewport] = useState<ReturnType<PDFPageProxy['getViewport']> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +44,7 @@ export const PageSurface = memo(function PageSurface({
       const page = await doc.getPage(pageNumber);
       if (cancelled) return;
       const css = page.getViewport({ scale });
+      setViewport(css);
       host.current!.parentElement!.style.setProperty('--user-unit', String(page.userUnit));
       // Cap each surface at 6 MP/8192 px (~24 MB), even on high-DPI phones at extreme zoom.
       const dpr = Math.min(
@@ -116,6 +122,7 @@ export const PageSurface = memo(function PageSurface({
     >
       <div ref={host} className="reader-canvas" aria-hidden="true" />
       <div ref={text} className="textLayer" />
+      {!!marks?.length && viewport && <svg className="reader-draft-overlay" viewBox={`0 0 ${viewport.width} ${viewport.height}`} aria-label={t('Saved annotations')} role="img"><PdfMarks marks={marks} viewport={viewport} /></svg>}
       {!rendered && (
         <div className="reader-paper-loading">
           {failed ? (

@@ -1,4 +1,5 @@
 import { openDB, type DBSchema } from 'idb';
+import type { PdfDraft } from './annotations';
 
 export const CACHE_LIMIT = { count: 20, bytes: 500 * 1024 * 1024 };
 
@@ -16,6 +17,7 @@ export interface ReaderDocument {
 }
 interface ReaderDB extends DBSchema {
   documents: { key: string; value: ReaderDocument };
+  edits: { key: string; value: PdfDraft };
 }
 export interface ReaderStorageAdapter {
   list(): Promise<ReaderDocument[]>;
@@ -121,9 +123,10 @@ export function createReaderRepository(adapter: ReaderStorageAdapter, lock: <T>(
 
 let database: ReturnType<typeof openDB<ReaderDB>> | undefined;
 function db() {
-  database ??= openDB<ReaderDB>('localkit-reader', 1, {
+  database ??= openDB<ReaderDB>('localkit-reader', 2, {
     upgrade(db) {
-      db.createObjectStore('documents', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('documents')) db.createObjectStore('documents', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('edits')) db.createObjectStore('edits', { keyPath: 'id' });
     },
   });
   return database;
@@ -146,7 +149,10 @@ const adapter: ReaderStorageAdapter = {
     await (await db()).put('documents', r);
   },
   remove: async (id) => {
-    await (await db()).delete('documents', id);
+    const tx = (await db()).transaction(['documents', 'edits'], 'readwrite');
+    await tx.objectStore('documents').delete(id);
+    await tx.objectStore('edits').delete(id);
+    await tx.done;
   },
   writeFile: async (id, file) => {
     const handle = await (await directory()).getFileHandle(id + '.pdf', { create: true });
@@ -172,6 +178,17 @@ function lock<T>(job: () => Promise<T>): Promise<T> {
   return result;
 }
 export const readerRepository = createReaderRepository(adapter, lock);
+export const pdfDrafts = {
+  get: async (id: string) => (await db()).get('edits', id),
+  count: async () => (await db()).count('edits'),
+  clear: () => lock(async () => { await (await db()).clear('edits'); }),
+  put: (draft: PdfDraft) => lock(async () => { await (await db()).put('edits', draft); }),
+  patch: (id: string, patch: Partial<Pick<PdfDraft, 'marks' | 'forms'>>) => lock(async () => {
+    const database = await db();
+    const old = await database.get('edits', id);
+    await database.put('edits', { id, marks: [], forms: {}, ...old, ...patch, updated: Date.now() });
+  }),
+};
 
 export async function fingerprint(bytes: Uint8Array) {
   const hash = await crypto.subtle.digest('SHA-256', bytes.slice().buffer);

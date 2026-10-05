@@ -28,15 +28,15 @@ import { PositionGrid } from './components/PositionGrid';
 import { t } from '@/lib/i18n';
 
 const POSITIONS: Array<{ value: Position; label: string }> = [
-  { value: 'top-left', label: t('Top left') },
-  { value: 'top-center', label: t('Top center') },
-  { value: 'top-right', label: t('Top right') },
-  { value: 'middle-left', label: t('Middle left') },
-  { value: 'center', label: t('Center') },
-  { value: 'middle-right', label: t('Middle right') },
-  { value: 'bottom-left', label: t('Bottom left') },
-  { value: 'bottom-center', label: t('Bottom center') },
-  { value: 'bottom-right', label: t('Bottom right') },
+  { value: 'top-left', label: 'Top left' },
+  { value: 'top-center', label: 'Top center' },
+  { value: 'top-right', label: 'Top right' },
+  { value: 'middle-left', label: 'Middle left' },
+  { value: 'center', label: 'Center' },
+  { value: 'middle-right', label: 'Middle right' },
+  { value: 'bottom-left', label: 'Bottom left' },
+  { value: 'bottom-center', label: 'Bottom center' },
+  { value: 'bottom-right', label: 'Bottom right' },
 ];
 
 let measureCtx: CanvasRenderingContext2D | null = null;
@@ -100,10 +100,10 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const margin = 36;
   const unsupported = unsupportedCharacters(text);
   const errors = [
-    kind === 'text' && !text.trim() ? 'Enter the watermark text.' : null,
+    kind === 'text' && !text.trim() ? t('Enter the watermark text.') : null,
     kind === 'text' && unsupported.length ? unsupportedCharacterMessage(unsupported) : null,
-    kind === 'text' && (fontSize === '' || fontSize < 4 || fontSize > 400) ? 'Font size must be between 4 and 400 pt.' : null,
-    kind === 'image' && !image ? (imageError ?? 'Choose an image for the watermark.') : null,
+    kind === 'text' && (fontSize === '' || fontSize < 4 || fontSize > 400) ? t('Font size must be between 4 and 400 pt.') : null,
+    kind === 'image' && !image ? (imageError ?? t('Choose an image for the watermark.')) : null,
   ].filter(Boolean) as string[];
 
   const previewPage = scope.pages[0];
@@ -248,7 +248,7 @@ function WatermarkWorkspace({ pdf }: { pdf: LoadedPdf }) {
                   label={t('Position')}
                   value={position}
                   onChange={setPosition}
-                  options={POSITIONS}
+                  options={POSITIONS.map((entry) => ({ ...entry, label: t(entry.label) }))}
                   disabled={tile}
                   className="w-32 gap-1"
                   cellClassName={() => 'h-8 justify-center rounded-md'}

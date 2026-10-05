@@ -44,7 +44,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useHistory } from './components/useHistory';
 import { useKeyedResult } from './components/useKeyedResult';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 
 interface ExtraSource {
   name: string;
@@ -64,6 +64,7 @@ export default function OrganizePages() {
 }
 
 function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const locale = getLocale();
   const history = useHistory<PageItem[]>(useMemo(() => initialItems(pdf.pageCount), [pdf.pageCount]));
   const items = history.value;
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -121,11 +122,13 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
               doc: docs[it.source],
               pageIndex: it.index,
               rotation: it.rotate,
-              label: it.source === 0 ? t('Page {index}', { index: it.index + 1 }) : `p. ${it.index + 1}`,
+              label: t('Page {index}', { index: it.index + 1 }),
               sublabel: it.source === 0 ? undefined : extras[it.source - 1]?.name,
             },
       ),
-    [items, docs, extras],
+    // t() reads the current locale implicitly; cached page labels must follow language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, docs, extras, locale],
   );
 
   function change(next: PageItem[] | ((prev: PageItem[]) => PageItem[])) {
@@ -285,7 +288,7 @@ function OrganizeWorkspace({ pdf }: { pdf: LoadedPdf }) {
           </span>
           {(['all', 'odd', 'even'] as const).map((w) => (
             <Button key={w} size="sm" variant="ghost" onClick={() => setSelected(idsByPosition(items, w))}>
-              {w[0].toUpperCase() + w.slice(1)}
+              {t(w === 'all' ? 'All' : w === 'odd' ? 'Odd' : 'Even')}
             </Button>
           ))}
           <Button size="sm" variant="ghost" disabled={!hasSel} onClick={() => setSelected(new Set())}>

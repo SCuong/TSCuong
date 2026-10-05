@@ -240,7 +240,7 @@ test('restores the scroll offset within a page after a full reload', async ({ pa
       page.evaluate(
         () =>
           new Promise<number>((resolve, reject) => {
-            const request = indexedDB.open('localkit-reader', 1);
+            const request = indexedDB.open('localkit-reader');
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
               const db = request.result;

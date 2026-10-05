@@ -26,12 +26,12 @@ import { t } from '@/lib/i18n';
 
 const FORMATS = ['{n}', 'Page {n}', 'Page {n} of {total}', '{n} / {total}', '- {n} -'] as const;
 const POSITIONS: Array<{ value: NumberPosition; label: string }> = [
-  { value: 'top-left', label: t('Top left') },
-  { value: 'top-center', label: t('Top center') },
-  { value: 'top-right', label: t('Top right') },
-  { value: 'bottom-left', label: t('Bottom left') },
-  { value: 'bottom-center', label: t('Bottom center') },
-  { value: 'bottom-right', label: t('Bottom right') },
+  { value: 'top-left', label: 'Top left' },
+  { value: 'top-center', label: 'Top center' },
+  { value: 'top-right', label: 'Top right' },
+  { value: 'bottom-left', label: 'Bottom left' },
+  { value: 'bottom-center', label: 'Bottom center' },
+  { value: 'bottom-right', label: 'Bottom right' },
 ];
 
 export default function AddPageNumbers() {
@@ -64,11 +64,11 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
   const pages = useMemo(() => (skipFirst ? scope.pages.filter((p) => p !== 0) : scope.pages), [scope.pages, skipFirst]);
 
   const errors = [
-    fontSize === '' || fontSize < 4 || fontSize > 144 ? 'Font size must be between 4 and 144 pt.' : null,
-    marginMm === '' || marginMm < 0 || marginMm > 100 ? 'Margin must be between 0 and 100 mm.' : null,
-    start === '' || !Number.isInteger(start) || start < 0 ? 'The start number must be a whole number (0 or more).' : null,
-    !hasPageToken(format) ? 'The format must contain {n} (or a zero-padded {n:6}).' : null,
-    format.length > 60 ? 'The format is too long.' : null,
+    fontSize === '' || fontSize < 4 || fontSize > 144 ? t('Font size must be between 4 and 144 pt.') : null,
+    marginMm === '' || marginMm < 0 || marginMm > 100 ? t('Margin must be between 0 and 100 mm.') : null,
+    start === '' || !Number.isInteger(start) || start < 0 ? t('The start number must be a whole number (0 or more).') : null,
+    !hasPageToken(format) ? t('The format must contain {n} (or a zero-padded {n:6}).') : null,
+    format.length > 60 ? t('The format is too long.') : null,
     unsupported.length ? unsupportedCharacterMessage(unsupported) : null,
   ].filter(Boolean) as string[];
 
@@ -113,7 +113,7 @@ function NumbersWorkspace({ pdf }: { pdf: LoadedPdf }) {
                 label={t('Position')}
                 value={position}
                 onChange={setPosition}
-                options={POSITIONS}
+                options={POSITIONS.map((entry) => ({ ...entry, label: t(entry.label) }))}
                 className="max-w-xs"
                 cellClassName={(v) =>
                   cn(

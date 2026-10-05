@@ -38,12 +38,12 @@ interface Loaded {
 }
 
 const TEXT_FIELDS: Array<{ key: keyof MetadataFields; label: string; multiline?: boolean; hint?: string }> = [
-  { key: 'title', label: t('Title') },
-  { key: 'author', label: t('Author') },
-  { key: 'subject', label: t('Subject'), multiline: true },
-  { key: 'keywords', label: t('Keywords'), hint: t('Usually separated by commas.') },
-  { key: 'creator', label: t('Creator'), hint: t('The app that created the original document.') },
-  { key: 'producer', label: t('Producer'), hint: t('The app that produced the PDF.') },
+  { key: 'title', label: 'Title' },
+  { key: 'author', label: 'Author' },
+  { key: 'subject', label: 'Subject', multiline: true },
+  { key: 'keywords', label: 'Keywords', hint: 'Usually separated by commas.' },
+  { key: 'creator', label: 'Creator', hint: 'The app that created the original document.' },
+  { key: 'producer', label: 'Producer', hint: 'The app that produced the PDF.' },
 ];
 
 async function readWithPdfjs(pdf: LoadedPdf): Promise<Loaded> {
@@ -141,7 +141,7 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {TEXT_FIELDS.map((f) => (
             <div key={f.key} className={f.multiline ? 'sm:col-span-2' : undefined}>
-              <Label htmlFor={`${baseId}-${f.key}`}>{f.label}</Label>
+              <Label htmlFor={`${baseId}-${f.key}`}>{t(f.label)}</Label>
               {f.multiline ? (
                 <Textarea
                   id={`${baseId}-${f.key}`}
@@ -154,7 +154,7 @@ function MetadataWorkspace({ pdf }: { pdf: LoadedPdf }) {
               ) : (
                 <Input id={`${baseId}-${f.key}`} value={fields[f.key]} onChange={(e) => set(f.key, e.target.value)} />
               )}
-              {f.hint && <p className="mt-1 text-[12px] text-fg-muted">{f.hint}</p>}
+              {f.hint && <p className="mt-1 text-[12px] text-fg-muted">{t(f.hint)}</p>}
             </div>
           ))}
           {(['creationDate', 'modDate'] as const).map((key) => (

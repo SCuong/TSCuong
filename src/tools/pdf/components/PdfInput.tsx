@@ -9,6 +9,9 @@ import { Spinner } from '@/components/ui/Feedback';
 import { formatBytes, pluralize } from '@/lib/utils';
 import type { LoadedPdf, PdfFileController } from './usePdfFile';
 import { t } from '@/lib/i18n';
+import { usePdfWorkspace } from './PdfWorkspaceContext';
+import { readerErrorMessage } from '@/reader/errorMessage';
+import { Link } from 'react-router';
 
 export const PDF_ACCEPT = 'application/pdf,.pdf';
 
@@ -28,6 +31,7 @@ export function PdfInput({
   hint?: ReactNode;
 }) {
   const { state, open, submitPassword, reset } = controller;
+  const workspace = usePdfWorkspace();
 
   if (state.status === 'ready') {
     return (
@@ -47,12 +51,12 @@ export function PdfInput({
   }
 
   if (state.status === 'password') {
-    return <PasswordPrompt name={state.file.name} error={state.error} onSubmit={submitPassword} onCancel={reset} />;
+    return <PasswordPrompt name={state.file.name} error={state.error && workspace ? t('That PDF password is incorrect. Try again.') : state.error} onSubmit={submitPassword} onCancel={reset} />;
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {state.status === 'error' && <ErrorMessage error={state.error} title={t('Could not open the PDF')} />}
+      {state.status === 'error' && <ErrorMessage error={workspace ? readerErrorMessage(state.error, state.name) : state.error} title={t('Could not open the PDF')} />}
       <FileDrop
         accept={PDF_ACCEPT}
         onFiles={(files) => void open(files[0])}
@@ -217,6 +221,7 @@ const PROTECTION_HINT = 'Remove the protection in your PDF app first (for exampl
  * default explanation of what goes wrong for 'copy'/'draw' tools.
  */
 export function useEncryptionGate(pdf: LoadedPdf | null, impact: EncryptionImpact, detail?: string) {
+  const workspace = usePdfWorkspace();
   const [allowed, setAllowed] = useState<LoadedPdf | null>(null);
   if (!pdf?.encrypted) return { ok: true, ignoreEncryption: false, notice: null };
   const protection = pdf.password ? 'an open password' : 'permission restrictions (an owner password)';
@@ -233,6 +238,10 @@ export function useEncryptionGate(pdf: LoadedPdf | null, impact: EncryptionImpac
       ),
     };
   }
+  if (workspace) return {
+    ok: false, ignoreEncryption: false,
+    notice: <Alert tone="warning" title={t('This PDF is encrypted')}>{t('Unlock a copy in PDF passwords before using this tool. Text and forms will be preserved.')} <Link className="text-accent underline" to="/read/tools/pdf-protection">{t('PDF passwords')}</Link></Alert>,
+  };
   const tried = allowed === pdf;
   const consequence =
     detail ??
@@ -240,14 +249,14 @@ export function useEncryptionGate(pdf: LoadedPdf | null, impact: EncryptionImpac
       ? 'Pages copied out of an encrypted PDF come out blank or unreadable, because the in-browser PDF editor cannot decrypt them.'
       : 'Text or images added to an encrypted PDF will not show up, because the in-browser PDF editor cannot encrypt them with the file’s key.');
   return {
-    ok: tried,
+    ok: tried && !workspace,
     ignoreEncryption: tried,
     notice: (
       <Alert
         tone="warning"
         title={t('This PDF is encrypted')}
         action={
-          tried ? undefined : (
+          tried || workspace ? undefined : (
             <Button size="sm" variant="secondary" onClick={() => setAllowed(pdf)}>
               {t('Try anyway')}
             </Button>

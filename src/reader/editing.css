@@ -1,0 +1,24 @@
+.pdf-edit-workspace { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.pdf-edit-navigation { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pdf-edit-navigation label { display: flex; align-items: center; gap: 6px; margin-right: auto; font-size: 13px; }
+.pdf-edit-navigation input { width: 64px; padding: 6px; border: 1px solid var(--lk-border); border-radius: 8px; background: var(--lk-surface); }
+.pdf-edit-toolbar { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px; border-radius: 12px; border: 1px solid var(--lk-border); background: var(--lk-surface); }
+.pdf-annotate-toolbar { position: sticky; top: calc(61px + env(safe-area-inset-top)); z-index: 15; }
+.pdf-edit-toolbar button { padding: 8px 12px; border-radius: 8px; font-size: 13px; border: 1px solid transparent; }
+.pdf-edit-toolbar button[aria-pressed='true'] { background: var(--lk-accent-soft); border-color: var(--lk-accent); color: var(--lk-accent-text); }
+.pdf-edit-color { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 0 8px; }
+.pdf-edit-color input { width: 44px; height: 44px; background: transparent; }
+.pdf-edit-hint { font-size: 12px; line-height: 1.7; color: var(--lk-text-secondary); }
+.pdf-edit-paper-host { min-width: 0; min-height: 100px; overflow: auto; max-height: 75dvh; overscroll-behavior: contain; }
+.pdf-edit-paper { position: relative; margin: 0 auto; background: white; box-shadow: 0 2px 12px #0002; }
+.pdf-edit-navigation select { max-width: 140px; padding: 6px; border: 1px solid var(--lk-border); border-radius: 8px; background: var(--lk-surface); }
+.pdf-edit-overlay { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; }
+.pdf-edit-note, .pdf-form-field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.pdf-edit-note textarea, .pdf-form-field input:not([type=checkbox]):not([type=radio]), .pdf-form-field textarea, .pdf-form-field select { border: 1px solid var(--lk-border); padding: 12px; border-radius: 8px; background: var(--lk-surface); width: 100%; min-width: 0; font-size: 16px; }
+.pdf-edit-note-label { background: #fff7ce; color: #17212f; font-size: 13px; padding: 5px 8px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; height: 100%; }
+.pdf-edit-marks { display: flex; flex-direction: column; gap: 6px; }
+.pdf-edit-marks li { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--lk-border); border-radius: 10px; }
+.pdf-edit-marks span { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.pdf-form-fields { display: flex; flex-direction: column; gap: 20px; padding: 16px; border: 1px solid var(--lk-border); border-radius: 12px; background: var(--lk-surface); }
+.pdf-form-checkbox { display: flex; gap: 12px; align-items: center; min-height: 44px; }
+.pdf-form-checkbox input { width: 22px; height: 22px; accent-color: var(--lk-accent); }

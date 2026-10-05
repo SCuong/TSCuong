@@ -13,10 +13,14 @@ import { createOcrEngine, type OcrEngine } from './lib/engine';
 import { imageFileToCanvas } from './lib/canvas';
 import { confidenceLevel, type OcrPageResult } from './lib/result';
 import { t } from '@/lib/i18n';
+import { ShareResult } from '@/tools/pdf/components/Results';
+import { usePdfWorkspace } from '@/tools/pdf/components/PdfWorkspaceContext';
+import { pdfProgressText } from '@/tools/pdf/lib/progressText';
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif,.png,.jpg,.jpeg,.webp,.gif,.bmp,.avif';
 
 export default function ImageOcr() {
+  const mobile = Boolean(usePdfWorkspace());
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<OcrPageResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +175,7 @@ export default function ImageOcr() {
           <div className="flex min-w-0 flex-col gap-4">
             {running && (
               <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-                <ProgressBar value={progress.value} label={progress.label || t('Working…')} onCancel={cancel} />
+                <ProgressBar value={progress.value} label={mobile ? pdfProgressText(progress.label || t('Working…')) : progress.label || t('Working…')} onCancel={cancel} />
               </div>
             )}
             <ErrorMessage error={error} title={t('Recognition failed')} />
@@ -182,6 +186,7 @@ export default function ImageOcr() {
             )}
             {result && (
               <EditorPanel
+                actions={<ShareResult files={[{ name: withExtension(file.name, 'txt'), data: new Blob([result.text], { type: 'text/plain' }), type: 'text/plain' }]} />}
                 title={
                   <span className="inline-flex items-center gap-2">
                     {t('Recognized text')}

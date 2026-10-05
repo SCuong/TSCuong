@@ -91,7 +91,7 @@ function CropWorkspace({ pdf }: { pdf: LoadedPdf }) {
               {SIDES.map((side) => (
                 <div key={side}>
                   <Label htmlFor={`${baseId}-${side}`}>
-                    <span className="capitalize">{side}</span> ({unit})
+                    <span>{t(side === 'top' ? 'Top' : side === 'right' ? 'Right' : side === 'bottom' ? 'Bottom' : 'Left')}</span> ({unit})
                   </Label>
                   <NumberInput
                     id={`${baseId}-${side}`}

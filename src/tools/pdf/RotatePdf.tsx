@@ -18,7 +18,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { verifyEncryptedEdit } from './components/verifyEdit';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 
 type Angle = '90' | '180' | '270';
 
@@ -34,6 +34,7 @@ export default function RotatePdf() {
 }
 
 function RotateWorkspace({ pdf }: { pdf: LoadedPdf }) {
+  const locale = getLocale();
   const scope = usePageScope(pdf.pageCount, 'all');
   const [angle, setAngle] = useState<Angle>('90');
   const inputKey = `${angle}|${scope.pages.join(',')}`;
@@ -54,7 +55,9 @@ function RotateWorkspace({ pdf }: { pdf: LoadedPdf }) {
         label: t('Page {i}', { i: i + 1 }),
         state: affected.has(i) ? 'highlight' : 'normal',
       })),
-    [pdf, rotationOf, affected],
+    // t() reads the current locale implicitly; cached page labels must follow language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pdf, rotationOf, affected, locale],
   );
 
   async function run() {

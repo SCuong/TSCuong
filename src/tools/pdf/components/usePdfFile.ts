@@ -3,6 +3,7 @@ import { readPdfFile, looksEncrypted } from '../lib/bytes';
 import { toPdfError } from '../lib/errors';
 import { openPdf, type OpenedPdf, type PDFDocumentProxy } from '../lib/pdfjs';
 import { releaseThumbnails } from '../lib/thumbnails';
+import { usePdfWorkspace } from './PdfWorkspaceContext';
 
 export interface LoadedPdf {
   file: File;
@@ -28,6 +29,10 @@ export type PdfFileState =
  * thumbnails) when replaced or when the component unmounts.
  */
 export function usePdfFile() {
+  const workspace = usePdfWorkspace();
+  const initialFile = workspace?.file;
+  const setSource = workspace?.setSource;
+  const source = useRef<File | null>(null);
   const [state, setState] = useState<PdfFileState>({ status: 'idle' });
   const opened = useRef<OpenedPdf | null>(null);
   const generation = useRef(0);
@@ -42,6 +47,7 @@ export function usePdfFile() {
 
   useEffect(
     () => () => {
+      source.current = null;
       generation.current++;
       dispose();
     },
@@ -89,6 +95,8 @@ export function usePdfFile() {
 
   const open = useCallback(
     async (file: File) => {
+      source.current = file;
+      setSource?.(file);
       const gen = ++generation.current;
       dispose();
       setState({ status: 'loading', name: file.name });
@@ -101,7 +109,7 @@ export function usePdfFile() {
         setState({ status: 'error', error: toPdfError(error, file.name).message, name: file.name });
       }
     },
-    [openBytes, dispose],
+    [openBytes, dispose, setSource],
   );
 
   const submitPassword = useCallback(
@@ -116,10 +124,16 @@ export function usePdfFile() {
   );
 
   const reset = useCallback(() => {
+    source.current = null;
+    setSource?.(null);
     generation.current++;
     dispose();
     setState({ status: 'idle' });
-  }, [dispose]);
+  }, [dispose, setSource]);
+
+  useEffect(() => {
+    if (source.current !== initialFile && (initialFile?.type === 'application/pdf' || initialFile?.name.toLowerCase().endsWith('.pdf'))) void open(initialFile);
+  }, [initialFile, open]);
 
   return { state, open, submitPassword, reset, pdf: state.status === 'ready' ? state.pdf : null };
 }

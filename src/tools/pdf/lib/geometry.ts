@@ -141,8 +141,8 @@ export const ptToIn = (pt: number) => pt / 72;
 
 export const PAPER_SIZES = {
   a4: { width: 595.28, height: 841.89, label: 'A4' },
-  letter: { width: 612, height: 792, label: t('Letter') },
-  legal: { width: 612, height: 1008, label: t('Legal') },
+  letter: { width: 612, height: 792, label: 'Letter' },
+  legal: { width: 612, height: 1008, label: 'Legal' },
   a3: { width: 841.89, height: 1190.55, label: 'A3' },
   a5: { width: 419.53, height: 595.28, label: 'A5' },
 } as const;
@@ -151,7 +151,7 @@ export const PAPER_SIZES = {
 export function paperName(width: number, height: number): string | null {
   for (const p of Object.values(PAPER_SIZES)) {
     const near = (a: number, b: number) => Math.abs(a - b) < 1.5;
-    if ((near(width, p.width) && near(height, p.height)) || (near(width, p.height) && near(height, p.width))) return p.label;
+    if ((near(width, p.width) && near(height, p.height)) || (near(width, p.height) && near(height, p.width))) return t(p.label);
   }
   return null;
 }

@@ -88,7 +88,7 @@ function DeleteWorkspace({ pdf }: { pdf: LoadedPdf }) {
               loading={job.running}
               onClick={() => setConfirming(true)}
             >
-              Delete {removed.size ? pluralize(removed.size, t('page'), t('pages')) : 'pages'}
+              {t('Delete')} {removed.size ? pluralize(removed.size, t('page'), t('pages')) : t('pages')}
             </Button>
             {removed.size > 0 && !everything && (
               <span className="text-[13px] text-fg-muted">

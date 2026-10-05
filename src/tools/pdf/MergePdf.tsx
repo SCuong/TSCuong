@@ -23,6 +23,7 @@ import { JobProgress, ResultFiles } from './components/Results';
 import { usePdfJob } from './components/usePdfJob';
 import { useKeyedResult } from './components/useKeyedResult';
 import { t } from '@/lib/i18n';
+import { usePdfWorkspace } from './components/PdfWorkspaceContext';
 
 interface Entry {
   id: string;
@@ -39,6 +40,9 @@ interface Entry {
 let seq = 0;
 
 export default function MergePdf() {
+  const workspace = usePdfWorkspace();
+  const initialFile = workspace?.file;
+  const claimed = useRef<File | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [outputName, setOutputName] = useState('merged.pdf');
   const [allowEncrypted, setAllowEncrypted] = useState(false);
@@ -71,6 +75,7 @@ export default function MergePdf() {
   }
 
   async function addFiles(files: File[]) {
+    if (workspace && !workspace.file && files[0]) { claimed.current = files[0]; workspace.setSource(files[0]); }
     const added: Entry[] = files.map((file) => ({ id: `f${++seq}`, file, status: 'loading', range: '' }));
     setEntries((list) => [...list, ...added]);
     for (const entry of added) {
@@ -102,6 +107,14 @@ export default function MergePdf() {
       }
     }
   }
+
+  useEffect(() => {
+    if (!initialFile || claimed.current === initialFile) return;
+    claimed.current = initialFile;
+    void addFiles([initialFile]);
+    // The incoming file is claimed once; later edits are managed by this workspace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
 
   function remove(id: string) {
     setEntries((list) => {
@@ -140,7 +153,7 @@ export default function MergePdf() {
   }, [ready]);
 
   const canMerge =
-    ready.length > 0 && !loading && plan.errors.length === 0 && plan.pages > 0 && (!hasEncrypted || allowEncrypted) && !job.running;
+    ready.length > 0 && !loading && plan.errors.length === 0 && plan.pages > 0 && (!hasEncrypted || allowEncrypted && !workspace) && !job.running;
   // Order, files and page ranges: a merged file is only offered while it matches the list.
   const inputKey = JSON.stringify(plan.files.map((f) => [f.entry.id, f.pages ?? null]));
   const result = useKeyedResult<{ data: Blob; pages: number; files: number }>(inputKey);
@@ -257,7 +270,7 @@ export default function MergePdf() {
       {hasEncrypted && (
         <Alert tone="warning" title={t('Some files are encrypted')}>
           {t('Pages copied out of an encrypted PDF come out blank or unreadable, because the in-browser PDF editor cannot decrypt them. Remove the protection in your PDF app first (for example by printing to a new PDF), then add that copy here.')}
-          <Checkbox className="mt-2" label={t('Merge them anyway')} checked={allowEncrypted} onChange={setAllowEncrypted} />
+          {!workspace && <Checkbox className="mt-2" label={t('Merge them anyway')} checked={allowEncrypted} onChange={setAllowEncrypted} />}
         </Alert>
       )}
 
