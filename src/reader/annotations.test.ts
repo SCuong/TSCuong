@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFRawStream, decodePDFRawStream, degrees } from 'pdf-lib';
 import { annotate } from '@/tools/pdf/lib/ops';
-import { clampPoint, markBounds } from './annotations';
+import { clampPoint, markBounds, wrapNoteLines } from './annotations';
 describe('local PDF annotations', () => {
+  it('wraps notes using measured glyph widths while keeping Unicode and blank lines', () => {
+    const measure = (text: string) => [...text].reduce((width, char) => width + (char === 'W' ? 12 : 4), 0);
+    expect(wrapNoteLines('WWW\n\nViệt', 24, measure)).toEqual(['WW', 'W', '', 'Việt']);
+    expect(wrapNoteLines('😀😀', 1, measure)).toEqual(['😀', '😀']);
+  });
   it('bounds strokes and clips pointer positions to the page', () => {
     expect(markBounds([[10, 90], [80, 20]])).toEqual({ x: 10, y: 20, width: 70, height: 70 });
     expect(clampPoint(-5, 400, 100, 300)).toEqual([0, 300]);

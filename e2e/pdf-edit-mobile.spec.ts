@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import { makePdf, type FilePayload } from './files';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFNumber, PDFRawStream } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -82,11 +82,20 @@ test('real text selection, touch drawing, notes and signatures persist and expor
   await page.getByRole('dialog').getByRole('textbox', { name: 'Text note' }).fill('Ghi chú tiếng Việt — đã sửa');
   await page.getByRole('button', { name: 'Save note', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const noteBounds = (await page.locator('.pdf-edit-overlay foreignObject').boundingBox())!;
   await page.getByRole('button', { name: 'Export annotated copy' }).click();
   await expect(page.getByRole('button', { name: 'Read exported PDF' })).toBeVisible();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download', exact: true }).click();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const bytes = await readFile((await (await download).path())!);
+  const exported = await PDFDocument.load(bytes);
+  const images = exported.context.enumerateIndirectObjects().map(([, object]) => object).filter((object): object is PDFRawStream => object instanceof PDFRawStream && object.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'));
+  expect(images.length).toBeGreaterThan(0);
+  for (const image of images) {
+    const width = image.dict.lookup(PDFName.of('Width'), PDFNumber).asNumber();
+    const height = image.dict.lookup(PDFName.of('Height'), PDFNumber).asNumber();
+    expect(height / width).toBeCloseTo(noteBounds.height / noteBounds.width, 2);
+  }
   const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 }); const doc = await task.promise;
   const annotations = await (await doc.getPage(1)).getAnnotations();
   expect(annotations.some((annotation) => annotation.contentsObj?.str === 'Ghi chú tiếng Việt')).toBe(true);

@@ -16,7 +16,7 @@ import { docId } from '@/tools/pdf/lib/thumbnails';
 import { PageSurface } from './PageSurface';
 import { PdfMarks } from './PdfMarks';
 import { fingerprint, pdfDrafts, readerRepository } from './storage';
-import { clampPoint, markBounds, type MarkKind, type PdfMark } from './annotations';
+import { clampPoint, markBounds, wrapNoteLines, type MarkKind, type PdfMark } from './annotations';
 import { t } from '@/lib/i18n';
 import './editing.css';
 import { Link } from 'react-router';
@@ -112,9 +112,10 @@ function AnnotateWorkspace({ pdf, initial }: { pdf: LoadedPdf; initial: Initial 
   }
   function notePoints(text: string, x: number, y: number, width = 240) {
     const w = Math.min(width, viewport!.width - 16);
-    const columns = Math.max(1, Math.floor((w - 16) / 8));
-    const lines = text.split('\n').reduce((total, paragraph) => total + Math.max(1, Math.ceil(paragraph.length / columns)), 0);
-    const h = Math.min(viewport!.height - 16, 14 + lines * 19);
+    const context = document.createElement('canvas').getContext('2d')!;
+    context.font = '13px "Geist Variable", sans-serif';
+    const lines = wrapNoteLines(text, w - 16, (line) => context.measureText(line).width);
+    const h = Math.min(viewport!.height - 16, Math.ceil(10 + lines.length * 18.2));
     return pointsForRect(Math.max(0, Math.min(x, viewport!.width - w)), Math.max(0, Math.min(y, viewport!.height - h)), w, h);
   }
   function finish(event: PointerEvent<SVGSVGElement>) {
@@ -160,21 +161,19 @@ function AnnotateWorkspace({ pdf, initial }: { pdf: LoadedPdf; initial: Initial 
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
         if (mark.kind !== 'note') { prepared.push(mark); continue; }
         const canvas = document.createElement('canvas');
-        canvas.width = 720; canvas.height = 300;
+        const [tl, tr, , bl] = mark.points;
+        const noteWidth = Math.hypot(tr[0] - tl[0], tr[1] - tl[1]);
+        const noteHeight = Math.hypot(bl[0] - tl[0], bl[1] - tl[1]);
+        // Equal resolution on both axes preserves font proportions when embedded in the PDF.
+        canvas.width = Math.max(1, Math.round(noteWidth * 3));
+        canvas.height = Math.max(1, Math.round(noteHeight * 3));
         const context = canvas.getContext('2d')!;
-        context.fillStyle = '#fff7ce'; context.fillRect(0, 0, 720, 300);
-        context.fillStyle = '#17212f'; context.font = '36px "Geist Variable", sans-serif';
-        const lines: string[] = [];
-        for (const paragraph of (mark.text ?? '').split('\n')) {
-          let line = '';
-          for (const char of paragraph) { if (context.measureText(line + char).width > 660) { lines.push(line); line = ''; } line += char; }
-          lines.push(line);
-        }
-        // Grow the note to include every line, with a bounded canvas (notes are limited to 500 characters).
-        canvas.height = Math.max(100, lines.length * 44 + 40);
-        context.fillStyle = '#fff7ce'; context.fillRect(0, 0, canvas.width, canvas.height);
-        context.fillStyle = '#17212f'; context.font = '36px "Geist Variable", sans-serif';
-        lines.forEach((line, i) => context.fillText(line, 24, 48 + i * 44));
+        context.scale(3, 3);
+        context.fillStyle = '#fff7ce'; context.fillRect(0, 0, noteWidth, noteHeight);
+        context.fillStyle = '#17212f'; context.font = '13px "Geist Variable", sans-serif';
+        context.textBaseline = 'top';
+        const lines = wrapNoteLines(mark.text ?? '', noteWidth - 16, (line) => context.measureText(line).width);
+        lines.forEach((line, i) => context.fillText(line, 8, 5 + i * 18.2));
         const blob = await new Promise<Blob>((resolve) => canvas.toBlob((value) => resolve(value!), 'image/png'));
         prepared.push({ ...mark, image: new Uint8Array(await blob.arrayBuffer()) });
         canvas.width = canvas.height = 0;
