@@ -1,23 +1,22 @@
-# LocalKit
+# LocalKit PDF
 
-A local-first toolbox of developer, document, media and data utilities that run entirely in your browser.
-Open it, search for what you need (`Ctrl/⌘ K`), use the tool. Files never leave your device. There is no account and no backend, and it works offline once cached.
+This feature branch defaults to a standalone mobile PDF application. Open `/` or `/read` for Overview, then use Library, Tools and Settings through one bottom navigation. Read, organize, annotate, fill forms, protect and export PDFs locally, with cached first-page previews. Files never leave your device; there is no account or backend.
+
+See [the PDF application guide](docs/MOBILE-PDF-READER.md) for installation, offline preparation and file management. Unrelated routes redirect into the PDF app. The original LocalKit toolbox remains shared internally and can be built explicitly with `VITE_APP_MODE=toolbox`; production deployment requires no mode override.
 
 ## Highlights
 
-- **100+ tools** across PDF, images, JSON, text, encoding, data formats, web development, color, security/crypto,
-  generators, date/time, networking, Git, QR/barcodes, math and files.
-- **Workspaces**: Markdown notes, snippet manager, Mermaid diagram studio, SQLite studio, API client, local file search.
-- **Universal search** with fuzzy matching, synonyms and natural phrases ("compress picture", "jpg to webp", "decode jwt"),
-  plus a keyboard-first command palette.
-- **Favorites, pins, recent tools, usage history, recent searches**, all stored locally, with backup/restore.
+- **File library** with persistent first-page previews, filename search, favorites, availability filters and sorting.
+- **One app navigation**: Overview, Library, Tools and Settings; immersive reading hides the navigation and scroll chrome.
 - **Dark, light and system themes** with no flash on startup.
-- **Mobile PDF application** at `/read`: continuous reading, touch zoom, search, bookmarks and saved positions;
+- **PDF reading and editing**: continuous reading, touch zoom, search, bookmarks and saved positions;
   a mobile toolkit for arranging, converting, cropping, compressing and exporting; persistent annotations,
   visual signatures, form filling and AES-256 password tools. English/Vietnamese UI and local device storage.
 - **Installable PWA** with offline support. PDF reading, editing and password engines are precached for first use.
-  English OCR has an explicit offline preparation workflow. Other heavy engines (SQLite WASM, Mermaid)
-  are lazy-loaded and cached the first time you use them.
+  English OCR has an explicit offline preparation workflow.
+
+The shared toolbox source still contains its original developer, image, data, text and workspace tools.
+They are available in the explicit toolbox build and covered by the regression suite, without appearing in the PDF deployment.
 
 ## Development
 
@@ -45,6 +44,8 @@ On first use, install Playwright's browser with `npx playwright install chromium
 
 See [the mobile reader guide](docs/MOBILE-PDF-READER.md) for Chrome DevTools device-emulation review and the
 installed-Chrome e2e command, complete PDF workflows and HTTPS PWA installation. Validation requires no physical phone or ADB.
+
+The [standalone acceptance record](docs/PDF-STANDALONE-VALIDATION.md) documents app routing, preview persistence, mobile UI review and production regression coverage.
 
 ## Architecture
 

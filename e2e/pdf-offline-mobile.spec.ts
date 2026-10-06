@@ -28,10 +28,10 @@ test('toolkit and AES-256 engine work on their first use entirely offline', asyn
 test('prepared OCR recognizes images and creates a searchable scanned PDF offline', async ({ page, context }) => {
   test.setTimeout(150000);
   await installed(page); const fixture = await scan(page);
-  await page.getByRole('button', { name: 'Reader settings' }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Prepare English OCR for offline use' }).click();
   await expect(page.getByRole('button', { name: 'English OCR is ready offline' })).toBeVisible({ timeout: 90000 });
-  await page.getByRole('button', { name: 'Close dialog' }).click(); await context.setOffline(true);
+  await page.getByRole('link', { name: 'Overview', exact: true }).click(); await context.setOffline(true);
   await page.goto('/read/tools/image-ocr'); await page.locator('.pdf-toolkit input[type=file]').first().setInputFiles(fixture.png);
   // Image OCR starts immediately after choosing an image.
   await expect(page.getByRole('textbox', { name: 'Recognized text', exact: true })).toContainText('invoice 12345', { timeout: 60000 });

@@ -1,5 +1,7 @@
 # PDF product acceptance — 2026-10-05
 
+The subsequent PDF-only mobile app redesign is documented in [the 2026-10-06 standalone acceptance record](PDF-STANDALONE-VALIDATION.md). This file preserves the completed Phase 2–4 validation history.
+
 Phases 2–4 extend approved Phase 1 commit `38dc6465c50da5ef3a09dc875ae0e3afaa70f8ca` on `codex/mobile-pdf-reader`. The implementation milestone is `4415d8e15bd6479b65c69ff3a342362e8dd7b563`; the final follow-up fixes exported note proportions and records acceptance here. No merge to `main`, backend, cloud document processing or native packaging is included.
 
 ## Final checks

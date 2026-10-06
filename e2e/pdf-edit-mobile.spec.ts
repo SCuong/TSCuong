@@ -119,10 +119,10 @@ test('clearing editing drafts keeps the source PDF and reader bookmarks', async 
   await page.getByRole('button', { name: 'Bookmark this page' }).click();
   await expect(page.getByText('Edits saved on this device. Export a copy to keep your markup in the PDF.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Read source PDF' }).click(); await expect(page.locator('.reader-draft-overlay')).toContainText('Local draft');
-  await page.getByRole('button', { name: 'Back to library' }).click(); await page.getByRole('button', { name: 'Reader settings' }).click();
+  await page.getByRole('button', { name: 'Back to library' }).click(); await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(page.getByText('1 document editing drafts saved', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Clear annotation and form drafts' }).click(); await page.getByRole('button', { name: 'Clear drafts', exact: true }).click();
-  await expect(page.getByText('0 document editing drafts saved', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(page.getByText('0 document editing drafts saved', { exact: true })).toBeVisible(); await page.getByRole('link', { name: 'Library', exact: true }).click();
   await page.locator('.reader-document-open').filter({ hasText: 'Keep original.pdf' }).click();
   await expect(page.getByRole('heading', { name: 'Keep original.pdf', exact: true })).toBeVisible();
   await expect(page.locator('.reader-draft-overlay')).toHaveCount(0);

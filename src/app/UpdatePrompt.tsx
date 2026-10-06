@@ -9,7 +9,7 @@ import { t } from '@/lib/i18n';
  * new version has been downloaded. Never reloads on its own, so no one loses
  * work in progress.
  */
-export function UpdatePrompt() {
+export function UpdatePrompt({ announceOffline = true }: { announceOffline?: boolean }) {
   const [needRefresh, setNeedRefresh] = useState(false);
   const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null);
 
@@ -23,14 +23,14 @@ export function UpdatePrompt() {
           setNeedRefresh(true);
         },
         onOfflineReady() {
-          toast(t('LocalKit is ready to work offline.'), 'info', 4000);
+          if (announceOffline) toast(t('LocalKit is ready to work offline.'), 'info', 4000);
         },
       });
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [announceOffline]);
 
   if (!needRefresh) return null;
   return (

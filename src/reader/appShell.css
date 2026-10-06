@@ -1,0 +1,69 @@
+.pdf-app-content { max-width: 860px; margin: 0 auto; padding: 0 14px calc(88px + env(safe-area-inset-bottom)); }
+.pdf-app-header { position: sticky; top: 0; z-index: 20; min-height: 64px; padding-top: env(safe-area-inset-top); display: flex; align-items: center; gap: 2px; background: var(--lk-bg); }
+.pdf-app-brand { min-width: 0; flex: 1; display: flex; align-items: center; gap: 9px; }
+.pdf-app-brand > svg { color: var(--lk-accent-text); flex-shrink: 0; }
+.pdf-app-brand h1 { font-size: 19px; font-weight: 650; letter-spacing: -.035em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 8px 0 20px; }
+.pdf-quick-actions > * { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; min-height: 76px; padding: 10px 3px; border-radius: 12px; background: var(--lk-surface); border: 1px solid var(--lk-border); }
+.pdf-quick-actions svg { color: var(--lk-accent-text); }
+.pdf-quick-actions span { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.4; }
+.pdf-section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.pdf-section-title h2 { font-size: 16px; font-weight: 650; letter-spacing: -.02em; }
+.pdf-section-title a { min-height: 44px; display: inline-flex; align-items: center; font-size: 12px; color: var(--lk-accent-text); }
+.pdf-file-list { display: flex; flex-direction: column; }
+.pdf-file-row { display: flex; align-items: center; gap: 0; min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--lk-border); }
+.pdf-file-row .reader-document-open { gap: 12px; min-height: 84px; }
+.pdf-file-preview { display: flex; justify-content: center; align-items: center; flex: 0 0 60px; width: 60px; height: 80px; overflow: hidden; border-radius: 5px; background: var(--lk-surface); color: var(--lk-text-muted); border: 1px solid var(--lk-border); }
+.pdf-file-preview img { width: 100%; height: 100%; object-fit: contain; background: white; }
+.pdf-file-info { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+.pdf-file-title { font-size: 14px; font-weight: 600; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-file-meta { font-size: 12px; color: var(--lk-text-secondary); }
+.pdf-file-date { font-size: 11px; color: var(--lk-text-muted); }
+.pdf-file-star { flex-shrink: 0; color: var(--lk-accent-text); }
+.pdf-bottom-nav { position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); background: var(--lk-surface); border-top: 1px solid var(--lk-border); box-shadow: 0 -4px 18px #00000005; }
+.pdf-bottom-nav > a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 54px; color: var(--lk-text-secondary); border-radius: 10px; font-size: 11px; font-weight: 550; }
+.pdf-bottom-nav [aria-current] { color: var(--lk-accent-text); background: var(--lk-accent-soft); font-weight: 650; }
+.pdf-library-controls { margin: 8px 0 6px; display: flex; flex-direction: column; gap: 10px; }
+.pdf-library-controls input, .pdf-library-controls select, .pdf-setting-row select { min-width: 0; width: 100%; min-height: 44px; border: 1px solid var(--lk-border); background: var(--lk-surface); padding: 8px 11px; border-radius: 10px; font-size: 16px; }
+.pdf-library-controls > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pdf-library-controls label { min-width: 0; }
+.pdf-list-empty { padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.pdf-list-empty svg { color: var(--lk-text-muted); }
+.pdf-list-empty p { font-size: 14px; font-weight: 600; }
+.pdf-list-empty span { font-size: 12px; color: var(--lk-text-secondary); line-height: 1.6; }
+.pdf-app-content .reader-settings { padding: 12px 0; }
+.pdf-app-content .reader-settings h2 { font-size: 16px; font-weight: 650; margin: 12px 0 4px; }
+.pdf-app-content .reader-settings progress { height: 6px; min-height: 6px; border: 0; border-radius: 6px; overflow: hidden; width: 100%; appearance: none; background: var(--lk-border); }
+.pdf-app-content .reader-settings progress::-webkit-progress-bar { background: var(--lk-border); }
+.pdf-app-content .reader-settings progress::-webkit-progress-value { background: var(--lk-accent); }
+.pdf-app-content .reader-settings progress::-moz-progress-bar { background: var(--lk-accent); }
+.pdf-app-content .reader-settings p { line-height: 1.6; }
+.pdf-app-content .pdf-setting-row > button { min-height: 44px; }
+.pdf-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 50px; font-size: 14px; }
+.pdf-setting-row select { width: 55%; max-width: 220px; }
+.pdf-file-menu { display: flex; flex-direction: column; gap: 8px; }
+.reader-sheet > div > header > button { min-width: 44px; min-height: 44px; }
+.pdf-file-menu > p { color: var(--lk-text-secondary); font-size: 13px; }
+.pdf-file-menu .reader-row { display: flex; gap: 12px; align-items: center; min-height: 48px; }
+.pdf-danger { color: var(--lk-danger); }
+.pdf-toolkit { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+.pdf-kit-content { padding-top: 14px; }
+.pdf-kit-header { min-height: 64px; background: var(--lk-bg); }
+.pdf-kit-root-icon { color: var(--lk-accent-text); margin: 0 5px; }
+.pdf-kit-header h1 { font-size: 18px; }
+.pdf-kit-group { margin: 22px 0; }
+.pdf-kit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pdf-kit-grid > a { min-height: 70px; padding: 12px; gap: 10px; align-items: center; }
+.pdf-kit-grid h3 { font-size: 13px; line-height: 1.45; margin: 0; }
+.reader-show-controls { min-width: 72px; min-height: 44px; }
+@media (min-width: 768px) {
+  .pdf-bottom-nav { padding-left: max(8px, calc((100vw - 600px) / 2)); padding-right: max(8px, calc((100vw - 600px) / 2)); }
+  .pdf-app-content { padding-left: 24px; padding-right: 24px; }
+  .pdf-quick-actions { gap: 12px; }
+  .pdf-kit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-height: 450px) and (orientation: landscape) {
+  .pdf-bottom-nav { padding-top: 3px; padding-bottom: calc(3px + env(safe-area-inset-bottom)); }
+  .pdf-bottom-nav > a { flex-direction: row; min-height: 46px; gap: 8px; }
+  .pdf-app-header, .pdf-kit-header { min-height: 56px; }
+}

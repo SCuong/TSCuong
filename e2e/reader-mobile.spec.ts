@@ -27,8 +27,8 @@ async function waitForSW(page: Page) {
 
 test('polished library and full reader fit the phone, with real selectable text', async ({ page }) => {
   await page.goto('/read');
-  await expect(page.getByRole('heading', { name: 'PDF Reader', exact: true })).toBeVisible();
-  await expect(page.getByText('Your next read starts here')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'LocalKit PDF', exact: true })).toBeVisible();
+  await expect(page.getByText('No PDFs yet')).toBeVisible();
   await page.screenshot({ path: 'test-results/reader-library-mobile.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   await open(page);
@@ -86,7 +86,7 @@ for (const width of [320, 360]) {
     await page.screenshot({ path: `test-results/reader-small-${width}-search.png` });
     await page.getByRole('button', { name: 'Close search' }).click();
     await page.getByRole('button', { name: 'Back to library' }).click();
-    await expect(page.getByRole('heading', { name: 'PDF Reader', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
     expect(await overflow()).toBeLessThanOrEqual(0);
   });
 }
@@ -111,11 +111,11 @@ test('jump, favorites, page bookmarks, thumbnails and contents work and survive 
   await expect(page.getByRole('button', { name: 'Jump to page', exact: true })).toHaveText('1 / 12');
   await jump(page, 5);
   await page.getByRole('button', { name: 'Back to library' }).click();
-  await page.getByRole('button', { name: 'Favorites', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Reading guide.pdf' })).toBeVisible();
-  await expect(page.getByText('Page 5 of 12')).toBeVisible();
+  await page.getByLabel('Filter files').selectOption('favorites');
+  await expect(page.locator('.pdf-file-title').filter({ hasText: 'Reading guide.pdf' })).toBeVisible();
+  await expect(page.getByText('12 pages ·')).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: /^PDF Reading guide\.pdf/ }).click();
+  await page.getByRole('button', { name: 'Open Reading guide.pdf', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Jump to page', exact: true })).toHaveText('5 / 12');
   await expect(page.getByRole('button', { name: 'Remove page bookmark' })).toBeVisible();
 });
@@ -208,17 +208,18 @@ test('evicted file re-pick restores fingerprint position and manual removal dele
   await open(page, file);
   await jump(page, 7);
   await page.getByRole('button', { name: 'Back to library' }).click();
-  await page.getByRole('button', { name: 'Reader settings' }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Clear saved copies except favorites' }).click();
-  await page.getByRole('button', { name: 'Close dialog' }).click();
-  await expect(page.getByText('Pick file to reopen')).toBeVisible();
+  await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open Reading guide.pdf', exact: true })).toContainText('Pick file to reopen');
   await page.getByLabel('Open PDF from device').setInputFiles({ ...file, name: 'Renamed.pdf' });
   await expect(page.getByRole('heading', { name: 'Renamed.pdf', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Jump to page', exact: true })).toHaveText('7 / 12');
   await page.getByRole('button', { name: 'Back to library' }).click();
+  await page.getByRole('button', { name: 'File actions for Renamed.pdf' }).click();
   await page.getByRole('button', { name: 'Remove Renamed.pdf' }).click();
   await page.getByRole('button', { name: 'Remove document', exact: true }).click();
-  await expect(page.getByText('Your next read starts here')).toBeVisible();
+  await expect(page.getByText('No PDFs yet')).toBeVisible();
   expect(
     await page.evaluate(async () => {
       const folder = await (await navigator.storage.getDirectory()).getDirectoryHandle('reader-files');
@@ -298,7 +299,7 @@ test('password-protected PDFs open with a retry and never save passwords', async
 test('Vietnamese library and reader fit the phone and translate controls', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('localkit:locale', 'vi'));
   await page.goto('/read');
-  await expect(page.getByRole('heading', { name: 'Trình đọc PDF' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'LocalKit PDF' })).toBeVisible();
   await page
     .getByLabel('Mở PDF từ thiết bị')
     .setInputFiles({ name: 'bad.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not PDF') });
@@ -326,9 +327,9 @@ test('production PWA precaches PDF engine: first-ever PDF opens offline and pers
   await expect(page.locator('[data-page="1"] canvas')).toBeVisible();
   await jump(page, 8);
   await page.getByRole('button', { name: 'Back to library' }).click();
-  await expect(page.getByRole('heading', { name: 'PDF Reader', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: /^PDF Reading guide\.pdf/ }).click();
+  await page.getByRole('button', { name: 'Open Reading guide.pdf', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Jump to page', exact: true })).toHaveText('8 / 12');
   await expect(page.locator('[data-page="8"] canvas')).toBeVisible();
   await context.setOffline(false);

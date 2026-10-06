@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { engineAssetDirs } from './scripts/engine-assets.mjs';
 
 const engineDirs = engineAssetDirs();
+const toolboxBuild = process.env.VITE_APP_MODE === 'toolbox';
 
 /**
  * Libraries that are large enough that we do not want them in the service
@@ -75,6 +76,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
+      name: 'pdf-deployment-metadata',
+      transformIndexHtml(html) {
+        if (toolboxBuild) return html;
+        return html.replace(/<title>.*?<\/title>/, '<title>LocalKit PDF</title>')
+          .replace('Over 100 developer, PDF, image, data and text tools that run entirely in your browser. Files never leave your device.', 'Read, organize, annotate and export PDFs locally on your device.');
+      },
+    },
+    {
       name: 'localkit-ocr-offline-manifest',
       generateBundle(_options, bundle) {
         const files = new Set<string>();
@@ -96,10 +105,10 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'reader-share.js'],
       manifest: {
-        name: 'LocalKit — Local-first toolbox',
-        short_name: 'LocalKit',
+        name: toolboxBuild ? 'LocalKit — Local-first toolbox' : 'LocalKit PDF',
+        short_name: toolboxBuild ? 'LocalKit' : 'LocalKit PDF',
         description:
-          'Developer, document, image and data tools that run entirely on your device. No uploads, no accounts.',
+          toolboxBuild ? 'Developer, document, image and data tools that run entirely on your device. No uploads, no accounts.' : 'Read, organize, annotate and export PDFs on your device.',
         theme_color: '#0b0e14',
         background_color: '#0b0e14',
         display: 'standalone',
@@ -112,7 +121,7 @@ export default defineConfig({
           enctype: 'multipart/form-data',
           params: { files: [{ name: 'pdf', accept: ['application/pdf', '.pdf'] }] },
         },
-        categories: ['developer', 'productivity', 'utilities'],
+        categories: toolboxBuild ? ['developer', 'productivity', 'utilities'] : ['productivity', 'utilities'],
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },

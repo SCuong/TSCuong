@@ -1,6 +1,19 @@
 # LocalKit PDF application
 
-LocalKit PDF is a local-first browser/PWA application at `/read`. The library, continuous reader, mobile toolkit, annotations, forms and password tools share one workspace. Existing desktop tools remain at their original `/tools/pdf/...` routes. LocalKit still opens its normal toolbox home page.
+This branch deploys **LocalKit PDF**, a standalone local-first browser/PWA application. Opening the domain alone enters the PDF app. `/read` remains supported; unrelated routes redirect into the app. The general toolbox shell and its tools remain shared internally, with an explicit `VITE_APP_MODE=toolbox` build for regression testing or the original product.
+
+## App navigation and files
+
+There is one fixed, safe-area-aware bottom navigation: **Overview, Library, Tools, Settings**. It disappears in the reader; real scrolling hides reader controls, and the page indicator or a tap restores them. Tool workspace back buttons stay within PDF tools.
+
+- **Overview**: compact import/search app bar, Open PDF / Images → PDF / Merge / OCR shortcuts, then recently added files. No hero, promotional copy or technical cache status.
+- **Library**: filename search, recently added/last opened/name/size sorting, favorites and saved/missing-file filters. Tap a file to read; use its overflow sheet to favorite or remove it.
+- **Tools**: compact categorized PDF workspaces, using the existing local PDF engines.
+- **Settings**: language, system/light/dark theme, reading paper, OCR preparation, storage, installation and privacy.
+
+First-page previews are rendered locally through the existing PDF renderer and cached as bounded JPEG blobs in IndexedDB. Only visible/nearby rows request previews, with one render at a time and at most 43,200 pixels/240 pixels per side. Object URLs are revoked when rows unmount. Previews survive reload and work offline; file removal/eviction clears their previews. Favorites retain cached files/previews during cache clearing. Existing version-two libraries migrate without losing document metadata, bookmarks or editing drafts. Encrypted or very large older PDFs receive a preview when actually opened; background preview generation never asks for a password or copies files larger than 64 MiB into memory.
+
+Routes: `/read` (Overview), `/read/library`, `/read/tools`, `/read/tools/<workspace>`, `/read/settings`, `/read/doc?id=<fingerprint>`. Deep links and refresh work with the production SPA/service worker.
 
 ## Run locally
 
@@ -11,23 +24,23 @@ cd C:\Users\scuong\.codex\worktrees\mobile-pdf-reader\TSCuong
 npm run dev -- --port 5175 --strictPort
 ```
 
-Open `http://localhost:5175/read`. To serve the production PWA instead:
+Open `http://localhost:5175/`. To serve the production PWA instead:
 
 ```powershell
 npm run build
 npm run preview -- --host 127.0.0.1 --port 4319
 ```
 
-Open `http://localhost:4319/read`. The development server intentionally has no service worker; offline testing uses the production build. On a fresh independent checkout, run `npm ci` first. The current feature worktree already has dependencies linked from the original checkout; do not reinstall or remove that link while preserving the original environment.
+Open `http://localhost:4319/`. The development server intentionally has no service worker; offline testing uses the production build. On a fresh independent checkout, run `npm ci` first. The current feature worktree already has dependencies linked from the original checkout; do not reinstall or remove that link while preserving the original environment.
 
 ## Install and use on Android
 
-1. In Chrome, open the **HTTPS URL of the Cloudflare Pages deployment**, then `/read`. Use the same hostname consistently: libraries belong to a browser origin.
-2. Wait for **Ready for offline reading**. Open a PDF from Files or Downloads.
+1. In Chrome, open the **HTTPS URL of the Cloudflare Pages deployment**. No path or toolbox selection is needed. Use the same hostname consistently: libraries belong to a browser origin.
+2. Import a PDF from Files or Downloads. **Settings** shows when offline reading is ready.
 3. Open Chrome's menu (⋮), choose **Add to Home screen**, then **Install** when offered.
-4. Launch LocalKit from the home screen and select **PDF Reader**. Where supported, long-press its icon for the reader shortcut.
+4. Launch **LocalKit PDF** from the home screen; Overview shows your recent files immediately.
 5. Share a PDF from Files to LocalKit when Chrome/Android registers the installed app as a share target. **Open PDF** works when the OS does not offer LocalKit.
-6. Before going offline, open **Reader settings → Prepare English OCR for offline use** if you need OCR. Wait for **English OCR is ready offline**. Reading, page tools, annotation, forms and password protection are prepared with the application itself.
+6. Before going offline, open **Settings → Prepare English OCR for offline use** if you need OCR. Wait for **English OCR is ready offline**. Reading, page tools, annotation, forms and password protection are prepared with the application itself.
 7. Read and edit offline. Download or share exported files to keep durable copies outside browser storage.
 8. For updates, open the same site online and accept LocalKit's update prompt after exporting pending work. Refresh the offline OCR pack when a new engine/build requires it.
 
@@ -46,7 +59,7 @@ Plain LAN HTTP (such as `http://192.168.x.x`) does not provide the secure contex
 
 ## Phase 2 — Mobile toolkit
 
-Use **PDF Toolkit** from the library or **View → Edit and export this PDF** while reading. The current source carries into other PDF tools; **Read source PDF** returns to it. **Read exported PDF** opens the new result as a separate document.
+Use **Tools** in bottom navigation or **View → Edit and export this PDF** while reading. The current source carries into other PDF tools; **Read source PDF** returns to it. **Read exported PDF** opens the new result as a separate document.
 
 - Merge multiple PDFs; choose/order inputs and page ranges.
 - Split into files, extract/delete selected pages, rotate, duplicate and organize pages.
@@ -108,7 +121,9 @@ Remove-Item Env:E2E_PORT
 
 `check` runs strict typecheck, zero-warning lint, contrast/invisible-source checks, all unit/component tests and a production build. Playwright serves a production build and covers desktop tools, mobile reading/editing, real output PDFs, touch drag/drawing/pinch through Chrome DevTools Protocol, accessibility, service workers, incoming Share Target and offline operation. No physical phone is required. Omit `E2E_BROWSER_CHANNEL` to use Playwright's bundled Chromium instead.
 
-For manual inspection in installed Chrome, open the production preview, press **F12**, then **Ctrl+Shift+M**. Review 320/360/412-pixel phones, landscape, tablet and desktop in English/Vietnamese. Check actual page rendering, selection, touch ordering, notes, form inputs and export controls; inspect viewport screenshots, not only assertions. Wait for offline readiness, choose **Offline** in DevTools Network, reload, reopen saved PDFs and try new local files. Prepare OCR before testing recognition offline.
+The production suite serves both the default PDF application and an explicit toolbox build on adjacent ports. Its four projects cover standalone PDF mobile/desktop and original toolbox mobile/desktop behavior.
+
+For manual inspection in installed Chrome, open the production preview, press **F12**, then **Ctrl+Shift+M**. Review 320/360/390/412-pixel phones, landscape, tablet and desktop in English/Vietnamese. Check actual page rendering, selection, touch ordering, notes, form inputs and export controls; inspect viewport screenshots, not only assertions. Wait for offline readiness, choose **Offline** in DevTools Network, reload, reopen saved PDFs and try new local files. Prepare OCR before testing recognition offline.
 
 ## Packaging recommendation
 

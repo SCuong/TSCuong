@@ -1,18 +1,20 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { Layout } from './Layout';
 import { RouteError } from './pages/RouteError';
 
-const routes: Parameters<typeof createBrowserRouter>[0] = [
+const readerRoutes: Parameters<typeof createBrowserRouter>[0] = [
   {
     path: '/read/*',
     lazy: async () => ({ Component: (await import('@/reader/ReaderApp')).ReaderApp }),
     errorElement: <RouteError />,
     hydrateFallbackElement: <div className="min-h-dvh" />,
   },
-  {
+];
+// This feature deployment is PDF-only. The shared toolbox remains available to its
+// original builds and regression suite through an explicit build-time selection.
+const routes: Parameters<typeof createBrowserRouter>[0] = import.meta.env.VITE_APP_MODE === 'toolbox' ? [...readerRoutes, {
     path: '/',
-    element: <Layout />,
+    lazy: async () => ({ Component: (await import('./Layout')).Layout }),
     errorElement: <RouteError />,
     hydrateFallbackElement: <div className="min-h-dvh" />,
     children: [
@@ -28,8 +30,7 @@ const routes: Parameters<typeof createBrowserRouter>[0] = [
       { path: 'privacy', lazy: async () => ({ Component: (await import('./pages/PrivacyPage')).PrivacyPage }) },
       { path: '*', lazy: async () => ({ Component: (await import('./pages/NotFoundPage')).NotFoundPage }) },
     ],
-  },
-];
+  }] : [...readerRoutes, { path: '*', element: <Navigate to="/read" replace /> }];
 
 let router: ReturnType<typeof createBrowserRouter> | null = null;
 

@@ -63,6 +63,7 @@ export function MobileReader({
     return mode === 'sepia' || mode === 'night' ? mode : 'paper';
   });
   const [controls, setControls] = useState(true);
+  const scrollGesture = useRef(0);
   const [leaving, setLeaving] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [pageTab, setPageTab] = useState<'thumbnails' | 'contents' | 'bookmarks'>('thumbnails');
@@ -109,11 +110,13 @@ export function MobileReader({
     zoom: number;
     anchor: NonNullable<typeof zoomAnchor.current>;
   } | null>(null);
-  const tap = useRef<{ time: number; x: number; y: number; start: number; timer?: ReturnType<typeof setTimeout> }>({
+  const tap = useRef<{ time: number; x: number; y: number; start: number; startX: number; startY: number; timer?: ReturnType<typeof setTimeout> }>({
     time: 0,
     x: 0,
     y: 0,
     start: 0,
+    startX: 0,
+    startY: 0,
   });
 
   useEffect(() => () => releaseThumbnails(doc), [doc, sheet, galleryStart]);
@@ -497,7 +500,11 @@ export function MobileReader({
         className="reader-scroller"
         tabIndex={0}
         aria-label={t('PDF pages')}
+        onTouchMove={(e) => { if (e.touches.length === 1) scrollGesture.current = performance.now(); }}
+        onWheel={() => { scrollGesture.current = performance.now(); }}
         onScroll={() => {
+          if (performance.now() - scrollGesture.current < 500 && scrollGesture.current > 0 && !sheet && !searchOpen) setControls(false);
+          scrollGesture.current = 0;
           cancelAnimationFrame(frame.current);
           frame.current = requestAnimationFrame(() => setView((v) => ({ ...v, top: scroller.current!.scrollTop })));
         }}
@@ -516,13 +523,14 @@ export function MobileReader({
           }
         }}
         onPointerDown={(e) => {
-          if (e.isPrimary) tap.current.start = performance.now();
+          if (e.isPrimary) { tap.current.start = performance.now(); tap.current.startX = e.clientX; tap.current.startY = e.clientY; }
         }}
         onPointerUp={(e) => {
           if (
             !e.isPrimary ||
             gesture.current ||
             performance.now() - tap.current.start > 350 ||
+            Math.hypot(e.clientX - tap.current.startX, e.clientY - tap.current.startY) > 12 ||
             window.getSelection()?.toString()
           )
             return;

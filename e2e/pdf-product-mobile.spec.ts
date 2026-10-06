@@ -7,7 +7,7 @@ import AxeBuilder from '@axe-core/playwright';
 test('toolkit fits small phone, landscape, tablet and desktop with accessible navigation', async ({ page }) => {
   for (const viewport of [{ width: 320, height: 740 }, { width: 740, height: 360 }, { width: 768, height: 1024 }, { width: 1360, height: 900 }]) {
     await page.setViewportSize(viewport); await page.goto('/read/tools');
-    await expect(page.getByRole('heading', { name: 'PDF Toolkit', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tools', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: /Annotate & sign/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
     await page.screenshot({ path: `test-results/pdf-product-${viewport.width}.png` });
@@ -19,16 +19,17 @@ test('toolkit fits small phone, landscape, tablet and desktop with accessible na
 test('Vietnamese switching updates loaded page controls, metadata and validation messages', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 }); await page.goto('/read/tools/pdf-rotate');
   await page.locator('.pdf-toolkit input[type=file]').first().setInputFiles(await makePdf('Nguyen.pdf', 3));
-  await page.getByRole('button', { name: 'Tiếng Việt', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click(); await page.getByRole('button', { name: 'Tiếng Việt', exact: true }).click(); await page.getByRole('link', { name: 'Công cụ', exact: true }).click();
+  await page.getByRole('link', { name: /Xoay PDF/ }).click();
   await expect(page.getByRole('img', { name: /Trang 1/ }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Tất cả công cụ PDF' }).click();
   await page.getByRole('link', { name: /Sửa siêu dữ liệu PDF/ }).click();
   await expect(page.getByLabel('Tiêu đề', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/pdf-product-vietnamese-320.png' });
-  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await page.getByRole('link', { name: 'Cài đặt', exact: true }).click(); await page.getByRole('button', { name: 'English', exact: true }).click(); await page.getByRole('link', { name: 'Tools', exact: true }).click(); await page.getByRole('link', { name: /PDF Metadata/ }).click();
   await expect(page.getByLabel('Title', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'All PDF tools' }).click(); await page.getByRole('link', { name: /PDF to images/i }).click();
-  await page.getByRole('button', { name: 'Tiếng Việt', exact: true }).click(); await page.getByRole('radio', { name: 'Khoảng trang', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click(); await page.getByRole('button', { name: 'Tiếng Việt', exact: true }).click(); await page.getByRole('link', { name: 'Công cụ', exact: true }).click(); await page.getByRole('link', { name: /PDF sang ảnh/ }).click(); await page.getByRole('radio', { name: 'Khoảng trang', exact: true }).click();
   await page.getByRole('textbox', { name: 'Khoảng trang', exact: true }).fill('100');
   await expect(page.getByText('Trang 100 không tồn tại: tài liệu có 3 trang.', { exact: true })).toBeVisible();
 });

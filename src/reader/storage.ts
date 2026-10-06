@@ -9,6 +9,8 @@ export interface ReaderDocument {
   size: number;
   pages: number;
   lastOpened: number;
+  /** Older libraries fall back to lastOpened until their next import. */
+  addedAt?: number;
   page: number;
   offset: number;
   favorite: boolean;
@@ -18,6 +20,7 @@ export interface ReaderDocument {
 interface ReaderDB extends DBSchema {
   documents: { key: string; value: ReaderDocument };
   edits: { key: string; value: PdfDraft };
+  thumbnails: { key: string; value: { id: string; blob: Blob } };
 }
 export interface ReaderStorageAdapter {
   list(): Promise<ReaderDocument[]>;
@@ -60,6 +63,7 @@ export function createReaderRepository(adapter: ReaderStorageAdapter, lock: <T>(
                 favorite: old.favorite,
                 bookmarks: old.bookmarks,
                 cached: old.cached,
+                addedAt: old.addedAt ?? old.lastOpened,
               }
             : {}),
         };
@@ -123,10 +127,11 @@ export function createReaderRepository(adapter: ReaderStorageAdapter, lock: <T>(
 
 let database: ReturnType<typeof openDB<ReaderDB>> | undefined;
 function db() {
-  database ??= openDB<ReaderDB>('localkit-reader', 2, {
+  database ??= openDB<ReaderDB>('localkit-reader', 3, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('documents')) db.createObjectStore('documents', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('edits')) db.createObjectStore('edits', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('thumbnails')) db.createObjectStore('thumbnails', { keyPath: 'id' });
     },
   });
   return database;
@@ -149,9 +154,10 @@ const adapter: ReaderStorageAdapter = {
     await (await db()).put('documents', r);
   },
   remove: async (id) => {
-    const tx = (await db()).transaction(['documents', 'edits'], 'readwrite');
+    const tx = (await db()).transaction(['documents', 'edits', 'thumbnails'], 'readwrite');
     await tx.objectStore('documents').delete(id);
     await tx.objectStore('edits').delete(id);
+    await tx.objectStore('thumbnails').delete(id);
     await tx.done;
   },
   writeFile: async (id, file) => {
@@ -167,7 +173,7 @@ const adapter: ReaderStorageAdapter = {
     }
   },
   readFile: async (id) => (await (await directory()).getFileHandle(id + '.pdf')).getFile(),
-  deleteFile: deleteIfPresent,
+  deleteFile: async (id) => { await deleteIfPresent(id); await (await db()).delete('thumbnails', id); },
 };
 // Serialize in this tab and, where supported, between every LocalKit tab.
 let queue: Promise<unknown> = Promise.resolve();
@@ -178,6 +184,16 @@ function lock<T>(job: () => Promise<T>): Promise<T> {
   return result;
 }
 export const readerRepository = createReaderRepository(adapter, lock);
+export const readerThumbnails = {
+  get: async (id: string) => (await (await db()).get('thumbnails', id))?.blob,
+  put: (id: string, blob: Blob) => lock(async () => {
+    if (blob.size > 200_000) return;
+    const tx = (await db()).transaction(['documents', 'thumbnails'], 'readwrite');
+    // A deleted/evicted file cannot gain an orphan thumbnail from an in-flight render.
+    if ((await tx.objectStore('documents').get(id))?.cached) await tx.objectStore('thumbnails').put({ id, blob });
+    await tx.done;
+  }),
+};
 export const pdfDrafts = {
   get: async (id: string) => (await db()).get('edits', id),
   count: async () => (await db()).count('edits'),

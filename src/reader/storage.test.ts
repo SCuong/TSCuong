@@ -68,6 +68,11 @@ describe('reader cache policy', () => {
   });
 });
 describe('reader repository', () => {
+  it('preserves addition time when reopening or renaming a document', async () => {
+    const { repository } = memory([record('a', { addedAt: 3, lastOpened: 10 })]);
+    const result = await repository.remember(record('a', { name: 'renamed.pdf', addedAt: 99, lastOpened: 99 }), new File(['PDF'], 'renamed.pdf'));
+    expect(result.record).toMatchObject({ name: 'renamed.pdf', addedAt: 3, lastOpened: 99 });
+  });
   it('keeps evicted metadata and restores a re-picked fingerprint', async () => {
     const records = Array.from({ length: 20 }, (_, n) =>
       record(String(n), { lastOpened: n + 1, page: 5, offset: 0.45, bookmarks: [2, 5] }),
