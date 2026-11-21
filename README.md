@@ -1,111 +1,83 @@
 # LocalKit PDF
 
-This feature branch defaults to a standalone mobile PDF application. Open `/` or `/read` for Overview, then use Library, Tools and Settings through one bottom navigation. Read, organize, annotate, fill forms, protect and export PDFs locally, with cached first-page previews. Files never leave your device; there is no account or backend.
+A browser-based PDF reader and editor that runs entirely on the device. It is a React + TypeScript single-page app that installs as a PWA and works offline. Files are processed in the browser; there is no backend, account or analytics.
 
-See [the PDF application guide](docs/MOBILE-PDF-READER.md) for installation, offline preparation and file management. Unrelated routes redirect into the PDF app. The original LocalKit toolbox remains shared internally and can be built explicitly with `VITE_APP_MODE=toolbox`; production deployment requires no mode override.
+The same codebase also contains **LocalKit**, a larger toolbox of 186 browser tools (PDF, image, text, JSON, data conversion, encoding, security, web, date/time, Git, network, math, QR and a few workspaces such as Markdown notes, a SQLite viewer and an API client). The default build ships only the PDF app; the toolbox is built with `VITE_APP_MODE=toolbox`.
 
-## Highlights
+## What the PDF app does
 
-- **File library** with persistent first-page previews, filename search, favorites, availability filters and sorting.
-- **One app navigation**: Overview, Library, Tools and Settings; immersive reading hides the navigation and scroll chrome.
-- **Dark, light and system themes** with no flash on startup.
-- **PDF reading and editing**: continuous reading, touch zoom, search, bookmarks and saved positions;
-  a mobile toolkit for arranging, converting, cropping, compressing and exporting; persistent annotations,
-  visual signatures, form filling and AES-256 password tools. English/Vietnamese UI and local device storage.
-- **Installable PWA** with offline support. PDF reading, editing and password engines are precached for first use.
-  English OCR has an explicit offline preparation workflow.
+- **Library**: imported PDFs are kept in browser storage (OPFS + IndexedDB) with cached first-page previews, filename search, sorting and favorites. The cache holds up to 20 files / 500 MiB and evicts the least recently opened non-favorites.
+- **Reading**: continuous scrolling with only nearby pages rendered, text selection and search, pinch/double-tap zoom, thumbnails, outline, bookmarks, saved position, and sepia/night paper modes.
+- **Page tools**: merge, split, extract, delete, rotate, reorder, crop, images to PDF, PDF to images, watermarks, page numbers, metadata editing, text and image extraction, and compression (lossless, or rasterizing with an explicit warning).
+- **Annotations**: highlight/underline/strikethrough on selected text, freehand drawing, visual signatures and text notes. Drafts are saved per file (keyed by SHA-256) and can be exported into a new PDF.
+- **Forms**: fill AcroForm text fields, checkboxes, radio groups and choice lists. XFA and scripted forms are not supported.
+- **Passwords**: add, change or remove AES-256 encryption using [QPDF](https://github.com/qpdf/qpdf) compiled to WebAssembly, running in a worker.
+- **OCR**: English OCR with Tesseract.js on images and scanned pages, producing text or a searchable PDF. Other OCR languages are not bundled.
+- English and Vietnamese UI; light, dark and system themes.
 
-The shared toolbox source still contains its original developer, image, data, text and workspace tools.
-They are available in the explicit toolbox build and covered by the regression suite, without appearing in the PDF deployment.
+Every export creates a new file; originals are not overwritten. Cropping hides content but is not redaction. Editing a signed PDF can invalidate its digital signature.
 
-## Development
+See [docs/MOBILE-PDF-READER.md](docs/MOBILE-PDF-READER.md) for routes, installation on Android, storage behaviour and limits.
 
-Requires Node 20+.
+## Tech stack
+
+React 19, React Router, TypeScript (strict), Vite, Tailwind CSS 4, pdf.js, pdf-lib, QPDF (WASM), Tesseract.js, Workbox (PWA), Vitest and Playwright. Heavy work (PDF operations, OCR, SQLite, image batches) runs in Web Workers.
+
+## Getting started
+
+Requires Node 20 or newer.
 
 ```sh
-npm install
+npm ci
 npm run dev          # http://localhost:5173
-npm run build        # production build (dist/)
-npm run preview      # serve the production build on :4317
-npm run check        # typecheck + lint + unit tests + build
+npm run build        # production build in dist/
+npm run preview      # serve dist/ on http://localhost:4317
 ```
 
-### Testing
+Build the toolbox instead of the PDF app:
 
 ```sh
-npm run typecheck    # strict TypeScript
-npm run lint         # ESLint (zero warnings)
-npm test             # Vitest unit/component tests
-npm run test:e2e     # Playwright E2E (builds and serves the production bundle)
-E2E_DEV=1 npx playwright test   # E2E against a running dev server
+VITE_APP_MODE=toolbox npm run build    # PowerShell: $env:VITE_APP_MODE='toolbox'; npm run build
 ```
 
-On first use, install Playwright's browser with `npx playwright install chromium`.
+The service worker is only active in the production build, so test offline behaviour with `npm run preview`.
 
-See [the mobile reader guide](docs/MOBILE-PDF-READER.md) for Chrome DevTools device-emulation review and the
-installed-Chrome e2e command, complete PDF workflows and HTTPS PWA installation. Validation requires no physical phone or ADB.
+## Tests
 
-The [standalone acceptance record](docs/PDF-STANDALONE-VALIDATION.md) documents app routing, preview persistence, mobile UI review and production regression coverage.
+```sh
+npm run check        # typecheck + lint + contrast/invisible-character checks + unit tests + build
+npm test             # Vitest unit and component tests only
+npx playwright install chromium
+npm run test:e2e     # Playwright against production builds of both app modes
+```
 
-## Architecture
+See [docs/TESTING.md](docs/TESTING.md) for details.
+
+## Project layout
 
 ```
 src/
-  app/            shell: router, layout, sidebar, command palette, pages (home, all tools, category, tool, settings…)
-  components/     shared UI primitives (ui/), CodeMirror editor (editor/), tool layout helpers (tool/)
-  lib/            search, theme, persistence (localStorage stores + IndexedDB), backup, hooks, utils
-  reader/         PDF library/reader/toolkit, annotations, forms, offline OCR, OPFS and editing drafts
-  tools/
-    types.ts      ToolDefinition — the registry contract
-    categories.ts category metadata
-    registry/     one metadata file per category; index.ts aggregates, searches and resolves routes
-    <category>/   tool implementations (default-exported React components) + lib/ pure logic with tests
-companion/        optional local proxy for the API client (see companion/README.md)
-e2e/              Playwright specs
-docs/             authoring guide
+  app/         router, layout and pages
+  reader/      PDF app: library, reader, toolkit, annotations, forms, OCR, storage
+  tools/       toolbox tools; registry/ holds metadata, <category>/ holds implementations and tests
+  components/  shared UI primitives and the CodeMirror editor
+  lib/         search, theme, persistence, backup and utilities
+companion/     optional local proxy for the toolbox API client
+e2e/           Playwright specs
+scripts/       build helpers and repository checks
+public/qpdf/   vendored QPDF WebAssembly build with its licenses and provenance
 ```
 
-- **Tool registry.** Every tool is a `ToolDefinition` (id, name, description, category, icon, route, keywords, aliases,
-  `load: () => import(...)`, network use, browser requirements, layout). The home page, category pages, sidebar,
-  command palette, search and privacy page are all generated from the registry. Only metadata is in the main
-  bundle; tool code loads on demand, and each tool is its own chunk. See [docs/TOOL_AUTHORING.md](docs/TOOL_AUTHORING.md) for
-  how to add a tool.
-- **Routing.** `/tools/<route>` (e.g. `/tools/json-formatter`, `/tools/pdf/merge`, `/tools/image/compress`,
-  `/tools/sqlite`, `/tools/mermaid`). Routes are stable, because favorites and history reference tool ids.
-- **Search** (`src/lib/search.ts`) is a deterministic scored scan with AND semantics, prefix/substring/typo matching,
-  a synonym table and phrase/order bonuses. It is unit-tested against realistic queries.
-- **Persistence.** Small state (theme, favorites, pins, recents, settings) lives in versioned localStorage stores with
-  validation and migrations. Documents (notes, snippets, diagrams, API collections, file indexes) live in IndexedDB, and schema
-  changes are expressed as ordered migrations. There is an in-memory fallback with a visible warning when IndexedDB is unavailable.
-- **Heavy work** runs in Web Workers (PDF operations, SQLite, image batches, file indexing, OCR) with progress and
-  cancellation.
+More documentation: [architecture](docs/ARCHITECTURE.md), [privacy](docs/PRIVACY.md), [browser support](docs/BROWSER_SUPPORT.md), [adding a tool](docs/TOOL_AUTHORING.md), [companion proxy](companion/README.md).
 
-## Privacy model
+## Privacy
 
-- Processing happens in the browser. Opened files are never uploaded.
-- There are no analytics, trackers, accounts or remote logging.
-- Tools that can touch the network are marked in the UI and listed on the in-app Privacy page. The API client
-  sends requests only when you click Send, only to the URL you entered, either directly or through the optional
-  local companion that you start yourself.
-- The API client never stores authorization headers or auth settings in history. Saving a request with credentials
-  shows a warning first.
-- The service worker precaches the app shell and caches lazily loaded engine chunks. It never caches API-client traffic.
+Files, passwords, form values and OCR results stay in the browser. The only network requests are for the app's own static files. In the toolbox build, tools that can use the network (for example the API client) are marked in the UI and send requests only when you trigger them.
 
-## Browser support and limitations
+## Third-party code and assets
 
-Current Chromium browsers are the primary target, and Firefox and Safari are supported with graceful fallbacks:
-
-| Feature | Notes |
-| --- | --- |
-| Local File Search, repository inspector | Folder access uses the File System Access API (Chromium). Other browsers use a folder `<input>`, which works but cannot re-scan without re-selecting. |
-| AVIF encoding | Uses the browser encoder when available and falls back to a WebAssembly encoder otherwise. |
-| Camera QR scanning | Requires camera permission and a secure context (HTTPS or localhost). |
-| API client | Browsers enforce CORS and forbid some headers. The UI explains CORS failures honestly, and the optional local companion removes this restriction. |
-| OCR | English language data is bundled and served locally. |
-| Eye dropper | The EyeDropper API is Chromium-only. The color tools fall back to a color input. |
-
-## Optional local companion
-
-`npm run companion` starts a small dependency-free Node proxy on `127.0.0.1` that the API client can use to bypass
-browser CORS restrictions. It is token-protected and loopback-only. The rest of the app never needs it. See
-`companion/README.md`.
+- QPDF 12.4.2 (Apache-2.0) built by [le0pard/qpdf-wasm](https://github.com/le0pard/qpdf-wasm) (MIT), with zlib and libjpeg-turbo; see `public/qpdf/12.4.2/`.
+- pdf.js, Tesseract.js and their language data are copied from `node_modules` at build time together with their license files.
+- The pdf.js text-layer CSS in `src/tools/pdf/components/viewer.css` is adapted from pdfjs-dist (Apache-2.0).
+- The password generator's short word list is the EFF short wordlist (CC BY 3.0).
+- Geist fonts via Fontsource (SIL OFL 1.1).

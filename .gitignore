@@ -14,3 +14,8 @@ test-results/
 public/ocr/
 public/pdfjs/
 dist-toolbox/
+
+# Local AI-assistant and session files
+.claude/
+.agent-state.json
+PROGRESS.md

@@ -1,6 +1,6 @@
 # LocalKit PDF application
 
-This branch deploys **LocalKit PDF**, a standalone local-first browser/PWA application. Opening the domain alone enters the PDF app. `/read` remains supported; unrelated routes redirect into the app. The general toolbox shell and its tools remain shared internally, with an explicit `VITE_APP_MODE=toolbox` build for regression testing or the original product.
+The default build is **LocalKit PDF**, a standalone local-first browser/PWA application. Opening the domain alone enters the PDF app. `/read` remains supported; unrelated routes redirect into the app. The general toolbox shell and its tools remain shared internally, with an explicit `VITE_APP_MODE=toolbox` build for regression testing or the original product.
 
 ## App navigation and files
 
@@ -17,25 +17,25 @@ Routes: `/read` (Overview), `/read/library`, `/read/tools`, `/read/tools/<worksp
 
 ## Run locally
 
-Requires Node 20 or newer. Use the isolated checkout, keeping the original checkout unchanged:
+Requires Node 20 or newer.
 
-```powershell
-cd C:\Users\scuong\.codex\worktrees\mobile-pdf-reader\TSCuong
-npm run dev -- --port 5175 --strictPort
+```sh
+npm ci
+npm run dev
 ```
 
-Open `http://localhost:5175/`. To serve the production PWA instead:
+Open `http://localhost:5173/`. To serve the production PWA instead:
 
-```powershell
+```sh
 npm run build
-npm run preview -- --host 127.0.0.1 --port 4319
+npm run preview
 ```
 
-Open `http://localhost:4319/`. The development server intentionally has no service worker; offline testing uses the production build. On a fresh independent checkout, run `npm ci` first. The current feature worktree already has dependencies linked from the original checkout; do not reinstall or remove that link while preserving the original environment.
+Open `http://localhost:4317/`. The development server intentionally has no service worker; offline testing uses the production build.
 
 ## Install and use on Android
 
-1. In Chrome, open the **HTTPS URL of the Cloudflare Pages deployment**. No path or toolbox selection is needed. Use the same hostname consistently: libraries belong to a browser origin.
+1. In Chrome, open the **HTTPS URL where the app is deployed**. No path or toolbox selection is needed. Use the same hostname consistently: libraries belong to a browser origin.
 2. Import a PDF from Files or Downloads. **Settings** shows when offline reading is ready.
 3. Open Chrome's menu (⋮), choose **Add to Home screen**, then **Install** when offered.
 4. Launch **LocalKit PDF** from the home screen; Overview shows your recent files immediately.
@@ -44,7 +44,7 @@ Open `http://localhost:4319/`. The development server intentionally has no servi
 7. Read and edit offline. Download or share exported files to keep durable copies outside browser storage.
 8. For updates, open the same site online and accept LocalKit's update prompt after exporting pending work. Refresh the offline OCR pack when a new engine/build requires it.
 
-Cloudflare serves only the compiled application files. PDF bytes, passwords, images, form values and OCR results are processed on the device; there is no document backend. Pushes to `codex/mobile-pdf-reader` are intended to trigger the connected Pages deployment. Pages build command: `npm run build`; output directory: `dist`; Node 20+.
+The app is a set of static files (build command `npm run build`, output directory `dist`, Node 20+). PDF bytes, passwords, images, form values and OCR results are processed on the device; there is no document backend.
 
 Plain LAN HTTP (such as `http://192.168.x.x`) does not provide the secure context needed for installation, OPFS and full offline support. Use HTTPS for phone installation; localhost works for computer testing. Physical Android hardware or ADB is not an acceptance prerequisite.
 
