@@ -2,6 +2,10 @@
 
 A browser-based PDF reader and editor that runs entirely on the device. It is a React + TypeScript single-page app that installs as a PWA and works offline. Files are processed in the browser; there is no backend, account or analytics.
 
+<p align="center">
+  <img src="docs/screenshots/pdf-reader-and-tools.webp" width="540" alt="LocalKit PDF on mobile, showing the document reader and PDF tools.">
+</p>
+
 The same codebase also contains **LocalKit**, a larger toolbox of 186 browser tools (PDF, image, text, JSON, data conversion, encoding, security, web, date/time, Git, network, math, QR and a few workspaces such as Markdown notes, a SQLite viewer and an API client). The default build ships only the PDF app; the toolbox is built with `VITE_APP_MODE=toolbox`.
 
 ## What the PDF app does
@@ -25,7 +29,7 @@ React 19, React Router, TypeScript (strict), Vite, Tailwind CSS 4, pdf.js, pdf-l
 
 ## Getting started
 
-Requires Node 20 or newer.
+Use Node.js 24.
 
 ```sh
 npm ci
