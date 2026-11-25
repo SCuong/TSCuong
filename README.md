@@ -29,7 +29,7 @@ React 19, React Router, TypeScript (strict), Vite, Tailwind CSS 4, pdf.js, pdf-l
 
 ## Getting started
 
-Requires Node 20 or newer.
+Use Node.js 24.
 
 ```sh
 npm ci
